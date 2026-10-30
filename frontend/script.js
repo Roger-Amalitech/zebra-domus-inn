@@ -4,7 +4,7 @@
    price summary and booking submission
 ========================================= */
 
-const GREEN_HAVEN_API = "http://localhost:5000/api";
+const GREEN_HAVEN_API = "https://zebra-domus-inn-1.onrender.com/api";
 
 let zebradomusRooms = [];
 
