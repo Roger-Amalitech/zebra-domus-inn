@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Zebra dormus Inn in Huye, Rwanda: comfortable rooms, outdoor pools, spa and restaurant. Book directly with the inn.">
+    <meta name="theme-color" content="#FFFFFF">
+
+    <title>Zebra dormus Inn | Huye, Rwanda</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="192x192" href="images/logo/icon-192.png">
+    <link rel="apple-touch-icon" href="images/logo/apple-touch-icon.png">
+    <link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="192x192" href="images/logo/icon-192.png">
+<link rel="apple-touch-icon" href="images/logo/apple-touch-icon.png">
+</head>
+
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<header class="header">
+   <a href="#home" class="logo" aria-label="Zebra Domus Inn home">
+    <span class="logo-badge">
+        <img src="images/logo/zebra-domus-logo-white.png" alt="Zebra Domus Inn" width="90" height="38">
+    </span>
+</a>
+
+    <div class="header-actions">
+        <div class="language-selector">
+            <label for="languageSelect" class="visually-hidden">Language</label>
+            <select id="languageSelect">
+                <option value="en">EN</option>
+                <option value="rw">RW</option>
+                <option value="fr">FR</option>
+            </select>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+
+        <button id="menuButton" class="menu-button" type="button" aria-label="Open menu" aria-controls="navigation" aria-expanded="false">
+            <svg class="icon-open" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+            <svg class="icon-close" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+        </button>
+    </div>
+
+    <nav id="navigation" class="navigation" aria-label="Main navigation">
+        <a href="#home" data-i18n="home">Home</a>
+        <a href="#rooms" data-i18n="ourRooms">Our Rooms</a>
+        <a href="#booking" data-i18n="bookYourStay">Book Your Stay</a>
+        <a href="#about" data-i18n="about">About</a>
+        <a href="#contact" data-i18n="contact">Contact</a>
+    </nav>
+</header>
+
+<main>
+
+    <!-- HERO -->
+    <section class="hero" id="home">
+        <div class="hero-image">
+            <img
+                src="images/entrance.jpg"
+                alt="Zebra dormus Inn with palm trees at the entrance"
+                fetchpriority="high"
+            >
+            <span class="hero-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7" cy="7" r="1.5"/></svg>
+                Book direct — no booking-site fees
+            </span>
+        </div>
+
+        <div class="hero-text">
+            <h1 data-i18n="heroTitle">A peaceful stay.<br>A beautiful experience.</h1>
+            <p class="lead" data-i18n="heroDescription">
+                Relax, recharge, and feel at home in Huye. Comfortable rooms,
+                outdoor swimming pools, a spa and a restaurant, with warm
+                hospitality for every journey.
+            </p>
+        </div>
+    </section>
+
+    <!-- DATES AND GUESTS (these fields belong to the booking form below) -->
+    <section class="search" id="dates" aria-label="Choose your dates">
+        <div class="search-card">
+            <div class="date-grid">
+                <div class="search-field">
+                    <label for="checkIn" data-i18n="checkIn">Check-in</label>
+                    <span class="control">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        <input type="date" id="checkIn" name="checkIn" form="bookingForm" required>
+                    </span>
+                </div>
+
+                <div class="search-field">
+                    <label for="checkOut" data-i18n="checkOut">Check-out</label>
+                    <span class="control">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        <input type="date" id="checkOut" name="checkOut" form="bookingForm" required>
+                    </span>
+                </div>
+            </div>
+
+            <div class="search-field">
+                <label for="guests" data-i18n="guests">Guests</label>
+                <span class="control">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>
+                    <select id="guests" name="guests" form="bookingForm" required>
+                        <option value="1" data-i18n="oneGuest">1 guest</option>
+                        <option value="2" selected data-i18n="twoGuests">2 guests</option>
+                        <option value="3" data-i18n="threeGuests">3 guests</option>
+                        <option value="4" data-i18n="fourGuests">4 guests</option>
+                        <option value="5" data-i18n="fiveGuests">5 guests</option>
+                        <option value="6" data-i18n="sixGuests">6 guests</option>
+                    </select>
+                    <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                </span>
+            </div>
+
+            <a href="#rooms" class="btn btn-primary btn-block" data-i18n="checkAvailability">Check availability</a>
+        </div>
+    </section>
+
+    <!-- WHY BOOK DIRECT -->
+    <section class="perks" aria-label="Why book with us">
+        <ul class="perks-box">
+            <li class="perk">
+                <span class="perk-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7" cy="7" r="1.5"/></svg>
+                </span>
+                <span><strong>Best price when you book here</strong><span>No booking-site commission added.</span></span>
+            </li>
+            <li class="perk">
+                <span class="perk-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+                </span>
+                <span><strong>Pay your way</strong><span>MTN MoMo, Airtel Money, card or at the inn.</span></span>
+            </li>
+            <li class="perk">
+                <span class="perk-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                </span>
+                <span><strong>Reserve now, pay on arrival</strong><span>Choose “Pay at the inn” when you book.</span></span>
+            </li>
+        </ul>
+    </section>
+
+    <!-- ROOMS: script.js fills #roomGrid from the backend -->
+    <section class="section rooms" id="rooms">
+        <h2 data-i18n="findRoom">Our rooms</h2>
+        <p class="section-sub" id="roomsFrom" data-i18n="roomIntro">A welcoming place to rest, relax, and feel at home.</p>
+
+        <div class="room-grid" id="roomGrid"></div>
+    </section>
+
+    <!-- BOOKING FORM -->
+    <section class="booking" id="booking">
+        <h2 data-i18n="bookingHeading">Book your stay</h2>
+        <p class="section-sub" data-i18n="bookingIntro">Pick a room, add your details and choose how to pay.</p>
+
+        <form id="bookingForm" class="booking-form" method="post" action="#booking">
+
+            <!-- Your stay -->
+            <div class="form-block">
+                <h3>Your stay</h3>
+                <div class="card">
+                    <div class="stay-summary">
+                        <span class="stay-icon" aria-hidden="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </span>
+                        <span class="stay-text">
+                            <strong id="stayDates">Choose your dates</strong>
+                            <span id="stayGuests">2 guests</span>
+                        </span>
+                        <a href="#dates" class="link-action">Change</a>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="roomType">Room</label>
+                        <span class="select-wrap">
+                            <select id="roomType" name="roomId" required>
+                                <option value="">Loading rooms…</option>
+                            </select>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Your details -->
+            <div class="form-block">
+                <h3>Your details</h3>
+                <div class="card">
+                    <div class="form-field">
+                        <label for="guestName" data-i18n="fullName">Full name</label>
+                        <input type="text" id="guestName" name="guestName" placeholder="e.g. Jean Uwase" autocomplete="name" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="guestPhone" data-i18n="phoneNumber">Phone number</label>
+                        <input type="tel" id="guestPhone" name="guestPhone" placeholder="078X XXX XXX" autocomplete="tel" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="guestEmail" data-i18n="emailAddress">Email for your confirmation</label>
+                        <input type="email" id="guestEmail" name="guestEmail" placeholder="name@example.com" autocomplete="email" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment -->
+            <fieldset class="form-block payment-options">
+                <legend data-i18n="paymentMethod">How would you like to pay?</legend>
+
+                <label class="pay-option">
+                    <input type="radio" name="paymentMethod" value="MTN Mobile Money" checked>
+                    <span class="pay-icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+                    </span>
+                    <span class="pay-text">
+                        <strong data-i18n="mtnMobileMoney">MTN Mobile Money</strong>
+                        <span>Pay from your MoMo wallet</span>
+                    </span>
+                    <span class="pay-ring" aria-hidden="true"></span>
+                </label>
+
+                <label class="pay-option">
+                    <input type="radio" name="paymentMethod" value="Airtel Money">
+                    <span class="pay-icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+                    </span>
+                    <span class="pay-text">
+                        <strong data-i18n="airtelMoney">Airtel Money</strong>
+                        <span>Pay from your Airtel wallet</span>
+                    </span>
+                    <span class="pay-ring" aria-hidden="true"></span>
+                </label>
+
+                <label class="pay-option">
+                    <input type="radio" name="paymentMethod" value="Visa/Mastercard">
+                    <span class="pay-icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                    </span>
+                    <span class="pay-text">
+                        <strong data-i18n="cardPayment">Visa or Mastercard</strong>
+                        <span>Debit or credit card</span>
+                    </span>
+                    <span class="pay-ring" aria-hidden="true"></span>
+                </label>
+
+                <label class="pay-option">
+                    <input type="radio" name="paymentMethod" value="Pay at the Motel">
+                    <span class="pay-icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+                    </span>
+                    <span class="pay-text">
+                        <strong data-i18n="payAtMotel">Pay at the inn</strong>
+                        <span>Pay at reception when you arrive</span>
+                    </span>
+                    <span class="pay-ring" aria-hidden="true"></span>
+                </label>
+
+                <p class="pay-note" id="paymentNote">Your booking is saved as pending until your payment is confirmed.</p>
+            </fieldset>
+
+            <!-- Price summary -->
+            <div class="card summary" id="priceSummary" aria-live="polite">
+                <p class="summary-empty">Choose a room and your dates to see the total.</p>
+            </div>
+
+            <!-- Submit -->
+            <div class="submit-area">
+                <button type="submit" id="searchButton" class="btn btn-primary btn-block btn-large" data-i18n="confirmBooking">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span class="button-label">Confirm booking</span>
+                </button>
+
+                <p id="bookingMessage" role="status" aria-live="polite"></p>
+
+                <p class="secure-line">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                    Booked directly with Zebra dormus
+                </p>
+            </div>
+        </form>
+
+        <!-- Shown after a successful booking -->
+        <div class="confirmation" id="bookingConfirmed" hidden tabindex="-1">
+            <span class="confirm-icon" aria-hidden="true">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>
+            <h3>Booking received</h3>
+            <p class="confirm-lead">Thank you. Keep this reference for your stay.</p>
+            <span class="confirm-ref" id="confirmRef"></span>
+            <dl class="confirm-details" id="confirmDetails"></dl>
+            <button type="button" class="btn btn-outline btn-block" id="newBookingButton">Make another booking</button>
+        </div>
+    </section>
+
+    <!-- AMENITIES: taken from the Zebra dormus Booking.com listing -->
+    <section class="section" aria-labelledby="amenitiesTitle">
+        <h2 id="amenitiesTitle">At Zebra dormus</h2>
+        <ul class="amenities">
+            <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5a11 11 0 0 1 14 0"/><path d="M1.5 9a16 16 0 0 1 21 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg>Free Wi-Fi</li>
+            <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12c2 0 2-1.5 4-1.5S8 12 10 12s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M2 17c2 0 2-1.5 4-1.5S8 17 10 17s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M8 9V4a2 2 0 0 1 4 0"/><path d="M16 9V4a2 2 0 0 0-4 0"/></svg>Swimming pools</li>
+            <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg>Breakfast</li>
+            <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6a2 2 0 0 0 2 2h3zm0 0v7"/></svg>Restaurant &amp; bar</li>
+            <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4-2.5 6-6 6-10a6 6 0 0 0-12 0c0 4 2 7.5 6 10z"/><path d="M12 22V12"/><path d="M12 15l-3-3M12 13l3-3"/></svg>Spa &amp; sauna</li>
+            <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>Free parking</li>
+            <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 16H9m10 0h3v-3.2a2 2 0 0 0-.6-1.4L18 8h-4"/><path d="M2 16h2"/><path d="M14 16V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>Airport shuttle</li>
+            <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 18h20"/><path d="M4 18a8 8 0 0 1 16 0"/><path d="M12 7V5"/><path d="M10 5h4"/></svg>Room service</li>
+        </ul>
+    </section>
+
+    <!-- PHOTOS -->
+    <section class="section" aria-labelledby="photosTitle">
+        <h2 id="photosTitle">Photos</h2>
+        <p class="section-sub">Pools, lounges and rooms. Swipe to see more.</p>
+        <div class="gallery" tabindex="0" role="region" aria-label="Photo gallery, scroll sideways">
+            <figure>
+                <img src="images/sign.jpg" alt="The Zebra dormus Inn sign above the gate, with two zebra statues" loading="lazy">
+                <figcaption>Welcome to Zebra dormus</figcaption>
+            </figure>
+            <figure>
+                <img src="images/pool.jpg" alt="The large outdoor swimming pool with loungers" loading="lazy">
+                <figcaption>Outdoor pool</figcaption>
+            </figure>
+            <figure>
+                <img src="images/pool-second.jpg" alt="Second swimming pool beside the inn" loading="lazy">
+                <figcaption>Second pool</figcaption>
+            </figure>
+            <figure>
+                <img src="images/lounge.jpg" alt="Bright lounge with cream sofas" loading="lazy">
+                <figcaption>Lounge</figcaption>
+            </figure>
+            <figure>
+                <img src="images/sitting-room.jpg" alt="Sitting room with black leather and wood sofas" loading="lazy">
+                <figcaption>Sitting room</figcaption>
+            </figure>
+            <figure>
+                <img src="images/outdoor-seating.jpg" alt="Covered seating area with green sofas" loading="lazy">
+                <figcaption>Green lounge</figcaption>
+            </figure>
+            <figure>
+                <img src="images/twin-room.jpg" alt="Room with two beds and fresh towels" loading="lazy">
+                <figcaption>Twin room</figcaption>
+            </figure>
+            <figure>
+                <img src="images/bathroom.jpg" alt="Private bathroom with a glass shower" loading="lazy">
+                <figcaption>Private bathroom</figcaption>
+            </figure>
+        </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="section" id="about">
+        <article class="about-card">
+            <img
+                src="images/main-house.jpg"
+                alt="The main house of Zebra dormus Inn and its garden"
+                loading="lazy"
+            >
+            <div class="about-body">
+                <p class="eyebrow" data-i18n="experience">The Zebra dormus experience</p>
+                <h2 data-i18n="aboutTitle">More than a stay. A place to feel at home.</h2>
+                <p class="section-sub" data-i18n="aboutDescription">
+                    Relax by the outdoor pool, unwind in the spa and sauna, and end the day
+                    at the restaurant, the bar or the lounge with its outdoor fireplace.
+                    Free bicycles are available for guests.
+                </p>
+                <a href="#booking" class="btn btn-tint btn-block" data-i18n="experiencezebradormus">Book your stay</a>
+            </div>
+        </article>
+    </section>
+
+    
+<section class="policies section" id="policies">
+
+    <div class="policies-heading">
+        <p class="eyebrow">GOOD TO KNOW</p>
+        <h2>Policies<span>.</span></h2>
+        <p class="section-intro">
+            Everything you need to know before your stay at
+            Zebra Dormus Inn.
+        </p>
+    </div>
+
+    <div class="stay-times">
+        <div class="stay-time">
+            <span>CHECK-IN</span>
+            <strong>10:00 AM</strong>
+            <small>Until 11:00 PM</small>
+        </div>
+
+        <div class="stay-divider"></div>
+
+        <div class="stay-time">
+            <span>CHECK-OUT</span>
+            <strong>10:00 AM</strong>
+            <small>From 5:00 AM</small>
+        </div>
+    </div>
+
+    <div class="policies-grid">
+
+        <article class="policy-card">
+            <span class="policy-number">01</span>
+            <h3>Cancellation & Prepayment</h3>
+            <p>
+                Cancellation and prepayment policies vary according
+                to accommodation type. Please check the conditions
+                of your selected room and stay dates.
+            </p>
+        </article>
+
+        <article class="policy-card">
+            <span class="policy-number">02</span>
+            <h3>Children & Beds</h3>
+            <p>Children of all ages are welcome.</p>
+            <p>Cribs and extra beds are not available.</p>
+            <p>
+                For accurate prices and occupancy information,
+                include the number and ages of children when booking.
+            </p>
+        </article>
+
+        <article class="policy-card">
+            <span class="policy-number">03</span>
+            <h3>Age Requirements</h3>
+            <p>There is no age restriction for check-in.</p>
+        </article>
+
+        <article class="policy-card">
+            <span class="policy-number">04</span>
+            <h3>Pets</h3>
+            <p>Pets are welcome free of charge.</p>
+        </article>
+
+        <article class="policy-card">
+            <span class="policy-number">05</span>
+            <h3>Payment Methods</h3>
+            <p>
+                We accept American Express, Visa, Mastercard,
+                Diners Club, JCB, Maestro, Discover, UnionPay
+                credit cards, and cash.
+            </p>
+        </article>
+
+        <article class="policy-card">
+            <span class="policy-number">06</span>
+            <h3>Parties & Events</h3>
+            <p>Parties and events are not allowed.</p>
+        </article>
+
+    </div>
+
+    <div class="special-request">
+        <span>SPECIAL REQUESTS</span>
+        <h3>Make your stay special.</h3>
+        <p>
+            Zebra Dormus Inn welcomes special requests.
+            Please let us know your preferences when making
+            your reservation.
+        </p>
+    </div>
+
+</section>
+
+
+    <!-- CONTACT -->
+    <section class="section" id="contact">
+        <h2 data-i18n="planStay">Find us</h2>
+       <div class="map-container">
+    <iframe
+        src="https://www.google.com/maps?q=-2.630193,29.745839&z=15&output=embed"
+        width="100%"
+        height="300"
+        style="border:0;"
+        allowfullscreen
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        title="Zebra Dormus Inn Location">
+    </iframe>
+</div>
+
+<a
+    href="https://www.google.com/maps/dir/?api=1&destination=-2.630193,29.745839"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="directions-button">
+    Get Directions
+</a>
+        <!-- Replace 2507XXXXXXXX with the inn's phone number, and [email address] with its email -->
+        <div class="contact-actions">
+            <a class="btn btn-outline" href="tel:+2507XXXXXXXX">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>
+                Call us
+            </a>
+            <a class="btn btn-outline" href="mailto:[email address]" data-i18n="contactUs">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>
+                Email us
+            </a>
+        </div>
+        <a class="btn btn-tint btn-block contact-whatsapp" href="https://wa.me/2507XXXXXXXX">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/></svg>
+            Chat with us on WhatsApp
+        </a>
+    </section>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="imigongo" aria-hidden="true"></div>
+  <div class="footer-body">
+
+    <img
+        class="footer-logo"
+        src="images/logo/zebra-domus-logo-white.png"
+        alt="Zebra Domus Inn"
+        width="152"
+        height="64"
+    >
+
+    <span class="footer-name">Zebra dormus Inn</span>
+        <address class="footer-address">
+            [Street address], Huye<br>
+            Southern Province, Rwanda<br>
+            +250 7XX XXX XXX · [email address]
+        </address>
+        <nav class="footer-nav" aria-label="Footer">
+            <a href="#rooms">Rooms</a>
+            <a href="#booking">Book</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+            <a href="#policies">Policies</a>
+        </nav>
+        <p class="footer-copy">
+            © <span id="currentYear"></span> Zebra dormus Inn. All rights reserved.
+            Bookings go directly to the inn.
+        </p>
+    </div>
+</footer>
+
+</div>
+
+<script src="translations.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
