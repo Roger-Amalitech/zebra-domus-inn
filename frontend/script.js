@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA dormus INN
+   ZEBRA DOMUS INN
    Mobile menu, room cards, room selection,
    price summary and booking submission
 ========================================= */
@@ -41,7 +41,7 @@ const BUILT_IN_ROOMS = [
 
 let zebradormusUsingBuiltInRooms = false;
 
-/* Zebra dormus room photos, kept in the images folder.
+/* Zebra Domus room photos, kept in the images folder.
    These are shown for the matching room type. To use different
    photos, replace the files or change the names here. */
 const roomImageFallbacks = {
@@ -243,7 +243,7 @@ function renderzebradormusRooms() {
     const roomGrid = document.getElementById("roomGrid");
 
     if (!roomGrid) {
-        console.error('Zebra dormus: "#roomGrid" was not found.');
+        console.error('Zebra Domus: "#roomGrid" was not found.');
         return;
     }
 
@@ -334,16 +334,6 @@ function renderzebradormusRooms() {
         );
         features.appendChild(capacityLabel);
 
-        const totalRooms = Number(room.totalRooms);
-
-        if (Number.isFinite(totalRooms) && totalRooms > 0) {
-            const roomsLabel = document.createElement("span");
-            roomsLabel.append(
-                iconElement("door"),
-                `${totalRooms} ${totalRooms === 1 ? "room" : "rooms"} of this type`
-            );
-            features.appendChild(roomsLabel);
-        }
 
         const description = document.createElement("p");
         description.className = "room-description";
@@ -481,7 +471,7 @@ async function loadzebradormusRooms() {
     const roomGrid = document.getElementById("roomGrid");
 
     if (!roomGrid) {
-        console.error('Zebra dormus: "#roomGrid" was not found.');
+        console.error('Zebra Domus: "#roomGrid" was not found.');
         return;
     }
 
@@ -520,14 +510,14 @@ async function loadzebradormusRooms() {
         updateBookingSummary();
 
         console.log(
-            `Zebra dormus: Loaded ${rooms.length} rooms successfully.`
+            `Zebra Domus: Loaded ${rooms.length} rooms successfully.`
         );
 
     } catch (error) {
         /* No backend running: still show the rooms from the built-in
            list, but don't pretend online booking works (see submit). */
         console.warn(
-            "Zebra dormus: backend not reachable, showing the built-in room list.",
+            "Zebra Domus: backend not reachable, showing the built-in room list.",
             error
         );
 
@@ -749,11 +739,11 @@ function initzebradormusDates() {
 
 const paymentNotes = {
     "MTN Mobile Money":
-        "Your booking is saved as pending until your MoMo payment is confirmed.",
+        "Your booking is saved as pending. We'll contact you to confirm it and explain how to pay with MoMo.",
     "Airtel Money":
-        "Your booking is saved as pending until your Airtel Money payment is confirmed.",
+        "Your booking is saved as pending. We'll contact you to confirm it and explain how to pay with Airtel Money.",
     "Visa/Mastercard":
-        "Your booking is saved as pending until your card payment is confirmed.",
+        "Your booking is saved as pending. We'll contact you to confirm it and explain how to pay by card.",
     "Pay at the Motel":
         "Nothing to pay now. Pay at reception when you arrive."
 };
@@ -774,7 +764,9 @@ function updatePaymentOptions() {
     const note = document.getElementById("paymentNote");
 
     if (note) {
-        note.textContent = paymentNotes[selected] || "";
+        const noteKeys = { "MTN Mobile Money": "mtnPending", "Airtel Money": "airtelPending", "Visa/Mastercard": "cardPending", "Pay at the Motel": "payAtInnNote" };
+        const dictionary = typeof getCurrentTranslations === "function" ? getCurrentTranslations() : {};
+        note.textContent = dictionary[noteKeys[selected]] || paymentNotes[selected] || "";
     }
 
     updateBookingSummary();
@@ -927,7 +919,7 @@ async function handleBookingSubmit(event) {
         showConfirmation(result.booking || {});
 
     } catch (error) {
-        console.error("Zebra dormus booking failed:", error);
+        console.error("Zebra Domus booking failed:", error);
 
         const text = error instanceof TypeError
             ? "We couldn't reach the booking server. Check your connection and try again."

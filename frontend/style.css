@@ -1326,7 +1326,7 @@ h3 {
     font-style: normal;
     line-height: 1.6;
     color: var(--footer-text);
-}
+}.footer-nav a
 
 .footer-nav {
     display: flex;
@@ -1335,13 +1335,6 @@ h3 {
 }
 
 .footer-nav a {
-  .footer-logo {
-    display: block;
-    align-self: flex-start;
-    height: 64px;
-    width: auto;
-    margin-bottom: 16px;
-}
     font-size: 14px;
     font-weight: 600;
     text-decoration: none;
@@ -1406,7 +1399,7 @@ h3 {
 
 
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    LUXURY POLICIES DESIGN
 ========================================= */
 
@@ -1623,3 +1616,16 @@ h3 {
     width: auto;
     margin-bottom: 16px;
 }
+
+/* ===== Fixes, November 2026 ===== */
+/* Labels in sentence case instead of all capitals */
+.eyebrow { text-transform: none; letter-spacing: 0; }
+/* Search-box dates shown as dd/mm/yyyy (see date-display.js) */
+.search-field .control input.has-date-display { color: transparent; -webkit-text-fill-color: transparent; }
+.search-field .control input.has-date-display::-webkit-datetime-edit { color: transparent; }
+.date-display {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    pointer-events: none; white-space: nowrap;
+    font-size: 16px; font-weight: 700; color: #111;
+}
+.date-display.is-empty { color: #5C5C5C; font-weight: 500; }
