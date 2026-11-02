@@ -12,8 +12,21 @@ const bookingRoutes = require("./routes/bookingRoutes");
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+
+
+app.use(cors({
+    origin: [
+        "http://localhost:3000",
+        "https://zebra-domus-inn-website.onrender.com"
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+
 app.use(express.json());
+
+
 app.use("/api/rooms", roomRoutes);
 app.use("/api/bookings", bookingRoutes);
 

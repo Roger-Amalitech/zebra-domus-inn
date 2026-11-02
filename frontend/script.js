@@ -1,12 +1,14 @@
 /* =========================================
-   ZEBRA DOMUS INN
+   ZEBRA dormus INN
    Mobile menu, room cards, room selection,
    price summary and booking submission
 ========================================= */
 
-const GREEN_HAVEN_API = "https://zebra-domus-inn-1.onrender.com/api";
+const GREEN_HAVEN_API = "http://localhost:5000/api";
 
-let zebradomusRooms = [];
+const API_BASE = "http://localhost:5000/api";
+
+let zebradormusRooms = [];
 
 /* Shown when the backend isn't running. Keep these in step with
    the rooms in the database (backend/seedRooms.js). */
@@ -37,9 +39,9 @@ const BUILT_IN_ROOMS = [
     }
 ];
 
-let zebradomusUsingBuiltInRooms = false;
+let zebradormusUsingBuiltInRooms = false;
 
-/* Zebra Domus room photos, kept in the images folder.
+/* Zebra dormus room photos, kept in the images folder.
    These are shown for the matching room type. To use different
    photos, replace the files or change the names here. */
 const roomImageFallbacks = {
@@ -116,7 +118,7 @@ function getRoomPrice(room) {
 }
 
 function findRoom(roomId) {
-    return zebradomusRooms.find((room) => getRoomId(room) === roomId) || null;
+    return zebradormusRooms.find((room) => getRoomId(room) === roomId) || null;
 }
 
 /* Static icon markup (no user data goes in here). */
@@ -140,7 +142,7 @@ function iconElement(name) {
    MOBILE MENU
 ========================================= */
 
-function initzebradomusMobileMenu() {
+function initzebradormusMobileMenu() {
     const menuButton = document.getElementById("menuButton");
     const navigation = document.getElementById("navigation");
 
@@ -237,17 +239,17 @@ function getRoomTranslations(room) {
    ROOM CARDS
 ========================================= */
 
-function renderzebradomusRooms() {
+function renderzebradormusRooms() {
     const roomGrid = document.getElementById("roomGrid");
 
     if (!roomGrid) {
-        console.error('Zebra Domus: "#roomGrid" was not found.');
+        console.error('Zebra dormus: "#roomGrid" was not found.');
         return;
     }
 
     const t = getTranslations();
 
-    if (zebradomusRooms.length === 0) {
+    if (zebradormusRooms.length === 0) {
         const empty = document.createElement("p");
         empty.className = "room-status";
         empty.textContent = "No rooms are available right now.";
@@ -259,7 +261,7 @@ function renderzebradomusRooms() {
     const selectedId = document.getElementById("roomType")?.value || "";
     const fragment = document.createDocumentFragment();
 
-    zebradomusRooms.forEach((room) => {
+    zebradormusRooms.forEach((room) => {
         const translated = getRoomTranslations(room);
         const roomId = getRoomId(room);
         const capacity = Number(room.capacity) || 2;
@@ -433,11 +435,11 @@ function populateRoomSelect() {
     const placeholder = document.createElement("option");
     placeholder.value = "";
     placeholder.textContent =
-        zebradomusRooms.length > 0 ? "Choose a room" : "No rooms available";
+        zebradormusRooms.length > 0 ? "Choose a room" : "No rooms available";
 
     const options = [placeholder];
 
-    zebradomusRooms.forEach((room) => {
+    zebradormusRooms.forEach((room) => {
         const translated = getRoomTranslations(room);
         const amount = getRoomPrice(room);
         const option = document.createElement("option");
@@ -462,7 +464,7 @@ function populateRoomSelect() {
 
 function updateRoomsIntro() {
     const intro = document.getElementById("roomsFrom");
-    const prices = zebradomusRooms
+    const prices = zebradormusRooms
         .map(getRoomPrice)
         .filter((price) => price !== null);
 
@@ -475,11 +477,11 @@ function updateRoomsIntro() {
 
 /* Load rooms from the existing backend */
 
-async function loadzebradomusRooms() {
+async function loadzebradormusRooms() {
     const roomGrid = document.getElementById("roomGrid");
 
     if (!roomGrid) {
-        console.error('Zebra Domus: "#roomGrid" was not found.');
+        console.error('Zebra dormus: "#roomGrid" was not found.');
         return;
     }
 
@@ -511,29 +513,29 @@ async function loadzebradomusRooms() {
             throw new Error("The API response does not contain a rooms array.");
         }
 
-        zebradomusRooms = rooms;
+        zebradormusRooms = rooms;
         populateRoomSelect();
         updateRoomsIntro();
-        renderzebradomusRooms();
+        renderzebradormusRooms();
         updateBookingSummary();
 
         console.log(
-            `Zebra Domus: Loaded ${rooms.length} rooms successfully.`
+            `Zebra dormus: Loaded ${rooms.length} rooms successfully.`
         );
 
     } catch (error) {
         /* No backend running: still show the rooms from the built-in
            list, but don't pretend online booking works (see submit). */
         console.warn(
-            "Zebra Domus: backend not reachable, showing the built-in room list.",
+            "Zebra dormus: backend not reachable, showing the built-in room list.",
             error
         );
 
-        zebradomusUsingBuiltInRooms = true;
-        zebradomusRooms = BUILT_IN_ROOMS;
+        zebradormusUsingBuiltInRooms = true;
+        zebradormusRooms = BUILT_IN_ROOMS;
         populateRoomSelect();
         updateRoomsIntro();
-        renderzebradomusRooms();
+        renderzebradormusRooms();
         updateBookingSummary();
     }
 }
@@ -541,7 +543,7 @@ async function loadzebradomusRooms() {
 
 /* Book Now: select the room and scroll to the booking form */
 
-function handlezebradomusBookNow(event) {
+function handlezebradormusBookNow(event) {
     const button = event.target.closest(".room-button");
 
     if (!button || button.disabled) {
@@ -562,8 +564,8 @@ function handlezebradomusBookNow(event) {
 
     /* Remember the selected room for other booking code. */
 
-    window.zebradomusSelectedRoomId = roomId;
-    window.zebradomusSelectedRoomName = roomName;
+    window.zebradormusSelectedRoomId = roomId;
+    window.zebradormusSelectedRoomName = roomName;
 
     /* Select the matching room in the dropdown. */
 
@@ -693,7 +695,7 @@ function updateBookingSummary() {
    DATES
 ========================================= */
 
-function initzebradomusDates() {
+function initzebradormusDates() {
     const checkIn = document.getElementById("checkIn");
     const checkOut = document.getElementById("checkOut");
     const guests = document.getElementById("guests");
@@ -726,7 +728,7 @@ function initzebradomusDates() {
 
     function onStayChange() {
         syncCheckOutMin();
-        renderzebradomusRooms();
+        renderzebradormusRooms();
         updateBookingSummary();
     }
 
@@ -892,12 +894,7 @@ async function handleBookingSubmit(event) {
         return;
     }
 
-    if (zebradomusUsingBuiltInRooms) {
-        showBookingMessage(
-            "Online booking isn't connected yet. Please call or WhatsApp the inn to book this room."
-        );
-        return;
-    }
+   
 
     const payload = {
         guestName: document.getElementById("guestName").value.trim(),
@@ -930,7 +927,7 @@ async function handleBookingSubmit(event) {
         showConfirmation(result.booking || {});
 
     } catch (error) {
-        console.error("Zebra Domus booking failed:", error);
+        console.error("Zebra dormus booking failed:", error);
 
         const text = error instanceof TypeError
             ? "We couldn't reach the booking server. Check your connection and try again."
@@ -958,7 +955,7 @@ function resetBooking() {
 
     showBookingMessage("");
     updatePaymentOptions();
-    renderzebradomusRooms();
+    renderzebradormusRooms();
     updateBookingSummary();
 
     document.getElementById("dates")?.scrollIntoView({
@@ -972,9 +969,9 @@ function resetBooking() {
    START
 ========================================= */
 
-function initzebradomus() {
-    initzebradomusMobileMenu();
-    initzebradomusDates();
+function initzebradormus() {
+    initzebradormusMobileMenu();
+    initzebradormusDates();
 
     const year = document.getElementById("currentYear");
 
@@ -985,14 +982,14 @@ function initzebradomus() {
     const roomGrid = document.getElementById("roomGrid");
 
     if (roomGrid) {
-        roomGrid.addEventListener("click", handlezebradomusBookNow);
+        roomGrid.addEventListener("click", handlezebradormusBookNow);
     }
 
     const roomType = document.getElementById("roomType");
 
     if (roomType) {
         roomType.addEventListener("change", () => {
-            renderzebradomusRooms();
+            renderzebradormusRooms();
             updateBookingSummary();
         });
     }
@@ -1011,11 +1008,11 @@ function initzebradomus() {
         ?.addEventListener("click", resetBooking);
 
     updatePaymentOptions();
-    loadzebradomusRooms();
+    loadzebradormusRooms();
 }
 
 if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initzebradomus, { once: true });
+    document.addEventListener("DOMContentLoaded", initzebradormus, { once: true });
 } else {
-    initzebradomus();
+    initzebradormus();
 }
