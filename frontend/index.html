@@ -10,7 +10,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&amp;family=DM+Sans:opsz,wght@9..40,300..700&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" sizes="192x192" href="images/logo/icon-192.png">
@@ -37,6 +37,7 @@
     <div class="header-actions">
         <div class="language-selector">
             <label for="languageSelect" class="visually-hidden">Language</label>
+            <svg class="globe" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
             <select id="languageSelect">
                 <option value="en">EN</option>
                 <option value="rw">RW</option>
@@ -67,11 +68,6 @@
     <section class="hero" id="home">
         <div class="hero-image">
             <img src="images/entrance.jpg" alt="Zebra Domus Inn with palm trees at the entrance" fetchpriority="high">
-
-            <span class="hero-badge">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7" cy="7" r="1.5"/></svg>
-                Book direct — no booking-site fees
-            </span>
         </div>
 
         <div class="hero-text">
@@ -80,8 +76,16 @@
                 Comfortable rooms, two outdoor pools, a spa and a restaurant,
                 set in a green garden.
             </p>
-
         </div>
+
+        <!-- Quick links along the bottom of the photo (computers only); top-bar.js translates them -->
+        <nav class="hero-links" aria-label="Explore the inn">
+            <a href="#rooms" data-link="rooms"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg><span>Rooms</span></a>
+            <a href="#amenities" data-link="amenities"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12c2 0 2-1.5 4-1.5S8 12 10 12s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M2 17c2 0 2-1.5 4-1.5S8 17 10 17s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M8 9V4a2 2 0 0 1 4 0"/><path d="M16 9V4a2 2 0 0 0-4 0"/></svg><span>At the inn</span></a>
+            <a href="#photos" data-link="photos"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Photos</span></a>
+            <a href="#policies" data-link="policies"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Good to know</span></a>
+            <a href="#contact" data-link="contact"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>Find us</span></a>
+        </nav>
     </section>
 
     <!-- DATES AND GUESTS (these fields belong to the booking form below) -->
@@ -305,7 +309,7 @@
     </section>
 
     <!-- AMENITIES: taken from the Zebra Domus Booking.com listing -->
-    <section class="section" aria-labelledby="amenitiesTitle">
+    <section class="section" id="amenities" aria-labelledby="amenitiesTitle">
         <h2 id="amenitiesTitle">At Zebra Domus</h2>
         <ul class="amenities">
             <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5a11 11 0 0 1 14 0"/><path d="M1.5 9a16 16 0 0 1 21 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg>Free Wi-Fi</li>
@@ -320,7 +324,7 @@
     </section>
 
     <!-- PHOTOS -->
-    <section class="section" aria-labelledby="photosTitle">
+    <section class="section" id="photos" aria-labelledby="photosTitle">
         <h2 id="photosTitle">Photos</h2>
         <p class="section-sub">Pools, lounges and rooms.<span class="swipe-hint"> Swipe to see more.</span></p>
         <div class="gallery" tabindex="0" role="region" aria-label="Photo gallery, scroll sideways">
@@ -528,5 +532,6 @@
 <script src="back-to-top.js"></script>
 <script src="header-overlay.js"></script>
 <script src="room-details.js"></script>
+<script src="top-bar.js"></script>
 </body>
 </html>

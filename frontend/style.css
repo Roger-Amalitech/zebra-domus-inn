@@ -1,7 +1,7 @@
 /* =========================================
    ZEBRA DOMUS INN
    Black-and-white version of the Huye motel mobile design:
-   DM Sans and DM Mono · black, white and greys ·
+   Inter (Marriott-style) · black, white and greys ·
    imigongo border in the footer. Photos stay in colour.
    ========================================= */
 
@@ -34,8 +34,8 @@
 
     --page-width: 480px;
     --header-height: 64px;
-    --font: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --font-display: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --font: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-display: var(--font);
 }
 
 /* 2. RESET AND BASICS */
@@ -378,27 +378,6 @@ h3 {
     width: 100%;
     height: 100%;
     object-fit: cover;
-}
-
-.hero-badge {
-    position: absolute;
-    left: 16px;
-    top: 16px;
-
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 11px;
-
-    border-radius: 999px;
-    background: var(--white);
-    color: var(--ink);
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.hero-badge svg {
-    color: var(--accent);
 }
 
 .hero-text {
@@ -1510,19 +1489,6 @@ h3 {
         linear-gradient(to bottom, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0) 26%, rgba(0, 0, 0, 0) 68%, rgba(0, 0, 0, 0.38) 100%),
         rgba(0, 0, 0, 0.42);
 }
-/* see-through "glass" badge, centred at the top */
-.hero-badge {
-    z-index: 2;
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
-    background: rgba(255, 255, 255, 0.14);
-    color: #FFFFFF;
-    border: 1px solid rgba(255, 255, 255, 0.38);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-}
-.hero-badge svg { color: #FFFFFF; }
 /* headline, text and photo controls, centred in the photo */
 .hero-text {
     position: absolute;
@@ -1532,7 +1498,7 @@ h3 {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 72px 20px 60px; /* below the badge, above the date card that overlaps the photo */
+    padding: 32px 20px 60px; /* above the date card that overlaps the photo */
     text-align: center;
 }
 .hero-text h1 {
@@ -1578,8 +1544,7 @@ h3 {
     height: calc(480px + var(--header-height));
     height: calc(clamp(440px, 64svh, 560px) + var(--header-height));
 }
-.has-overlay-header .hero-badge { top: calc(var(--header-height) + 12px); }
-.has-overlay-header .hero-text { padding-top: calc(var(--header-height) + 64px); }
+.has-overlay-header .hero-text { padding-top: calc(var(--header-height) + 24px); }
 @media (prefers-reduced-motion: reduce) {
     .header { transition: none; }
 }
@@ -1794,9 +1759,8 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
 
 /* ===== Top photo ===== */
 .hero-image { background: #2B2B2B; } /* dark while the photo loads, so the white words stay readable */
-/* the words and the badge float over the photo */
-.hero-text,
-.hero-badge { pointer-events: none; }
+/* the words float over the photo */
+.hero-text { pointer-events: none; }
 @media (max-width: 360px) {
     .hero-text { padding-left: 16px; padding-right: 16px; }
 }
@@ -2430,124 +2394,6 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
 }
 
 /* =========================================
-   TYPE (in the style of The Prince Akatoki London)
-   Headings and buttons: DM Mono, light, in capitals, spaced out.
-   Reading text: DM Sans, light. Both are free Google Fonts, loaded in index.html.
-   Labels and form text stay in sentence case so they're quick to read.
-========================================= */
-body { font-weight: 350; }
-strong, b { font-weight: 500; }
-
-h1, h2, h3,
-.room-title,
-.rs-title,
-.footer-name,
-.dr-title,
-.payment-options legend,
-.confirmation h3 {
-    font-family: var(--font-display);
-    font-weight: 300;
-    line-height: 1.25;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-h2 { font-size: 22px; }
-h3,
-.form-block h3,
-.payment-options legend { font-size: 15px; font-weight: 400; letter-spacing: 0.08em; }
-
-/* the headline on the photo */
-.hero-text h1 {
-    max-width: 16ch;
-    font-size: clamp(28px, 8.2vw, 34px);
-    font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: 0.02em;
-    text-wrap: balance;
-}
-.hero-text .lead { font-weight: 350; text-wrap: balance; }
-.hero-badge {
-    font-family: var(--font-display);
-    font-size: 10.5px;
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-}
-
-/* buttons: small capitals, spaced out */
-.btn,
-.room-button,
-.directions-button,
-.dr-done {
-    font-family: var(--font-display);
-    font-size: 13px;
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-}
-.btn-large { font-size: 13.5px; }
-.btn-outline,
-.btn-tint,
-.room-button { font-size: 12px; letter-spacing: 0.12em; }
-.rs-book {
-    max-width: 60%;
-    font-size: 12.5px;
-    letter-spacing: 0.1em;
-    line-height: 1.25;
-    text-align: center;
-    white-space: normal;
-}
-
-/* small details in the same mono type */
-.eyebrow { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.02em; }
-.language-selector select { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.06em; }
-.date-range-nights { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: 0.06em; }
-.confirm-ref { font-family: var(--font-display); font-weight: 400; }
-
-/* cards and sections */
-.room-title { font-size: 16px; font-weight: 400; letter-spacing: 0.06em; }
-.rs-title { font-size: 22px; }
-.rs-section h3 { font-size: 14px; }
-.about-body h2 { font-size: 22px; }
-.footer-name { font-size: 16px; font-weight: 400; letter-spacing: 0.08em; }
-
-/* calendar */
-.dr-title { font-size: 15px; font-weight: 400; letter-spacing: 0.08em; }
-.dr-month-title { font-family: var(--font-display); font-size: 13px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.12em; }
-.dr-weekdays span { font-family: var(--font-display); font-size: 11px; font-weight: 400; text-transform: uppercase; }
-.dr-num { font-weight: 400; }
-.dr-day.is-start .dr-num,
-.dr-day.is-end .dr-num { font-weight: 500; }
-
-@media (max-width: 360px) {
-    .hero-badge { font-size: 10px; letter-spacing: 0.05em; }
-}
-
-@media (min-width: 768px) {
-    h2,
-    .about-body h2 { font-size: 26px; }
-    .hero-text h1 { font-size: clamp(38px, 5.4vw, 46px); }
-    .hero-badge { font-size: 11px; letter-spacing: 0.14em; }
-    .rs-book { max-width: none; white-space: nowrap; }
-}
-
-@media (min-width: 1024px) {
-    h2 { font-size: 30px; }
-    .about-body h2 { font-size: 28px; }
-    .hero-text h1 { font-size: clamp(46px, 4vw, 58px); line-height: 1.15; }
-    .hero-text .lead { font-size: 18px; }
-    .navigation a { font-weight: 400; }
-    .navigation a[href="#booking"] {
-        font-family: var(--font-display);
-        font-size: 12.5px;
-        font-weight: 400;
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-    }
-    .search-card .btn { font-size: 13px; }
-}
-
-/* =========================================
    GOOD TO KNOW (policies), in the style of Marriott's
    "Your Lifelong Travel Partner" section: a small label, a large centred
    heading, then equal white cards with centred text.
@@ -2666,4 +2512,319 @@ h3,
     .policy-card h3 { font-size: 13px; }
     .policy-time { font-size: 24px; }
     .special-request { margin-top: 24px; }
+}
+
+/* =========================================
+   MARRIOTT STYLE (type, top bar, search, quick links, photo cards)
+   Type: Inter, a free font close to Marriott's Swiss 721: bold headings in
+   normal case, small bold capitals for little labels, bold pill-shaped buttons.
+   Top bar: dark and see-through over the photo, white once you scroll.
+   Computers: search card under the headline, quick links along the bottom of
+   the photo, and a slim search bar that takes the top bar's place while
+   scrolling down (top-bar.js).
+========================================= */
+body { font-weight: 400; color: #1C1C1C; }
+strong, b { font-weight: 700; }
+
+h1, h2, h3,
+.room-title,
+.rs-title,
+.footer-name,
+.dr-title,
+.payment-options legend,
+.confirmation h3 {
+    font-family: var(--font);
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: none;
+    letter-spacing: -0.01em;
+}
+h2 { font-size: 24px; }
+h3,
+.form-block h3,
+.payment-options legend { font-size: 17px; }
+
+/* small bold capitals, like Marriott's "SPECIAL HOTEL DEALS" */
+.policies-mark,
+.eyebrow,
+.search-card .search-field label,
+.search-card .date-range-label,
+.sticky-search .search-field label,
+.sticky-search .date-range-label {
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+/* headline on the photo */
+.hero-text h1 {
+    max-width: 16ch;
+    font-size: clamp(32px, 9vw, 40px);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+}
+.hero-text .lead { font-weight: 400; text-wrap: balance; }
+
+/* buttons: bold, normal case, pill-shaped */
+.btn,
+.room-button,
+.directions-button,
+.rs-book,
+.dr-done {
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+    border-radius: 999px;
+}
+.btn-outline,
+.btn-tint,
+.room-button { font-size: 14px; }
+.directions-button { padding: 13px 24px; }
+/* "Check availability" with a search icon, like Marriott's "Find Hotels" */
+.search-card .btn::before,
+.sticky-search-button::before {
+    content: "";
+    flex-shrink: 0;
+    width: 17px;
+    height: 17px;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.6-3.6'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.6-3.6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* details */
+.date-range-nights { font-weight: 600; }
+.room-title { font-size: 18px; }
+.rs-title { font-size: 24px; }
+.rs-section h3 { font-size: 16px; }
+.about-body h2 { font-size: 24px; }
+.footer-name { font-size: 18px; }
+.room-price strong,
+.rs-rate strong,
+.rs-bar-price strong,
+.summary-total span:last-child,
+.confirm-ref { font-weight: 700; }
+.dr-title { font-size: 18px; }
+.dr-month-title { font-size: 15px; font-weight: 700; }
+.dr-weekdays span { font-size: 12px; font-weight: 600; }
+.dr-day.is-start .dr-num,
+.dr-day.is-end .dr-num { font-weight: 700; }
+
+/* Good to know: Marriott's card titles */
+.policies-mark { color: #1C1C1C; letter-spacing: 0.22em; }
+.policy-card h3 { font-size: 17px; letter-spacing: -0.005em; }
+.policy-time { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.special-request h3 { font-size: 17px; letter-spacing: -0.005em; }
+
+/* ----- Top bar ----- */
+.header { transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.3s ease; }
+.header.is-overlay {
+    background: rgba(20, 20, 20, 0.42);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+/* language: a globe, like Marriott's */
+.language-selector select { padding-left: 32px; font-weight: 600; }
+.language-selector .globe { left: 8px; right: auto; }
+
+/* ----- Search card ----- */
+.search-card {
+    border: 0;
+    border-radius: 20px;
+    box-shadow: 0 14px 44px rgba(0, 0, 0, 0.14);
+}
+.search-card .date-range-value,
+.search-card .search-field select { font-size: 17px; font-weight: 500; }
+
+/* ----- Photos: Marriott-style cards, the name in white on a dark fade ----- */
+.gallery figure {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    background: var(--soft);
+}
+.gallery img { border-radius: 0; }
+.gallery figcaption {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 14px 16px 40px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0));
+    color: #FFFFFF;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+/* ----- Quick links and sticky search bar: computers only ----- */
+.hero-links,
+.sticky-search { display: none; }
+
+@media (min-width: 768px) {
+    h2 { font-size: 28px; }
+    .about-body h2 { font-size: 28px; }
+    .hero-text h1 { font-size: clamp(40px, 5.6vw, 50px); }
+}
+
+@media (min-width: 1024px) {
+    :root {
+        --hero-h: calc(clamp(540px, 74vh, 720px) + var(--header-height));
+        --hero-top: clamp(64px, 11vh, 110px);
+    }
+    h2 { font-size: 30px; }
+    .about-body h2 { font-size: 30px; }
+
+    /* top bar links */
+    .navigation a { font-size: 15px; font-weight: 500; }
+    .navigation a[href="#booking"] {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .navigation a[href="#booking"]::before {
+        content: "";
+        width: 16px;
+        height: 16px;
+        background: currentColor;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E") center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+
+    /* the photo, headline and search card, laid out like Marriott's */
+    .hero-image,
+    .has-overlay-header .hero-image { height: var(--hero-h); }
+    .hero-text,
+    .has-overlay-header .hero-text {
+        justify-content: flex-start;
+        padding-top: calc(var(--header-height) + var(--hero-top));
+        padding-bottom: 0;
+    }
+    .hero-text h1 { max-width: none; font-size: clamp(44px, 3.8vw, 56px); }
+    .hero-text .lead { max-width: 52ch; margin-top: 14px; font-size: 18px; }
+    /* the search card floats over the photo; the rest of the page starts below the photo */
+    main { position: relative; }
+    .search {
+        position: absolute;
+        z-index: 3;
+        top: calc(var(--header-height) + var(--hero-top) + 186px); /* main starts at the top of the photo */
+        left: 0;
+        right: 0;
+        margin: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    .perks { margin-top: 32px; }
+    .search-card { padding: 10px 10px 10px 12px; border-radius: 22px; }
+    .search-card .search-field {
+        min-height: 64px;
+        border-color: transparent;
+        border-radius: 14px;
+        transition: background-color 0.15s ease;
+    }
+    .search-card .search-field:hover,
+    .search-card .search-field:focus-within,
+    .search-card .date-range:focus-visible {
+        border-color: transparent;
+        background: var(--soft);
+        box-shadow: none;
+    }
+    .search-card .date-range { position: relative; }
+    .search-card .date-range::after {
+        content: "";
+        position: absolute;
+        top: 14px;
+        right: -7px;
+        bottom: 14px;
+        width: 1px;
+        background: var(--line-strong);
+    }
+    .search-card .btn { min-height: 56px; padding: 0 30px; font-size: 16px; }
+
+    /* quick links along the bottom of the photo */
+    .hero-links {
+        position: absolute;
+        z-index: 3;
+        left: var(--side);
+        right: var(--side);
+        bottom: 28px;
+        display: flex;
+        gap: 4px;
+        padding: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        background: rgba(20, 20, 20, 0.45);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+    }
+    .hero-links a {
+        display: inline-flex;
+        flex: 1;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: 999px;
+        color: #FFFFFF;
+        font-size: 15px;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .hero-links a:hover { background: #FFFFFF; color: #111111; }
+    .hero-links a:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+
+    /* slim search bar that takes the top bar's place while scrolling down */
+    .sticky-search {
+        position: fixed;
+        z-index: 99;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: block;
+        border-bottom: 1px solid var(--line);
+        background: var(--white);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+        transform: translateY(-110%);
+        transition: transform 0.3s ease;
+    }
+    .sticky-search-on .sticky-search { transform: none; }
+    .sticky-search-on .header { transform: translateY(-100%); }
+    .sticky-search-inner {
+        display: grid;
+        grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        height: var(--header-height);
+        padding: 0 var(--side);
+    }
+    .sticky-search-logo { margin-right: 16px; }
+    .sticky-search .search-field {
+        min-height: 56px;
+        padding: 7px 14px;
+        border-color: transparent;
+        border-radius: 14px;
+        background: transparent;
+    }
+    .sticky-search .search-field:hover,
+    .sticky-search .search-field:focus-within { background: var(--soft); box-shadow: none; }
+    .sticky-search .date-range-value,
+    .sticky-search .search-field select { font-size: 16px; font-weight: 500; }
+    .sticky-search-button { min-height: 50px; padding: 0 28px; }
+}
+
+@media (min-width: 1024px) and (prefers-reduced-motion: reduce) {
+    .sticky-search,
+    .hero-links a { transition: none; }
 }
