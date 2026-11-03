@@ -1399,180 +1399,6 @@ h3 {
 }
 
 
-/* =========================================
-   ZEBRA DOMUS INN
-   LUXURY POLICIES DESIGN
-========================================= */
-
-.policies {
-    background: #fff;
-    color: #000;
-}
-
-/* Heading */
-
-.policies-heading {
-    margin-bottom: 28px;
-}
-
-.policies-heading .eyebrow {
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 3px;
-    color: #666;
-    margin-bottom: 12px;
-}
-
-.policies-heading h2 {
-    font-size: 34px;
-    font-weight: 500;
-    letter-spacing: -1.5px;
-    margin: 0 0 10px;
-    color: #000;
-}
-
-.policies-heading h2 span {
-    color: #888;
-}
-
-.policies-heading .section-intro {
-    color: #666;
-    font-size: 14px;
-    line-height: 1.7;
-    max-width: 340px;
-}
-
-/* Check-in / Check-out panel */
-
-.stay-times {
-    display: grid;
-    grid-template-columns: 1fr 1px 1fr;
-    align-items: center;
-    background: #080808;
-    color: #fff;
-    padding: 24px 16px;
-    border-radius: 14px;
-    margin-bottom: 22px;
-}
-
-.stay-time {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-}
-
-.stay-time span {
-    font-size: 10px;
-    letter-spacing: 2px;
-    color: #aaa;
-    font-weight: 500;
-}
-
-.stay-time strong {
-    font-size: 23px;
-    font-weight: 500;
-}
-
-.stay-time small {
-    font-size: 12px;
-    color: #bbb;
-}
-
-.stay-divider {
-    width: 1px;
-    height: 55px;
-    background: #555;
-    margin: 0 auto;
-}
-
-/* Policy cards */
-
-.policies-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-}
-
-.policy-card {
-    position: relative;
-    background: #fff;
-    border: 1px solid #e5e5e5;
-    border-radius: 12px;
-    padding: 18px 14px;
-    min-width: 0;
-}
-
-.policy-number {
-    display: block;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 2px;
-    color: #999;
-    margin-bottom: 15px;
-}
-
-.policy-card h3 {
-    font-size: 15px;
-    line-height: 1.4;
-    font-weight: 500;
-    color: #000;
-    margin: 0 0 10px;
-}
-
-.policy-card p {
-    font-size: 12px;
-    line-height: 1.75;
-    color: #555;
-    margin: 0 0 8px;
-}
-
-.policy-card p:last-child {
-    margin-bottom: 0;
-}
-
-/* Special requests panel */
-
-.special-request {
-    margin-top: 18px;
-    padding: 25px 20px;
-    background: #080808;
-    color: #fff;
-    border-radius: 14px;
-}
-
-.special-request > span {
-    display: block;
-    color: #aaa;
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 2px;
-    margin-bottom: 12px;
-}
-
-.special-request h3 {
-    font-size: 21px;
-    font-weight: 500;
-    margin: 0 0 10px;
-}
-
-.special-request p {
-    font-size: 13px;
-    line-height: 1.7;
-    color: #ccc;
-    margin: 0;
-}
-
-/* Small phone screens */
-
-@media (max-width: 360px) {
-    .policies-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .stay-time strong {
-        font-size: 20px;
-    }
-}
 
 .map-container {
     width: 100%;
@@ -2356,12 +2182,6 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     .about-body { justify-content: center; padding: 32px; }
     .about-body .btn { align-self: flex-start; width: auto; padding: 0 28px; }
 
-    /* Good to know */
-    .policies-heading .section-intro { max-width: 52ch; }
-    .policies-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-    .policy-card { padding: 22px 20px; }
-    .policy-card p { font-size: 13.5px; }
-
     /* Find us */
     .map-container iframe { height: 360px; }
 
@@ -2551,17 +2371,6 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     .about-body { padding: 48px; gap: 12px; }
     .about-body h2 { font-size: 34px; }
 
-    /* Good to know: check-in times and special requests side by side */
-    .policies {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        column-gap: 24px;
-    }
-    .policies-heading { grid-column: 1 / -1; }
-    .stay-times { grid-row: 2; grid-column: 1; column-gap: 32px; margin-bottom: 24px; padding: 28px 32px; }
-    .special-request { grid-row: 2; grid-column: 2; margin: 0 0 24px; padding: 28px 32px; }
-    .policies-grid { grid-row: 3; grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-
     /* Find us: map on the left, buttons on the right */
     #contact {
         display: grid;
@@ -2702,13 +2511,6 @@ h3,
 .about-body h2 { font-size: 22px; }
 .footer-name { font-size: 16px; font-weight: 400; letter-spacing: 0.08em; }
 
-/* Good to know */
-.policies-heading h2 { font-size: 22px; font-weight: 300; letter-spacing: 0.04em; }
-.policy-card h3 { font-size: 13px; font-weight: 400; letter-spacing: 0.08em; line-height: 1.5; }
-.special-request h3 { font-size: 16px; font-weight: 400; }
-.stay-time span { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: 0.14em; }
-.stay-time strong { font-family: var(--font-display); font-size: 22px; font-weight: 300; letter-spacing: 0.02em; }
-
 /* calendar */
 .dr-title { font-size: 15px; font-weight: 400; letter-spacing: 0.08em; }
 .dr-month-title { font-family: var(--font-display); font-size: 13px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.12em; }
@@ -2723,7 +2525,6 @@ h3,
 
 @media (min-width: 768px) {
     h2,
-    .policies-heading h2,
     .about-body h2 { font-size: 26px; }
     .hero-text h1 { font-size: clamp(38px, 5.4vw, 46px); }
     .hero-badge { font-size: 11px; letter-spacing: 0.14em; }
@@ -2731,8 +2532,7 @@ h3,
 }
 
 @media (min-width: 1024px) {
-    h2,
-    .policies-heading h2 { font-size: 30px; }
+    h2 { font-size: 30px; }
     .about-body h2 { font-size: 28px; }
     .hero-text h1 { font-size: clamp(46px, 4vw, 58px); line-height: 1.15; }
     .hero-text .lead { font-size: 18px; }
@@ -2745,4 +2545,125 @@ h3,
         letter-spacing: 0.14em;
     }
     .search-card .btn { font-size: 13px; }
+}
+
+/* =========================================
+   GOOD TO KNOW (policies), in the style of Marriott's
+   "Your Lifelong Travel Partner" section: a small label, a large centred
+   heading, then equal white cards with centred text.
+   Phone: two cards per row. Tablet: two. Computer: four.
+========================================= */
+.policies-heading {
+    max-width: 640px;
+    margin: 0 auto 24px;
+    text-align: center;
+}
+.policies-mark {
+    margin: 0 0 10px;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.24em;
+}
+.policies-heading .section-intro {
+    max-width: 46ch;
+    text-wrap: balance;
+    margin: 10px auto 0;
+    font-size: 14.5px;
+    color: var(--muted);
+}
+.policy-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.policy-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 22px 14px 20px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--white);
+    text-align: center;
+}
+.policy-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 4px;
+    border-radius: 50%;
+    background: var(--soft);
+    color: var(--ink);
+}
+.policy-card h3 {
+    margin: 0;
+    text-wrap: balance;
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: 0.1em;
+}
+.policy-time {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 300;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+}
+.policy-card p {
+    margin: 0;
+    text-wrap: balance;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+.special-request {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-top: 16px;
+    padding: 24px 20px;
+    border-radius: 14px;
+    background: var(--soft);
+    text-align: center;
+}
+.special-request h3 { margin: 0; font-size: 14px; letter-spacing: 0.1em; }
+.special-request p { max-width: 52ch; text-wrap: balance; margin: 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
+.special-request-link {
+    margin-top: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    text-underline-offset: 3px;
+}
+@media (max-width: 340px) {
+    .policy-cards { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 768px) {
+    .policies-heading { margin-bottom: 32px; }
+    .policies-heading .section-intro { font-size: 15.5px; }
+    .policy-cards { gap: 16px; }
+    .policy-card { padding: 28px 22px 26px; }
+    .policy-card p { font-size: 13.5px; }
+    .special-request { margin-top: 20px; padding: 28px 32px; }
+}
+@media (min-width: 1024px) {
+    .policies-heading { margin-bottom: 40px; }
+    .policies-mark { margin-bottom: 14px; }
+    .policy-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+    .policy-card { padding: 32px 24px 30px; gap: 10px; }
+    .policy-icon { width: 52px; height: 52px; margin-bottom: 6px; }
+    .policy-card h3 { font-size: 13px; }
+    .policy-time { font-size: 24px; }
+    .special-request { margin-top: 24px; }
 }
