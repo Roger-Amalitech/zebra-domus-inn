@@ -1,7 +1,7 @@
 /* =========================================
    ZEBRA DOMUS INN
    Black-and-white version of the Huye motel mobile design:
-   Plus Jakarta Sans · black, white and greys ·
+   DM Sans and DM Mono · black, white and greys ·
    imigongo border in the footer. Photos stay in colour.
    ========================================= */
 
@@ -34,7 +34,8 @@
 
     --page-width: 480px;
     --header-height: 64px;
-    --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-display: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
 /* 2. RESET AND BASICS */
@@ -117,7 +118,7 @@ h1 {
     margin: 0;
     font-size: 30px;
     line-height: 1.15;
-    font-weight: 800;
+    font-weight: 500;
     letter-spacing: -0.02em;
 }
 
@@ -125,7 +126,7 @@ h2 {
     margin: 0;
     font-size: 22px;
     line-height: 1.25;
-    font-weight: 800;
+    font-weight: 500;
     letter-spacing: -0.01em;
 }
 
@@ -133,7 +134,7 @@ h3 {
     margin: 0;
     font-size: 18px;
     line-height: 1.3;
-    font-weight: 800;
+    font-weight: 500;
 }
 
 :focus-visible {
@@ -168,7 +169,7 @@ h3 {
     border: 0;
     border-radius: var(--radius);
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 500;
     line-height: 1.2;
     text-decoration: none;
     cursor: pointer;
@@ -295,7 +296,7 @@ h3 {
     border-radius: 10px;
     background: transparent;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     cursor: pointer;
 }
 
@@ -357,7 +358,7 @@ h3 {
     border-radius: 10px;
     color: var(--ink);
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 500;
     text-decoration: none;
 }
 
@@ -393,7 +394,7 @@ h3 {
     background: var(--white);
     color: var(--ink);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
 }
 
 .hero-badge svg {
@@ -453,7 +454,7 @@ h3 {
 
 .search-field label {
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--muted);
 }
 
@@ -484,7 +485,7 @@ h3 {
     outline: none;
     background: transparent;
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--ink);
 }
 
@@ -551,7 +552,7 @@ h3 {
 .perk strong {
     display: block;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
 }
 
 .perk strong + span {
@@ -575,7 +576,7 @@ h3 {
 .eyebrow {
     margin: 0;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--accent);
@@ -623,7 +624,7 @@ h3 {
     background: var(--white);
     color: var(--ink);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
 }
 
 .room-content {
@@ -636,7 +637,7 @@ h3 {
 .room-title {
     margin: 0;
     font-size: 18px;
-    font-weight: 800;
+    font-weight: 500;
 }
 
 .room-features {
@@ -667,7 +668,7 @@ h3 {
     background: #F2F2F2;
     color: #333333;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .room-bottom {
@@ -688,7 +689,7 @@ h3 {
 
 .room-price strong {
     font-size: 20px;
-    font-weight: 800;
+    font-weight: 500;
     line-height: 1.2;
 }
 
@@ -716,7 +717,7 @@ h3 {
     background: var(--accent);
     color: var(--white);
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 500;
     cursor: pointer;
     transition: background 0.15s ease;
 }
@@ -752,7 +753,7 @@ h3 {
 .room-error {
     background: var(--error-bg);
     color: var(--error);
-    font-weight: 600;
+    font-weight: 500;
 }
 
 /* 10. BOOKING FORM */
@@ -781,7 +782,7 @@ h3 {
     margin: 0 0 12px;
     padding: 0;
     font-size: 18px;
-    font-weight: 800;
+    font-weight: 500;
 }
 
 .card {
@@ -823,7 +824,7 @@ h3 {
 
 .stay-text strong {
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 500;
 }
 
 .stay-text span {
@@ -836,7 +837,7 @@ h3 {
     display: flex;
     align-items: center;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--accent);
     text-decoration: none;
 }
@@ -849,7 +850,7 @@ h3 {
 
 .form-field label {
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 500;
 }
 
 .form-field input,
@@ -965,7 +966,7 @@ h3 {
 
 .pay-text strong {
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 500;
 }
 
 .pay-text span {
@@ -1037,7 +1038,7 @@ h3 {
 }
 
 .summary-row span:last-child {
-    font-weight: 600;
+    font-weight: 500;
     text-align: right;
 }
 
@@ -1054,12 +1055,12 @@ h3 {
 
 .summary-total span:first-child {
     font-size: 16px;
-    font-weight: 800;
+    font-weight: 500;
 }
 
 .summary-total span:last-child {
     font-size: 20px;
-    font-weight: 800;
+    font-weight: 500;
 }
 
 /* Submit */
@@ -1081,7 +1082,7 @@ h3 {
     background: var(--error-bg);
     color: var(--error);
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 #bookingMessage.is-info {
@@ -1145,7 +1146,7 @@ h3 {
     border-radius: 999px;
     background: var(--soft);
     font-size: 16px;
-    font-weight: 800;
+    font-weight: 500;
     letter-spacing: 0.04em;
 }
 
@@ -1173,7 +1174,7 @@ h3 {
 
 .confirm-details dd {
     margin: 0;
-    font-weight: 700;
+    font-weight: 500;
     text-align: right;
 }
 
@@ -1197,7 +1198,7 @@ h3 {
     border: 1px solid var(--line);
     border-radius: var(--radius);
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .amenities svg {
@@ -1242,7 +1243,7 @@ h3 {
 .gallery figcaption {
     margin-top: 8px;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
 }
 
 /* 12. ABOUT */
@@ -1318,7 +1319,7 @@ h3 {
 
 .footer-name {
     font-size: 18px;
-    font-weight: 800;
+    font-weight: 500;
 }
 
 .footer-address {
@@ -1336,7 +1337,7 @@ h3 {
 
 .footer-nav a {
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     text-decoration: none;
 }
 
@@ -1393,7 +1394,7 @@ h3 {
     color: #fff;
     text-decoration: none;
     border-radius: 8px;
-    font-weight: 600;
+    font-weight: 500;
     text-align: center;
 }
 
@@ -1416,7 +1417,7 @@ h3 {
 
 .policies-heading .eyebrow {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 500;
     letter-spacing: 3px;
     color: #666;
     margin-bottom: 12px;
@@ -1424,7 +1425,7 @@ h3 {
 
 .policies-heading h2 {
     font-size: 34px;
-    font-weight: 800;
+    font-weight: 500;
     letter-spacing: -1.5px;
     margin: 0 0 10px;
     color: #000;
@@ -1464,12 +1465,12 @@ h3 {
     font-size: 10px;
     letter-spacing: 2px;
     color: #aaa;
-    font-weight: 700;
+    font-weight: 500;
 }
 
 .stay-time strong {
     font-size: 23px;
-    font-weight: 700;
+    font-weight: 500;
 }
 
 .stay-time small {
@@ -1504,7 +1505,7 @@ h3 {
 .policy-number {
     display: block;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 500;
     letter-spacing: 2px;
     color: #999;
     margin-bottom: 15px;
@@ -1513,7 +1514,7 @@ h3 {
 .policy-card h3 {
     font-size: 15px;
     line-height: 1.4;
-    font-weight: 700;
+    font-weight: 500;
     color: #000;
     margin: 0 0 10px;
 }
@@ -1543,14 +1544,14 @@ h3 {
     display: block;
     color: #aaa;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 500;
     letter-spacing: 2px;
     margin-bottom: 12px;
 }
 
 .special-request h3 {
     font-size: 21px;
-    font-weight: 700;
+    font-weight: 500;
     margin: 0 0 10px;
 }
 
@@ -1594,7 +1595,7 @@ h3 {
     color: #fff;
     text-decoration: none;
     border-radius: 8px;
-    font-weight: 600;
+    font-weight: 500;
     text-align: center;
 }
 
@@ -1626,7 +1627,7 @@ h3 {
 .date-display {
     position: absolute; top: 50%; transform: translateY(-50%);
     pointer-events: none; white-space: nowrap;
-    font-size: 16px; font-weight: 700; color: #111;
+    font-size: 16px; font-weight: 500; color: #111;
 }
 .date-display.is-empty { color: #5C5C5C; font-weight: 500; }
 
@@ -1772,7 +1773,7 @@ h3 {
     background: none;
     color: var(--ink);
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 3px;
     cursor: pointer;
@@ -1833,7 +1834,7 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
 .rs-body { padding: 20px 20px 28px; }
 .rs-title { font-size: 24px; line-height: 1.2; outline: none; }
 .rs-rate { margin: 6px 0 0; font-size: 15px; color: var(--muted); }
-.rs-rate strong { color: var(--ink); font-size: 18px; font-weight: 800; }
+.rs-rate strong { color: var(--ink); font-size: 18px; font-weight: 500; }
 .rs-meta {
     display: flex;
     align-items: center;
@@ -1861,7 +1862,7 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
     background: #F2F2F2;
     border-left: 3px solid #111111;
     font-size: 13.5px;
-    font-weight: 600;
+    font-weight: 500;
 }
 .rs-breakdown {
     display: flex;
@@ -1876,7 +1877,7 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
     padding-top: 8px;
     border-top: 1px solid var(--line-strong);
     font-size: 16px;
-    font-weight: 800;
+    font-weight: 500;
 }
 .rs-hint { margin: 0; font-size: 14px; color: var(--muted); }
 .rs-fees {
@@ -1918,7 +1919,7 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
     box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.06);
 }
 .rs-bar-price { display: flex; flex-direction: column; min-width: 0; }
-.rs-bar-price strong { font-size: 18px; font-weight: 800; line-height: 1.2; }
+.rs-bar-price strong { font-size: 18px; font-weight: 500; line-height: 1.2; }
 .rs-bar-price span { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-book { flex-shrink: 0; min-height: 50px; padding: 0 22px; }
 
@@ -1933,8 +1934,8 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
 
 /* ===== See-through ("glass") controls on photos =====
    A light dark tint plus blur, so the white icons stay readable on bright
-   photos (white rooms, sky) and dark ones alike. Used on the top photos
-   and the close button of the room details view. */
+   photos (white rooms, sky) and dark ones alike. Used on the close button
+   of the room details view. */
 .glass-button,
 .glass-pill {
     border: 1px solid rgba(255, 255, 255, 0.40);
@@ -1960,80 +1961,18 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     line-height: 1.5;
     font-variant-numeric: tabular-nums;
 }
 
-/* ===== Top photos: a slideshow of the inn ===== */
-.hero-image { background: #2B2B2B; } /* dark while a photo loads, so the white words stay readable */
-.hero-track {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    overscroll-behavior-x: contain;
-}
-.hero-track::-webkit-scrollbar { display: none; }
-.hero-track:focus-visible { outline: 3px solid #FFFFFF; outline-offset: -6px; }
-.hero-track img {
-    flex: 0 0 100%;
-    min-width: 0;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-}
-/* the words and the badge float over the photos; swipes pass through them */
+/* ===== Top photo ===== */
+.hero-image { background: #2B2B2B; } /* dark while the photo loads, so the white words stay readable */
+/* the words and the badge float over the photo */
 .hero-text,
 .hero-badge { pointer-events: none; }
-/* previous, one line per photo, next */
-.hero-controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 26px;
-    pointer-events: auto;
-}
-.hero-controls[hidden] { display: none; }
-.hero-dots {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-}
-.hero-dot {
-    position: relative;
-    width: 14px;
-    height: 28px;
-    padding: 0;
-    border: 0;
-    background: none;
-    cursor: pointer;
-    transition: width 0.25s ease;
-}
-.hero-dot::before {
-    content: "";
-    position: absolute;
-    left: 2px;
-    right: 2px;
-    top: 50%;
-    height: 3px;
-    margin-top: -1.5px;
-    border-radius: 2px;
-    background: rgba(255, 255, 255, 0.42);
-    transition: background-color 0.25s ease;
-}
-.hero-dot:hover::before { background: rgba(255, 255, 255, 0.75); }
-.hero-dot[aria-current="true"] { width: 28px; }
-.hero-dot[aria-current="true"]::before { background: #FFFFFF; }
-.hero-dot:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 0; border-radius: 4px; }
 @media (max-width: 360px) {
     .hero-text { padding-left: 16px; padding-right: 16px; }
-    .hero-controls { gap: 8px; }
-}
-@media (prefers-reduced-motion: reduce) {
-    .hero-dot, .hero-dot::before { transition: none; }
 }
 
 /* ===== Room cards: the whole card opens the room details ===== */
@@ -2068,7 +2007,7 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-ring);
 }
-.date-range-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.date-range-label { font-size: 12px; font-weight: 500; color: var(--muted); }
 .date-range .control { width: 100%; }
 .date-range .control > svg { color: var(--accent); }
 .date-range-value {
@@ -2076,7 +2015,7 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
     min-width: 0;
     overflow: hidden;
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 500;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
@@ -2087,7 +2026,7 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
     border-radius: 999px;
     background: var(--soft);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     white-space: nowrap;
 }
 .date-range-nights:empty { display: none; }
@@ -2181,7 +2120,7 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     justify-content: center;
     height: 56px;
     font-size: 16px;
-    font-weight: 800;
+    font-weight: 500;
 }
 .dr-weekdays,
 .dr-grid {
@@ -2194,7 +2133,7 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     justify-content: center;
     height: 30px;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--muted);
 }
 /* each day is a band (for the stay) with a round number on it */
@@ -2218,7 +2157,7 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     height: 42px;
     border-radius: 50%;
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 500;
     transition: background-color 0.12s ease;
 }
 .dr-day:disabled { color: #BDBDBD; cursor: default; }
@@ -2242,7 +2181,7 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
 .dr-day.is-preview-end { background: linear-gradient(to left, transparent 50%, #EFEFEF 50%); }
 .dr-day.is-preview-end { background: linear-gradient(to left, transparent 50%, #F5F5F5 50%); }
 .dr-day.is-start .dr-num,
-.dr-day.is-end .dr-num { background: var(--ink); color: var(--white); font-weight: 800; }
+.dr-day.is-end .dr-num { background: var(--ink); color: var(--white); font-weight: 500; }
 .dr-day.is-preview-end .dr-num { box-shadow: inset 0 0 0 1.5px var(--ink); }
 .dr-foot {
     display: flex;
@@ -2267,7 +2206,7 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     color: var(--ink);
     font: inherit;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 3px;
     cursor: pointer;
@@ -2510,7 +2449,7 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
         min-height: 40px;
         padding: 0 12px;
         font-size: 15px;
-        font-weight: 600;
+        font-weight: 500;
         transition: background-color 0.15s ease, color 0.15s ease;
     }
     .navigation a[href="#home"] { display: none; } /* the logo already goes home */
@@ -2523,7 +2462,7 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
         border: 1px solid var(--accent);
         background: var(--accent);
         color: var(--white);
-        font-weight: 700;
+        font-weight: 500;
     }
     .navigation a[href="#booking"]:hover { background: var(--accent-dark); color: var(--white); }
 
@@ -2540,10 +2479,6 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     .hero-text { padding-bottom: 100px; }
     .hero-text h1 { max-width: 18ch; font-size: clamp(50px, 4.8vw, 72px); line-height: 1.04; }
     .hero-text .lead { max-width: 52ch; margin-top: 18px; font-size: 19px; }
-    .hero-controls { margin-top: 34px; gap: 16px; }
-    .glass-button.hero-nav { width: 48px; height: 48px; }
-    .hero-dot { width: 20px; }
-    .hero-dot[aria-current="true"] { width: 40px; }
 
     /* Search: one bar - check-in, check-out, guests, button */
     .search { margin-top: -64px; }
@@ -2683,4 +2618,131 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
 @media (min-width: 768px) and (prefers-reduced-motion: reduce) {
     .room-image img,
     .navigation a { transition: none; }
+}
+
+/* =========================================
+   TYPE (in the style of The Prince Akatoki London)
+   Headings and buttons: DM Mono, light, in capitals, spaced out.
+   Reading text: DM Sans, light. Both are free Google Fonts, loaded in index.html.
+   Labels and form text stay in sentence case so they're quick to read.
+========================================= */
+body { font-weight: 350; }
+strong, b { font-weight: 500; }
+
+h1, h2, h3,
+.room-title,
+.rs-title,
+.footer-name,
+.dr-title,
+.payment-options legend,
+.confirmation h3 {
+    font-family: var(--font-display);
+    font-weight: 300;
+    line-height: 1.25;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+h2 { font-size: 22px; }
+h3,
+.form-block h3,
+.payment-options legend { font-size: 15px; font-weight: 400; letter-spacing: 0.08em; }
+
+/* the headline on the photo */
+.hero-text h1 {
+    max-width: 16ch;
+    font-size: clamp(28px, 8.2vw, 34px);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    text-wrap: balance;
+}
+.hero-text .lead { font-weight: 350; text-wrap: balance; }
+.hero-badge {
+    font-family: var(--font-display);
+    font-size: 10.5px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* buttons: small capitals, spaced out */
+.btn,
+.room-button,
+.directions-button,
+.dr-done {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+}
+.btn-large { font-size: 13.5px; }
+.btn-outline,
+.btn-tint,
+.room-button { font-size: 12px; letter-spacing: 0.12em; }
+.rs-book {
+    max-width: 60%;
+    font-size: 12.5px;
+    letter-spacing: 0.1em;
+    line-height: 1.25;
+    text-align: center;
+    white-space: normal;
+}
+
+/* small details in the same mono type */
+.eyebrow { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.02em; }
+.language-selector select { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.06em; }
+.date-range-nights { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: 0.06em; }
+.confirm-ref { font-family: var(--font-display); font-weight: 400; }
+
+/* cards and sections */
+.room-title { font-size: 16px; font-weight: 400; letter-spacing: 0.06em; }
+.rs-title { font-size: 22px; }
+.rs-section h3 { font-size: 14px; }
+.about-body h2 { font-size: 22px; }
+.footer-name { font-size: 16px; font-weight: 400; letter-spacing: 0.08em; }
+
+/* Good to know */
+.policies-heading h2 { font-size: 22px; font-weight: 300; letter-spacing: 0.04em; }
+.policy-card h3 { font-size: 13px; font-weight: 400; letter-spacing: 0.08em; line-height: 1.5; }
+.special-request h3 { font-size: 16px; font-weight: 400; }
+.stay-time span { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: 0.14em; }
+.stay-time strong { font-family: var(--font-display); font-size: 22px; font-weight: 300; letter-spacing: 0.02em; }
+
+/* calendar */
+.dr-title { font-size: 15px; font-weight: 400; letter-spacing: 0.08em; }
+.dr-month-title { font-family: var(--font-display); font-size: 13px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.12em; }
+.dr-weekdays span { font-family: var(--font-display); font-size: 11px; font-weight: 400; text-transform: uppercase; }
+.dr-num { font-weight: 400; }
+.dr-day.is-start .dr-num,
+.dr-day.is-end .dr-num { font-weight: 500; }
+
+@media (max-width: 360px) {
+    .hero-badge { font-size: 10px; letter-spacing: 0.05em; }
+}
+
+@media (min-width: 768px) {
+    h2,
+    .policies-heading h2,
+    .about-body h2 { font-size: 26px; }
+    .hero-text h1 { font-size: clamp(38px, 5.4vw, 46px); }
+    .hero-badge { font-size: 11px; letter-spacing: 0.14em; }
+    .rs-book { max-width: none; white-space: nowrap; }
+}
+
+@media (min-width: 1024px) {
+    h2,
+    .policies-heading h2 { font-size: 30px; }
+    .about-body h2 { font-size: 28px; }
+    .hero-text h1 { font-size: clamp(46px, 4vw, 58px); line-height: 1.15; }
+    .hero-text .lead { font-size: 18px; }
+    .navigation a { font-weight: 400; }
+    .navigation a[href="#booking"] {
+        font-family: var(--font-display);
+        font-size: 12.5px;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+    }
+    .search-card .btn { font-size: 13px; }
 }

@@ -10,7 +10,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&amp;family=DM+Sans:opsz,wght@9..40,300..700&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" sizes="192x192" href="images/logo/icon-192.png">
@@ -66,21 +66,7 @@
     <!-- HERO -->
     <section class="hero" id="home">
         <div class="hero-image">
-            <!-- Photos of the inn (no room photos here; rooms have their own photos).
-                 Guests swipe or use the arrows (hero-slider.js). To add a photo, copy one line;
-                 the first photo is the one guests see first. -->
-            <div class="hero-track" id="heroTrack" tabindex="0" role="region" aria-label="Photos of Zebra Domus Inn">
-                <img src="images/entrance.jpg" alt="Zebra Domus Inn with palm trees at the entrance" fetchpriority="high">
-                <img src="images/pool.jpg" alt="The large outdoor swimming pool with loungers" loading="lazy">
-                <img src="images/932183308.jpg" alt="The garden, with zebra statues and a golden arch" loading="lazy">
-                <img src="images/main-house.jpg" alt="The main house of Zebra Domus Inn and its garden" loading="lazy">
-                <img src="images/pool-second.jpg" alt="Second swimming pool beside the inn" loading="lazy">
-                <img src="images/lounge.jpg" alt="Bright lounge with cream sofas" loading="lazy">
-                <img src="images/outdoor-seating.jpg" alt="Covered seating area with green sofas" loading="lazy">
-                <img src="images/932183052.jpg" alt="Garden path with flowers and a golden arch" loading="lazy">
-                <img src="images/sitting-room.jpg" alt="Sitting room with black leather and wood sofas" loading="lazy">
-                <img src="images/sign.jpg" alt="The Zebra Domus Inn sign above the gate, with two zebra statues" loading="lazy">
-            </div>
+            <img src="images/entrance.jpg" alt="Zebra Domus Inn with palm trees at the entrance" fetchpriority="high">
 
             <span class="hero-badge">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7" cy="7" r="1.5"/></svg>
@@ -95,16 +81,6 @@
                 set in a green garden.
             </p>
 
-            <!-- Photo controls: previous, one line per photo (tap to jump), next. hero-slider.js turns them on. -->
-            <div class="hero-controls" id="heroControls" hidden>
-                <button type="button" class="glass-button hero-nav" id="heroPrev" aria-controls="heroTrack" aria-label="Previous photo">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-                </button>
-                <div class="hero-dots" id="heroDots"></div>
-                <button type="button" class="glass-button hero-nav" id="heroNext" aria-controls="heroTrack" aria-label="Next photo">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
-                </button>
-            </div>
         </div>
     </section>
 
@@ -557,6 +533,5 @@
 <script src="back-to-top.js"></script>
 <script src="header-overlay.js"></script>
 <script src="room-details.js"></script>
-<script src="hero-slider.js"></script>
 </body>
 </html>
