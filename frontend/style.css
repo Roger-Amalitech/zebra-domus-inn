@@ -2974,12 +2974,18 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 @media (prefers-reduced-motion: reduce) {
     .room-option { transition: none; }
 }
-/* phones: the dates and the nights tag fit on one line */
+/* the nights tag sits up beside the label (like Marriott's "1 NIGHT"),
+   so the dates get the whole line in every language */
+.date-range { position: relative; }
+.date-range .control { position: static; }
+.date-range-nights { position: absolute; top: 9px; right: 10px; padding: 1px 8px; font-size: 11.5px; }
+.sticky-search .date-range-nights { top: 7px; right: 14px; }
 @media (max-width: 420px) {
     .search-card .date-range-value { font-size: 16px; }
     .stay-card { padding: 12px; }
-    /* the nights tag sits up beside the label, so the dates get the whole line */
-    .date-range { position: relative; }
-    .date-range .control { position: static; }
-    .date-range-nights { position: absolute; top: 9px; right: 10px; padding: 1px 8px; font-size: 11.5px; }
+}
+@media (max-width: 360px) {
+    /* small phones: long dates (e.g. Kinyarwanda) go onto a second line instead of being cut */
+    .date-range-value,
+    .search-card .date-range-value { font-size: 15px; line-height: 1.3; white-space: normal; }
 }
