@@ -1,7 +1,7 @@
 /* Zebra Domus Inn: room details.
    Tapping a room card (anywhere except "Book now") opens a full-screen view of that room:
    one photo of the room, its price, the guest's dates, what's included and the house rules.
-   "Book this room" picks the room in the booking form and takes the guest straight there.
+   "Book this room" opens the booking page (book.html) with this room, the dates and the guests.
 
    The dates and guests in this view are the same as the ones in the search box at the top,
    so the two always agree; the dates use the shared calendar in date-range.js.
@@ -562,26 +562,10 @@
             return;
         }
 
-        /* Pick this room in the booking form, then take the guest there */
+        /* Open the booking page with this room and the chosen dates and guests */
         var roomId = idOf(room);
-        var select = main("roomType");
-        if (select) {
-            select.value = roomId;
-            select.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-        window.zebradormusSelectedRoomId = roomId;
-        window.zebradormusSelectedRoomName = String(room.name || "");
-
-        requestClose(function () {
-            var booking = main("booking");
-            if (!booking) return;
-            booking.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
-            var heading = booking.querySelector("h2");
-            if (heading) {
-                heading.setAttribute("tabindex", "-1");
-                heading.focus({ preventScroll: true });
-            }
-        });
+        if (typeof window.zdGoToBooking === "function") window.zdGoToBooking(roomId);
+        else window.location.href = "book.html?room=" + encodeURIComponent(roomId);
     }
 
 

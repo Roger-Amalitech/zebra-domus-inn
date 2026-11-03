@@ -55,7 +55,7 @@
     <nav id="navigation" class="navigation" aria-label="Main navigation">
         <a href="#home" data-i18n="home">Home</a>
         <a href="#rooms" data-i18n="ourRooms">Our Rooms</a>
-        <a href="#booking" data-i18n="bookYourStay">Book Your Stay</a>
+        <a href="book.html" data-i18n="bookYourStay">Book Your Stay</a>
         <a href="#about" data-i18n="about">About</a>
         <a href="#contact" data-i18n="contact">Contact</a>
         <a href="#policies">Policies</a>
@@ -88,7 +88,7 @@
         </nav>
     </section>
 
-    <!-- DATES AND GUESTS (these fields belong to the booking form below) -->
+    <!-- DATES AND GUESTS: "Check availability" takes them to the booking page (book.html) -->
     <section class="search" id="dates" aria-label="Choose your dates">
         <div class="search-card">
             <div class="date-grid">
@@ -96,7 +96,7 @@
                     <label for="checkIn" data-i18n="checkIn">Check-in</label>
                     <span class="control">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                        <input type="date" id="checkIn" name="checkIn" form="bookingForm" required>
+                        <input type="date" id="checkIn" name="checkIn">
                     </span>
                 </div>
 
@@ -104,7 +104,7 @@
                     <label for="checkOut" data-i18n="checkOut">Check-out</label>
                     <span class="control">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                        <input type="date" id="checkOut" name="checkOut" form="bookingForm" required>
+                        <input type="date" id="checkOut" name="checkOut">
                     </span>
                 </div>
             </div>
@@ -113,7 +113,7 @@
                 <label for="guests" data-i18n="guests">Guests</label>
                 <span class="control">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>
-                    <select id="guests" name="guests" form="bookingForm" required>
+                    <select id="guests" name="guests">
                         <option value="1" data-i18n="oneGuest">1 guest</option>
                         <option value="2" selected data-i18n="twoGuests">2 guests</option>
                         <option value="3" data-i18n="threeGuests">3 guests</option>
@@ -125,7 +125,7 @@
                 </span>
             </div>
 
-            <a href="#rooms" class="btn btn-primary btn-block" data-i18n="checkAvailability">Check availability</a>
+            <a href="book.html" class="btn btn-primary btn-block" data-i18n="checkAvailability">Check availability</a>
         </div>
     </section>
 
@@ -161,152 +161,6 @@
         <div class="room-grid" id="roomGrid"></div>
     </section>
 
-    <!-- BOOKING FORM -->
-    <section class="booking" id="booking">
-        <h2 data-i18n="bookingHeading">Book your stay</h2>
-        <p class="section-sub" data-i18n="bookingIntro">Pick a room, add your details and choose how to pay.</p>
-
-        <form id="bookingForm" class="booking-form" method="post" action="#booking">
-
-            <!-- Your stay -->
-            <div class="form-block">
-                <h3>Your stay</h3>
-                <div class="card">
-                    <div class="stay-summary">
-                        <span class="stay-icon" aria-hidden="true">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                        </span>
-                        <span class="stay-text">
-                            <strong id="stayDates">Choose your dates</strong>
-                            <span id="stayGuests">2 guests</span>
-                        </span>
-                        <a href="#dates" class="link-action">Change</a>
-                    </div>
-
-                    <div class="form-field">
-                        <label for="roomType">Room</label>
-                        <span class="select-wrap">
-                            <select id="roomType" name="roomId" required>
-                                <option value="">Loading rooms…</option>
-                            </select>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Your details -->
-            <div class="form-block">
-                <h3>Your details</h3>
-                <div class="card">
-                    <div class="form-field">
-                        <label for="guestName" data-i18n="fullName">Full name</label>
-                        <input type="text" id="guestName" name="guestName" placeholder="e.g. Jean Uwase" autocomplete="name" required>
-                    </div>
-
-                    <div class="form-field">
-                        <label for="guestPhone" data-i18n="phoneNumber">Phone number</label>
-                        <input type="tel" id="guestPhone" name="guestPhone" placeholder="078X XXX XXX" autocomplete="tel" required>
-                    </div>
-
-                    <div class="form-field">
-                        <label for="guestEmail" data-i18n="emailAddress">Email for your confirmation</label>
-                        <input type="email" id="guestEmail" name="guestEmail" placeholder="name@example.com" autocomplete="email" required>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Payment -->
-            <fieldset class="form-block payment-options">
-                <legend data-i18n="paymentMethod">How would you like to pay?</legend>
-
-                <label class="pay-option">
-                    <input type="radio" name="paymentMethod" value="MTN Mobile Money" checked>
-                    <span class="pay-icon" aria-hidden="true">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-                    </span>
-                    <span class="pay-text">
-                        <strong data-i18n="mtnMobileMoney">MTN Mobile Money</strong>
-                        <span>Pay from your MoMo wallet</span>
-                    </span>
-                    <span class="pay-ring" aria-hidden="true"></span>
-                </label>
-
-                <label class="pay-option">
-                    <input type="radio" name="paymentMethod" value="Airtel Money">
-                    <span class="pay-icon" aria-hidden="true">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-                    </span>
-                    <span class="pay-text">
-                        <strong data-i18n="airtelMoney">Airtel Money</strong>
-                        <span>Pay from your Airtel wallet</span>
-                    </span>
-                    <span class="pay-ring" aria-hidden="true"></span>
-                </label>
-
-                <label class="pay-option">
-                    <input type="radio" name="paymentMethod" value="Visa/Mastercard">
-                    <span class="pay-icon" aria-hidden="true">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
-                    </span>
-                    <span class="pay-text">
-                        <strong data-i18n="cardPayment">Visa or Mastercard</strong>
-                        <span>Debit or credit card</span>
-                    </span>
-                    <span class="pay-ring" aria-hidden="true"></span>
-                </label>
-
-                <label class="pay-option">
-                    <input type="radio" name="paymentMethod" value="Pay at the Motel">
-                    <span class="pay-icon" aria-hidden="true">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
-                    </span>
-                    <span class="pay-text">
-                        <strong data-i18n="payAtMotel">Pay at the inn</strong>
-                        <span>Pay at reception when you arrive</span>
-                    </span>
-                    <span class="pay-ring" aria-hidden="true"></span>
-                </label>
-
-                <p class="pay-note" id="paymentNote">Your booking is saved as pending until your payment is confirmed.</p>
-            </fieldset>
-
-            <!-- Price and confirm button: under the form on a phone, a column on the right on a computer -->
-            <div class="booking-aside">
-            <!-- Price summary -->
-            <div class="card summary" id="priceSummary" aria-live="polite">
-                <p class="summary-empty">Choose a room and your dates to see the total.</p>
-            </div>
-
-            <!-- Submit -->
-            <div class="submit-area">
-                <button type="submit" id="searchButton" class="btn btn-primary btn-block btn-large" data-i18n="confirmBooking">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    <span class="button-label">Confirm booking</span>
-                </button>
-
-                <p id="bookingMessage" role="status" aria-live="polite"></p>
-
-                <p class="secure-line">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
-                    Booked directly with Zebra Domus
-                </p>
-            </div>
-            </div>
-        </form>
-
-        <!-- Shown after a successful booking -->
-        <div class="confirmation" id="bookingConfirmed" hidden tabindex="-1">
-            <span class="confirm-icon" aria-hidden="true">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-            </span>
-            <h3>Booking received</h3>
-            <p class="confirm-lead">Thank you. Keep this reference for your stay.</p>
-            <span class="confirm-ref" id="confirmRef"></span>
-            <dl class="confirm-details" id="confirmDetails"></dl>
-            <button type="button" class="btn btn-outline btn-block" id="newBookingButton">Make another booking</button>
-        </div>
-    </section>
 
     <!-- AMENITIES: taken from the Zebra Domus Booking.com listing -->
     <section class="section" id="amenities" aria-labelledby="amenitiesTitle">
@@ -379,7 +233,7 @@
                     at the restaurant, the bar or the lounge with its outdoor fireplace.
                     Free bicycles are available for guests.
                 </p>
-                <a href="#booking" class="btn btn-tint btn-block" data-i18n="experiencezebradormus">Book your stay</a>
+                <a href="book.html" class="btn btn-tint btn-block" data-i18n="experiencezebradormus">Book your stay</a>
             </div>
         </article>
     </section>
@@ -517,7 +371,7 @@
         </address>
         <nav class="footer-nav" aria-label="Footer">
             <a href="#rooms">Rooms</a>
-            <a href="#booking">Book</a>
+            <a href="book.html">Book</a>
             <a href="#about">About</a>
             <a href="#contact">Contact</a>
             <a href="#policies">Policies</a>
@@ -532,6 +386,7 @@
 </div>
 
 <script src="translations.js"></script>
+<script src="page-nav.js"></script>
 <script src="script.js"></script>
 <script src="date-display.js"></script>
 <script src="date-range.js"></script>

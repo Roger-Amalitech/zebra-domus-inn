@@ -147,8 +147,7 @@ function initzebradormusMobileMenu() {
     const navigation = document.getElementById("navigation");
 
     if (!menuButton || !navigation) {
-        console.error("Mobile menu button or navigation was not found.");
-        return;
+        return; /* the booking page has no menu */
     }
 
     function setMenu(isOpen) {
@@ -243,8 +242,7 @@ function renderzebradormusRooms() {
     const roomGrid = document.getElementById("roomGrid");
 
     if (!roomGrid) {
-        console.error('Zebra Domus: "#roomGrid" was not found.');
-        return;
+        return; /* the booking page shows rooms its own way (book.js) */
     }
 
     const t = getTranslations();
@@ -470,15 +468,16 @@ function updateRoomsIntro() {
 async function loadzebradormusRooms() {
     const roomGrid = document.getElementById("roomGrid");
 
-    if (!roomGrid) {
-        console.error('Zebra Domus: "#roomGrid" was not found.');
-        return;
+    /* Show the inn's own room list straight away, so the page doesn't jump when the rooms
+       arrive (and "Back" from the booking page returns to the right place). If the booking
+       server answers, its rooms replace these a moment later. */
+    if (zebradormusRooms.length === 0) {
+        zebradormusRooms = BUILT_IN_ROOMS;
+        populateRoomSelect();
+        updateRoomsIntro();
+        renderzebradormusRooms();
+        updateBookingSummary();
     }
-
-    const loading = document.createElement("p");
-    loading.className = "room-status";
-    loading.textContent = "Loading rooms…";
-    roomGrid.replaceChildren(loading);
 
     try {
         const response = await fetch(`${GREEN_HAVEN_API}/rooms`);
@@ -531,7 +530,8 @@ async function loadzebradormusRooms() {
 }
 
 
-/* Book Now: select the room and scroll to the booking form */
+/* Book Now: open the booking page (book.html) with this room and the chosen
+   dates and guests (see page-nav.js), instead of scrolling down the page */
 
 function handlezebradormusBookNow(event) {
     const button = event.target.closest(".room-button");
@@ -546,53 +546,12 @@ function handlezebradormusBookNow(event) {
         return;
     }
 
-    const roomId = button.dataset.roomId;
-    const roomName = button.dataset.roomName;
+    const roomId = button.dataset.roomId || "";
 
-    const bookingSection = document.getElementById("booking");
-    const roomType = document.getElementById("roomType");
-
-    /* Remember the selected room for other booking code. */
-
-    window.zebradormusSelectedRoomId = roomId;
-    window.zebradormusSelectedRoomName = roomName;
-
-    /* Select the matching room in the dropdown. */
-
-    if (roomType) {
-        const options = Array.from(roomType.options);
-
-        let matchingOption = options.find((option) =>
-            option.value === roomId && roomId !== ""
-        );
-
-        if (!matchingOption) {
-            matchingOption = options.find((option) =>
-                option.value === roomName ||
-                option.text.trim() === roomName
-            );
-        }
-
-        if (matchingOption) {
-            roomType.value = matchingOption.value;
-            roomType.dispatchEvent(
-                new Event("change", { bubbles: true })
-            );
-        } else {
-            console.warn(
-                "Book Now: No matching option exists in #roomType. " +
-                "The form will still scroll into view."
-            );
-        }
-    }
-
-    if (bookingSection) {
-        bookingSection.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+    if (typeof window.zdGoToBooking === "function") {
+        window.zdGoToBooking(roomId);
     } else {
-        console.error('Book Now: Add id="booking" to the booking section.');
+        window.location.href = "book.html" + (roomId ? "?room=" + encodeURIComponent(roomId) : "");
     }
 }
 
@@ -849,7 +808,7 @@ function showConfirmation(booking) {
     form.hidden = true;
     confirmation.hidden = false;
     confirmation.focus({ preventScroll: true });
-    confirmation.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.scrollTo(0, 0);
 }
 
 async function handleBookingSubmit(event) {
@@ -950,10 +909,7 @@ function resetBooking() {
     renderzebradormusRooms();
     updateBookingSummary();
 
-    document.getElementById("dates")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-    });
+    window.scrollTo(0, 0);
 }
 
 

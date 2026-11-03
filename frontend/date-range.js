@@ -571,31 +571,21 @@
             });
         }
 
-        /* "Change" next to the dates in the booking form opens the calendar there */
-        var stayCard = document.querySelector(".stay-summary");
-        var change = stayCard && stayCard.querySelector('a[href="#dates"]');
-        if (change) {
-            change.addEventListener("click", function (event) {
+        /* Booking page: "Confirm booking" without dates opens the calendar (after the
+           browser has checked the other fields), instead of an error the guest can't see */
+        var form = checkIn.form;
+        if (form && searchTrigger) {
+            form.addEventListener("submit", function (event) {
+                if (checkIn.value && checkOut.value) return;
                 event.preventDefault();
-                open(stayCard);
-            });
+                event.stopImmediatePropagation();
+                searchTrigger.scrollIntoView({ block: "center" });
+                open(searchTrigger);
+            }, true);
         }
-
-        /* "Confirm booking" without dates: open the calendar instead of a hidden error */
-        var invalidShown = false;
-        [checkIn, checkOut].forEach(function (input) {
-            input.addEventListener("invalid", function (event) {
-                event.preventDefault();
-                if (invalidShown) return;
-                invalidShown = true;
-                setTimeout(function () { invalidShown = false; }, 500);
-                if (stayCard) stayCard.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
-                setTimeout(function () { open(stayCard || searchTrigger); }, reduceMotion() ? 0 : 350);
-            });
-        });
     }
 
-    window.ZDDateRange = { open: open, makeTrigger: makeTrigger };
+    window.ZDDateRange = { open: open, makeTrigger: makeTrigger, shortDate: shortDate };
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();

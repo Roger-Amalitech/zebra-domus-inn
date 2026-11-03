@@ -46,7 +46,7 @@
 }
 
 html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto; /* links jump straight to their section (page-nav.js adds a short fade) */
     scroll-padding-top: calc(var(--header-height) + 12px);
     -webkit-text-size-adjust: 100%;
 }
@@ -2194,7 +2194,7 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     }
     .navigation a[href="#home"] { display: none; } /* the logo already goes home */
     .navigation a { border-radius: 999px; }
-    .navigation a[href="#booking"] {
+    .navigation a[href="book.html"] {
         order: 99;
         margin-left: 10px;
         padding: 0 22px;
@@ -2204,13 +2204,13 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
         color: var(--white);
         font-weight: 500;
     }
-    .navigation a[href="#booking"]:hover { background: var(--accent-dark); color: var(--white); }
+    .navigation a[href="book.html"]:hover { background: var(--accent-dark); color: var(--white); }
 
     /* Header over the photo: white words, outlined white "Book" button */
     .header.is-overlay .navigation a { color: #FFFFFF; }
     .header.is-overlay .navigation a:hover { background: rgba(255, 255, 255, 0.16); }
-    .header.is-overlay .navigation a[href="#booking"] { border-color: rgba(255, 255, 255, 0.85); background: transparent; color: #FFFFFF; }
-    .header.is-overlay .navigation a[href="#booking"]:hover { background: #FFFFFF; color: #111111; }
+    .header.is-overlay .navigation a[href="book.html"] { border-color: rgba(255, 255, 255, 0.85); background: transparent; color: #FFFFFF; }
+    .header.is-overlay .navigation a[href="book.html"]:hover { background: #FFFFFF; color: #111111; }
 
     /* Top photos: taller, bigger headline */
     .hero-image,
@@ -2267,7 +2267,7 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     .booking-form > .payment-options { grid-column: 1; }
     .booking-aside {
         grid-column: 2;
-        grid-row: 1 / span 3;
+        grid-row: 1 / span 4;
         position: sticky;
         top: calc(var(--header-height) + 24px);
         gap: 16px;
@@ -2624,14 +2624,14 @@ h3,
 
     /* top bar links */
     .navigation a { font-size: 15px; font-weight: 500; }
-    .navigation a[href="#booking"] {
+    .navigation a[href="book.html"] {
         display: inline-flex;
         align-items: center;
         gap: 8px;
         font-size: 14px;
         font-weight: 600;
     }
-    .navigation a[href="#booking"]::before {
+    .navigation a[href="book.html"]::before {
         content: "";
         width: 16px;
         height: 16px;
@@ -2839,4 +2839,147 @@ h3,
     .location-card { padding: 44px 40px; gap: 12px; }
     .location-title { font-size: 24px; }
     .map-container { min-height: 500px; }
+}
+
+/* =========================================
+   MOVING AROUND (page-nav.js): a short fade instead of a visible scroll
+========================================= */
+main,
+.footer { transition: opacity 0.18s ease; }
+html.is-leaving main,
+html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
+@media (prefers-reduced-motion: reduce) {
+    main,
+    .footer { transition: none; }
+}
+
+/* =========================================
+   BOOKING PAGE (book.html)
+   Header with the logo, "Back to the inn" and the language; the stay, the rooms
+   as cards, the guest's details and payment on the left; the chosen room,
+   the total and "Confirm booking" on the right on a computer.
+========================================= */
+.checkout-header .header-actions { gap: 6px; margin-left: auto; }
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    padding: 0 14px 0 8px;
+    border-radius: 999px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.back-link:hover { background: var(--soft); color: var(--ink); }
+.book-page .booking {
+    margin-top: 0;
+    min-height: calc(100vh - var(--header-height));
+    padding-top: 28px;
+}
+.book-page .footer { margin-top: 0; }
+.checkout h1 { font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; }
+
+/* your stay: the same date field and guests as on the home page, in a plain card */
+.stay-card {
+    border: 1px solid var(--line);
+    box-shadow: none;
+}
+
+/* choose your room */
+.room-choice { min-width: 0; margin: 0; padding: 0; border: 0; }
+.room-choice legend { margin: 0 0 12px; padding: 0; font-size: 17px; font-weight: 700; }
+.room-options { display: flex; flex-direction: column; gap: 10px; }
+.room-option {
+    position: relative;
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr) 24px;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px 10px 10px;
+    border: 2px solid var(--line);
+    border-radius: 16px;
+    background: var(--white);
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+.room-option input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.room-option:hover { border-color: var(--line-strong); }
+.room-option.is-selected { border-color: var(--ink); }
+.room-option:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.room-option.is-disabled { opacity: 0.55; cursor: not-allowed; }
+.room-option-photo {
+    width: 92px;
+    height: 78px;
+    overflow: hidden;
+    border-radius: 12px;
+    background: var(--soft);
+}
+.room-option-photo img { width: 100%; height: 100%; object-fit: cover; }
+.room-option-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.room-option-name { font-size: 16px; font-weight: 700; }
+.room-option-meta,
+.room-option-rate { font-size: 13px; color: var(--muted); }
+.room-option-rate b { color: var(--ink); font-weight: 700; }
+.room-option-total { font-size: 13px; font-weight: 600; }
+.room-option-warning { font-size: 12.5px; font-weight: 600; color: #333333; }
+.room-option-check {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--line-strong);
+    border-radius: 50%;
+}
+.room-option.is-selected .room-option-check { border-color: var(--ink); background: var(--ink); }
+.room-option.is-selected .room-option-check::after {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--white);
+}
+
+/* the chosen room above the total */
+.book-page .booking-aside { gap: 12px; }
+.summary-room {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--white);
+}
+.summary-room img { width: 76px; height: 62px; flex-shrink: 0; border-radius: 10px; object-fit: cover; }
+.summary-room-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; color: var(--muted); }
+.summary-room-text strong { font-size: 15px; color: var(--ink); }
+
+@media (max-width: 360px) {
+    .room-option { grid-template-columns: 72px minmax(0, 1fr) 22px; gap: 10px; }
+    .room-option-photo { width: 72px; height: 64px; }
+    .back-link span { display: none; }
+}
+@media (min-width: 768px) {
+    .book-page .booking { padding-top: 40px; }
+    .checkout h1 { font-size: 32px; }
+    .room-option { grid-template-columns: 120px minmax(0, 1fr) 24px; gap: 18px; }
+    .room-option-photo { width: 120px; height: 90px; }
+}
+@media (min-width: 1024px) {
+    .book-page .booking { padding-top: 48px; }
+    .checkout h1 { font-size: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .room-option { transition: none; }
+}
+/* phones: the dates and the nights tag fit on one line */
+@media (max-width: 420px) {
+    .search-card .date-range-value { font-size: 16px; }
+    .stay-card { padding: 12px; }
+    /* the nights tag sits up beside the label, so the dates get the whole line */
+    .date-range { position: relative; }
+    .date-range .control { position: static; }
+    .date-range-nights { position: absolute; top: 9px; right: 10px; padding: 1px 8px; font-size: 11.5px; }
 }
