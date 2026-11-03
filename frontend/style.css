@@ -1634,11 +1634,11 @@ h3 {
 .back-to-top {
     position: fixed;
     z-index: 90;
-    bottom: calc(20px + env(safe-area-inset-bottom));
+    bottom: calc(16px + env(safe-area-inset-bottom));
     /* sits at the right edge of the page column, not the far edge of a wide screen */
     right: max(16px, calc((100vw - var(--page-width, 480px)) / 2 + 16px));
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     display: grid;
     place-items: center;
     border: 0;
@@ -1646,7 +1646,7 @@ h3 {
     background: #111111;
     color: #FFFFFF;
     /* white ring keeps it visible over the black footer */
-    box-shadow: 0 0 0 2px #FFFFFF, 0 6px 18px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 0 0 1.5px #FFFFFF, 0 4px 12px rgba(0, 0, 0, 0.2);
     cursor: pointer;
     opacity: 0;
     visibility: hidden;
