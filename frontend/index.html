@@ -66,11 +66,22 @@
     <!-- HERO -->
     <section class="hero" id="home">
         <div class="hero-image">
-            <img
-                src="images/entrance.jpg"
-                alt="Zebra Domus Inn with palm trees at the entrance"
-                fetchpriority="high"
-            >
+            <!-- Photos of the inn (no room photos here; rooms have their own photos).
+                 Guests swipe or use the arrows (hero-slider.js). To add a photo, copy one line;
+                 the first photo is the one guests see first. -->
+            <div class="hero-track" id="heroTrack" tabindex="0" role="region" aria-label="Photos of Zebra Domus Inn">
+                <img src="images/entrance.jpg" alt="Zebra Domus Inn with palm trees at the entrance" fetchpriority="high">
+                <img src="images/pool.jpg" alt="The large outdoor swimming pool with loungers" loading="lazy">
+                <img src="images/932183308.jpg" alt="The garden, with zebra statues and a golden arch" loading="lazy">
+                <img src="images/main-house.jpg" alt="The main house of Zebra Domus Inn and its garden" loading="lazy">
+                <img src="images/pool-second.jpg" alt="Second swimming pool beside the inn" loading="lazy">
+                <img src="images/lounge.jpg" alt="Bright lounge with cream sofas" loading="lazy">
+                <img src="images/outdoor-seating.jpg" alt="Covered seating area with green sofas" loading="lazy">
+                <img src="images/932183052.jpg" alt="Garden path with flowers and a golden arch" loading="lazy">
+                <img src="images/sitting-room.jpg" alt="Sitting room with black leather and wood sofas" loading="lazy">
+                <img src="images/sign.jpg" alt="The Zebra Domus Inn sign above the gate, with two zebra statues" loading="lazy">
+            </div>
+
             <span class="hero-badge">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7" cy="7" r="1.5"/></svg>
                 Book direct — no booking-site fees
@@ -83,6 +94,17 @@
                 Comfortable rooms, two outdoor pools, a spa and a restaurant,
                 set in a green garden.
             </p>
+
+            <!-- Photo controls: previous, one line per photo (tap to jump), next. hero-slider.js turns them on. -->
+            <div class="hero-controls" id="heroControls" hidden>
+                <button type="button" class="glass-button hero-nav" id="heroPrev" aria-controls="heroTrack" aria-label="Previous photo">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                <div class="hero-dots" id="heroDots"></div>
+                <button type="button" class="glass-button hero-nav" id="heroNext" aria-controls="heroTrack" aria-label="Next photo">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+            </div>
         </div>
     </section>
 
@@ -269,6 +291,8 @@
                 <p class="pay-note" id="paymentNote">Your booking is saved as pending until your payment is confirmed.</p>
             </fieldset>
 
+            <!-- Price and confirm button: under the form on a phone, a column on the right on a computer -->
+            <div class="booking-aside">
             <!-- Price summary -->
             <div class="card summary" id="priceSummary" aria-live="polite">
                 <p class="summary-empty">Choose a room and your dates to see the total.</p>
@@ -287,6 +311,7 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
                     Booked directly with Zebra Domus
                 </p>
+            </div>
             </div>
         </form>
 
@@ -321,7 +346,7 @@
     <!-- PHOTOS -->
     <section class="section" aria-labelledby="photosTitle">
         <h2 id="photosTitle">Photos</h2>
-        <p class="section-sub">Pools, lounges and rooms. Swipe to see more.</p>
+        <p class="section-sub">Pools, lounges and rooms.<span class="swipe-hint"> Swipe to see more.</span></p>
         <div class="gallery" tabindex="0" role="region" aria-label="Photo gallery, scroll sideways">
             <figure>
                 <img src="images/sign.jpg" alt="The Zebra Domus Inn sign above the gate, with two zebra statues" loading="lazy">
@@ -528,7 +553,10 @@
 <script src="translations.js"></script>
 <script src="script.js"></script>
 <script src="date-display.js"></script>
+<script src="date-range.js"></script>
 <script src="back-to-top.js"></script>
 <script src="header-overlay.js"></script>
+<script src="room-details.js"></script>
+<script src="hero-slider.js"></script>
 </body>
 </html>

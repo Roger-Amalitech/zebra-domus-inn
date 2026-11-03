@@ -1326,7 +1326,7 @@ h3 {
     font-style: normal;
     line-height: 1.6;
     color: var(--footer-text);
-}.footer-nav a
+}
 
 .footer-nav {
     display: flex;
@@ -1665,54 +1665,64 @@ h3 {
     .back-to-top, .back-to-top.is-visible { transition: none; transform: none; }
 }
 
-/* ===== Hero: headline on the photo ===== */
+/* ===== Top of the page: centred words on a darkened photo ===== */
 .hero { position: relative; }
 .hero-image {
     height: 480px;
     height: clamp(440px, 64svh, 560px);
 }
-.hero-image img { object-position: 50% 40%; }
-/* soft dark fade so white words stay readable on any part of the photo */
+.hero-image img { object-position: 50% 45%; }
+/* an even dark tint over every photo, a little deeper at the top (header) and bottom (date card),
+   so the white words read on bright and dark photos alike */
 .hero-image::after {
     content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
     background:
-        linear-gradient(to bottom, rgba(0, 0, 0, 0.30) 0%, rgba(0, 0, 0, 0) 22%),
-        linear-gradient(to top, rgba(0, 0, 0, 0.80) 0%, rgba(0, 0, 0, 0.50) 38%, rgba(0, 0, 0, 0) 70%);
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0) 26%, rgba(0, 0, 0, 0) 68%, rgba(0, 0, 0, 0.38) 100%),
+        rgba(0, 0, 0, 0.42);
 }
-/* see-through "glass" badge */
+/* see-through "glass" badge, centred at the top */
 .hero-badge {
     z-index: 2;
-    background: rgba(255, 255, 255, 0.16);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.14);
     color: #FFFFFF;
     border: 1px solid rgba(255, 255, 255, 0.38);
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
 }
 .hero-badge svg { color: #FFFFFF; }
+/* headline, text and photo controls, centred in the photo */
 .hero-text {
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     z-index: 2;
-    padding: 0 20px 64px; /* leaves room for the date card that overlaps the photo */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 72px 20px 60px; /* below the badge, above the date card that overlaps the photo */
+    text-align: center;
 }
 .hero-text h1 {
     max-width: 14ch;
+    margin: 0 auto;
     color: #FFFFFF;
-    font-size: clamp(30px, 9vw, 40px);
-    line-height: 1.06;
-    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+    font-size: clamp(32px, 9.4vw, 42px);
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
 }
 .hero-text .lead {
-    max-width: 34ch;
-    margin-top: 12px;
-    color: rgba(255, 255, 255, 0.92);
+    max-width: 32ch;
+    margin: 14px auto 0;
+    color: rgba(255, 255, 255, 0.9);
     font-size: 15.5px;
-    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45);
 }
 /* the date card sits slightly over the bottom of the photo */
 .search {
@@ -1721,6 +1731,8 @@ h3 {
     margin-top: -40px;
     padding-top: 0;
 }
+/* rounded "pill" search button */
+.search-card .btn { border-radius: 999px; }
 
 /* ===== See-through header over the photo ===== */
 .header { transition: background-color 0.25s ease, border-color 0.25s ease; }
@@ -1740,11 +1752,935 @@ h3 {
     height: calc(clamp(440px, 64svh, 560px) + var(--header-height));
 }
 .has-overlay-header .hero-badge { top: calc(var(--header-height) + 12px); }
-.has-overlay-header .hero-image::after {
-    background:
-        linear-gradient(to bottom, rgba(0, 0, 0, 0.50) 0%, rgba(0, 0, 0, 0) 30%),
-        linear-gradient(to top, rgba(0, 0, 0, 0.80) 0%, rgba(0, 0, 0, 0.50) 38%, rgba(0, 0, 0, 0) 70%);
-}
+.has-overlay-header .hero-text { padding-top: calc(var(--header-height) + 64px); }
 @media (prefers-reduced-motion: reduce) {
     .header { transition: none; }
+}
+
+/* ===== Room details (see room-details.js) ===== */
+/* Cards: tapping opens the details, with a clear link under the text */
+.room-card.has-details .room-image,
+.room-card.has-details .room-title { cursor: pointer; }
+.room-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    margin: -2px 0 0;
+    padding: 6px 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.room-more svg { transition: transform 0.15s ease; }
+.room-more:hover svg { transform: translateX(3px); }
+
+/* The view itself: full screen on a phone, the width of the page column on a computer */
+html.rs-lock, html.rs-lock body { overflow: hidden; }
+.room-sheet {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: var(--page-width);
+    height: 100%;
+    max-height: none;
+    margin: 0 auto;
+    padding: 0;
+    border: 0;
+    background: var(--white);
+    color: var(--ink);
+    overflow: hidden;
+}
+.room-sheet[open] {
+    display: flex;
+    flex-direction: column;
+    animation: rs-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.room-sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
+@keyframes rs-in {
+    from { opacity: 0; transform: translateY(28px); }
+    to { opacity: 1; transform: none; }
+}
+.rs-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* One photo of the room */
+.rs-gallery { position: relative; background: var(--soft); }
+.rs-photo {
+    position: relative;
+    margin: 0;
+    aspect-ratio: 4 / 3;
+    background: var(--soft);
+}
+.rs-photo img { width: 100%; height: 100%; object-fit: cover; }
+.rs-photo.is-missing img { visibility: hidden; }
+.rs-close {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 12px;
+} /* see-through look comes from .glass-button */
+
+/* Name, price and text */
+.rs-body { padding: 20px 20px 28px; }
+.rs-title { font-size: 24px; line-height: 1.2; outline: none; }
+.rs-rate { margin: 6px 0 0; font-size: 15px; color: var(--muted); }
+.rs-rate strong { color: var(--ink); font-size: 18px; font-weight: 800; }
+.rs-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: var(--muted);
+}
+.rs-description { margin: 14px 0 0; font-size: 15px; line-height: 1.6; color: #333333; }
+.rs-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 22px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line-soft);
+}
+.rs-section h3 { font-size: 17px; }
+
+
+.rs-warning {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #F2F2F2;
+    border-left: 3px solid #111111;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+.rs-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    background: var(--soft);
+}
+.rs-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14.5px; }
+.rs-total {
+    padding-top: 8px;
+    border-top: 1px solid var(--line-strong);
+    font-size: 16px;
+    font-weight: 800;
+}
+.rs-hint { margin: 0; font-size: 14px; color: var(--muted); }
+.rs-fees {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+/* Lists */
+.rs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.rs-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 14.5px;
+    line-height: 1.45;
+}
+.rs-list li svg { margin-top: 1px; }
+
+/* Bottom bar: price on the left, the next step on the right */
+.rs-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--white);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.06);
+}
+.rs-bar-price { display: flex; flex-direction: column; min-width: 0; }
+.rs-bar-price strong { font-size: 18px; font-weight: 800; line-height: 1.2; }
+.rs-bar-price span { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-book { flex-shrink: 0; min-height: 50px; padding: 0 22px; }
+
+@media (max-width: 360px) {
+    .rs-body { padding-left: 16px; padding-right: 16px; }
+    .rs-book { padding: 0 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .room-sheet[open] { animation: none; }
+    .room-more svg { transition: none; }
+}
+
+/* ===== See-through ("glass") controls on photos =====
+   A light dark tint plus blur, so the white icons stay readable on bright
+   photos (white rooms, sky) and dark ones alike. Used on the top photos
+   and the close button of the room details view. */
+.glass-button,
+.glass-pill {
+    border: 1px solid rgba(255, 255, 255, 0.40);
+    background: rgba(17, 17, 17, 0.28);
+    color: #FFFFFF;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+.glass-button {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+.glass-button:hover { background: rgba(17, 17, 17, 0.45); }
+.glass-button:active { transform: scale(0.94); }
+.glass-button:focus-visible { outline: 3px solid #FFFFFF; outline-offset: 2px; }
+.glass-pill {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ===== Top photos: a slideshow of the inn ===== */
+.hero-image { background: #2B2B2B; } /* dark while a photo loads, so the white words stay readable */
+.hero-track {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+}
+.hero-track::-webkit-scrollbar { display: none; }
+.hero-track:focus-visible { outline: 3px solid #FFFFFF; outline-offset: -6px; }
+.hero-track img {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+}
+/* the words and the badge float over the photos; swipes pass through them */
+.hero-text,
+.hero-badge { pointer-events: none; }
+/* previous, one line per photo, next */
+.hero-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 26px;
+    pointer-events: auto;
+}
+.hero-controls[hidden] { display: none; }
+.hero-dots {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.hero-dot {
+    position: relative;
+    width: 14px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    transition: width 0.25s ease;
+}
+.hero-dot::before {
+    content: "";
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    top: 50%;
+    height: 3px;
+    margin-top: -1.5px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.42);
+    transition: background-color 0.25s ease;
+}
+.hero-dot:hover::before { background: rgba(255, 255, 255, 0.75); }
+.hero-dot[aria-current="true"] { width: 28px; }
+.hero-dot[aria-current="true"]::before { background: #FFFFFF; }
+.hero-dot:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 0; border-radius: 4px; }
+@media (max-width: 360px) {
+    .hero-text { padding-left: 16px; padding-right: 16px; }
+    .hero-controls { gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .hero-dot, .hero-dot::before { transition: none; }
+}
+
+/* ===== Room cards: the whole card opens the room details ===== */
+/* ("Book now" still books straight away) */
+.room-card.has-details { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) {
+    .glass-button { transition: none; }
+}
+
+/* Footer menu links: light grey on the black footer (they were black on black) */
+.footer-nav a { color: var(--footer-text); }
+
+/* Price and confirm button sit together (a column on the right on a computer) */
+.booking-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ===== Dates: one "Check-in – Check-out" field and a calendar (date-range.js) ===== */
+.date-range {
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: var(--ink);
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+.date-range:hover { border-color: var(--ink); }
+.date-range:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.date-range-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.date-range .control { width: 100%; }
+.date-range .control > svg { color: var(--accent); }
+.date-range-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.date-range-value.is-empty { color: var(--muted); font-weight: 500; }
+.date-range-nights {
+    flex-shrink: 0;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--soft);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.date-range-nights:empty { display: none; }
+
+/* The calendar: slides up from the bottom on a phone */
+html.dr-lock, html.dr-lock body { overflow: hidden; }
+.dr-picker {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 92vh;
+    max-height: 92dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 20px 20px 0 0;
+    background: var(--white);
+    color: var(--ink);
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+.dr-picker[open] {
+    display: flex;
+    flex-direction: column;
+    animation: dr-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.dr-picker::backdrop { background: rgba(0, 0, 0, 0.45); }
+@keyframes dr-up {
+    from { transform: translateY(40px); opacity: 0; }
+    to { transform: none; opacity: 1; }
+}
+.dr-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+.dr-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 16px 2px 20px;
+}
+.dr-title { font-size: 18px; }
+.dr-close {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--soft);
+    color: var(--ink);
+    cursor: pointer;
+}
+.dr-close:hover { background: var(--line); }
+.dr-hint { margin: 0; padding: 0 20px 6px; font-size: 14px; color: var(--muted); }
+.dr-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 14px 10px;
+}
+.dr-nav-btn {
+    position: absolute;
+    z-index: 1;
+    top: 8px;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: var(--white);
+    color: var(--ink);
+    cursor: pointer;
+}
+.dr-nav-btn:hover:not(:disabled) { border-color: var(--ink); }
+.dr-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.dr-prev { left: 14px; }
+.dr-next { right: 14px; }
+.dr-months { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+.dr-month-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 56px;
+    font-size: 16px;
+    font-weight: 800;
+}
+.dr-weekdays,
+.dr-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.dr-weekdays span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+}
+/* each day is a band (for the stay) with a round number on it */
+.dr-day {
+    display: grid;
+    place-items: center;
+    height: 44px;
+    margin: 2px 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+}
+.dr-num {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    font-size: 15px;
+    font-weight: 600;
+    transition: background-color 0.12s ease;
+}
+.dr-day:disabled { color: #BDBDBD; cursor: default; }
+.dr-day:not(:disabled):hover .dr-num { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.dr-day:focus-visible { outline: none; }
+.dr-day:focus-visible .dr-num { outline: 2px solid var(--ink); outline-offset: 2px; }
+.dr-day.is-today .dr-num::after {
+    content: "";
+    position: absolute;
+    bottom: 6px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+}
+.dr-day.is-range,
+.dr-day.is-preview { background: #EFEFEF; }
+.dr-day.is-preview { background: #F5F5F5; }
+.dr-day.is-start.has-range { background: linear-gradient(to right, transparent 50%, #EFEFEF 50%); }
+.dr-day.is-end,
+.dr-day.is-preview-end { background: linear-gradient(to left, transparent 50%, #EFEFEF 50%); }
+.dr-day.is-preview-end { background: linear-gradient(to left, transparent 50%, #F5F5F5 50%); }
+.dr-day.is-start .dr-num,
+.dr-day.is-end .dr-num { background: var(--ink); color: var(--white); font-weight: 800; }
+.dr-day.is-preview-end .dr-num { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.dr-foot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom)) 20px;
+    border-top: 1px solid var(--line);
+}
+.dr-summary { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.dr-summary strong {
+    overflow: hidden;
+    font-size: 15px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.dr-summary span { font-size: 13px; color: var(--muted); }
+.dr-clear {
+    flex-shrink: 0;
+    padding: 10px 6px;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.dr-done {
+    flex-shrink: 0;
+    min-height: 46px;
+    padding: 0 24px;
+    border-radius: 999px;
+    font-size: 15px;
+}
+.dr-done:disabled { opacity: 0.3; cursor: not-allowed; }
+@media (max-width: 360px) {
+    .dr-num { width: 38px; height: 38px; font-size: 14px; }
+    .dr-done { padding: 0 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .dr-picker[open] { animation: none; }
+    .dr-num, .date-range { transition: none; }
+}
+
+/* =========================================
+   TABLET AND DESKTOP
+   Phones (under 768px wide) keep the design above exactly as it is.
+   768px to 1023px (tablets): the page uses the full width, content up to 720px.
+   1024px and up (computers, landscape tablets): full desktop layout, content up to 1160px,
+   menu in the header, search bar in one line, rooms in three columns,
+   booking form with the price on the right.
+   Every section lines up on the same edges using --side.
+========================================= */
+@media (min-width: 768px) {
+    :root {
+        --page-width: 100vw;
+        --wrap: 720px;
+        --side: max(32px, calc((100% - var(--wrap)) / 2));
+    }
+
+    .page {
+        max-width: none;
+        box-shadow: none;
+    }
+
+    body { font-size: 16px; }
+    h2 { font-size: 28px; }
+    .section-sub { font-size: 15.5px; }
+
+    /* Header */
+    .header {
+        padding-left: var(--side);
+        padding-right: calc(var(--side) - 10px);
+    }
+    .navigation {
+        padding-left: calc(var(--side) - 10px);
+        padding-right: calc(var(--side) - 10px);
+    }
+
+    /* Top photos */
+    .hero-image,
+    .has-overlay-header .hero-image { height: calc(clamp(480px, 62vh, 640px) + var(--header-height)); }
+    .hero-text {
+        padding-left: var(--side);
+        padding-right: var(--side);
+        padding-bottom: 84px;
+    }
+    .hero-text h1 { max-width: 16ch; font-size: clamp(42px, 6vw, 54px); }
+    .hero-text .lead { max-width: 44ch; font-size: 17px; }
+
+    /* Search: dates and guests in one row, the button underneath */
+    .search {
+        margin-top: -56px;
+        padding-left: var(--side);
+        padding-right: var(--side);
+    }
+    .search-card {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        gap: 12px;
+        padding: 14px;
+    }
+    .search-card .btn { grid-column: 1 / -1; }
+
+    /* Why book direct: three side by side */
+    .perks {
+        padding-left: var(--side);
+        padding-right: var(--side);
+    }
+    .perks-box {
+        flex-direction: row;
+        gap: 20px;
+        padding: 20px;
+    }
+    .perk { flex: 1; min-width: 0; }
+
+    /* Sections */
+    .section {
+        padding: 56px var(--side) 0;
+    }
+
+    /* Rooms: two per row */
+    .room-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    .room-grid > .room-status,
+    .room-grid > .room-error { grid-column: 1 / -1; }
+    .room-card { display: flex; flex-direction: column; }
+    .room-image { height: 200px; }
+    .room-content { flex: 1; }
+    .room-bottom { margin-top: auto; }
+
+    /* Booking */
+    .booking {
+        margin-top: 56px;
+        padding: 56px var(--side);
+    }
+    .payment-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+    .pay-note { grid-column: 1 / -1; }
+    .confirmation { max-width: 560px; margin-left: auto; margin-right: auto; }
+
+    /* Amenities: four per row */
+    .amenities {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    /* Photos: two and a bit in view, still swipeable, inside the page edges */
+    .gallery {
+        margin: 20px 0 0;
+        padding: 0 0 6px;
+        scroll-padding-left: 0;
+    }
+    .gallery figure { flex-basis: 44%; }
+    .gallery img { height: 240px; }
+
+    /* About: photo beside the text */
+    .about-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .about-card img { height: 100%; min-height: 320px; }
+    .about-body { justify-content: center; padding: 32px; }
+    .about-body .btn { align-self: flex-start; width: auto; padding: 0 28px; }
+
+    /* Good to know */
+    .policies-heading .section-intro { max-width: 52ch; }
+    .policies-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .policy-card { padding: 22px 20px; }
+    .policy-card p { font-size: 13.5px; }
+
+    /* Find us */
+    .map-container iframe { height: 360px; }
+
+    /* Footer */
+    .footer { margin-top: 64px; }
+    .footer-body {
+        padding: 40px var(--side) 36px;
+    }
+
+    /* Room details: a window in the middle of the screen, not full screen */
+    .room-sheet {
+        width: min(640px, calc(100% - 64px));
+        max-width: none;
+        height: min(860px, calc(100% - 64px));
+        margin: auto;
+        border-radius: 20px;
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
+    }
+    .rs-photo { aspect-ratio: auto; height: min(320px, 36vh); }
+    .rs-body { padding: 24px 28px 28px; }
+    .rs-bar { padding: 14px 28px; }
+    .rs-close { top: 14px; right: 14px; }
+
+    /* Back to top: the right edge of the screen */
+    .back-to-top { right: 24px; bottom: 24px; }
+
+    /* Calendar: a box next to the date field, two months side by side */
+    .dr-picker {
+        inset: auto;
+        width: 720px;
+        max-width: calc(100vw - 24px);
+        max-height: calc(100vh - 24px);
+        border-radius: 20px;
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+    }
+    .dr-picker[open] { animation-name: dr-pop; animation-duration: 0.18s; }
+    .dr-picker::backdrop { background: rgba(0, 0, 0, 0.18); }
+    .dr-head { padding: 18px 20px 0 28px; }
+    .dr-hint { padding: 0 28px 4px; }
+    .dr-body { padding: 4px 24px 12px; overflow: visible; }
+    .dr-prev { left: 24px; }
+    .dr-next { right: 24px; }
+    .dr-months { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; }
+    .dr-day { height: 42px; }
+    .dr-num { width: 40px; height: 40px; font-size: 14.5px; }
+    .dr-foot { padding: 14px 24px 16px 28px; }
+}
+@keyframes dr-pop {
+    from { transform: translateY(-6px); opacity: 0; }
+    to { transform: none; opacity: 1; }
+}
+
+@media (min-width: 1024px) {
+    :root {
+        --wrap: 1160px;
+        --header-height: 76px;
+    }
+
+    h2 { font-size: 32px; }
+
+    /* Header: logo, menu, "Book" button and language in one line */
+    .header {
+        justify-content: flex-start;
+        gap: 24px;
+        padding-right: var(--side);
+    }
+    .logo { order: 0; }
+    .navigation {
+        order: 1;
+        position: static;
+        display: flex;
+        flex: 1;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        padding: 0;
+        background: none;
+        border: 0;
+        box-shadow: none;
+    }
+    .header-actions { order: 2; }
+    .menu-button { display: none; }
+    .navigation a {
+        min-height: 40px;
+        padding: 0 12px;
+        font-size: 15px;
+        font-weight: 600;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .navigation a[href="#home"] { display: none; } /* the logo already goes home */
+    .navigation a { border-radius: 999px; }
+    .navigation a[href="#booking"] {
+        order: 99;
+        margin-left: 10px;
+        padding: 0 22px;
+        min-height: 44px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: var(--white);
+        font-weight: 700;
+    }
+    .navigation a[href="#booking"]:hover { background: var(--accent-dark); color: var(--white); }
+
+    /* Header over the photo: white words, outlined white "Book" button */
+    .header.is-overlay .navigation a { color: #FFFFFF; }
+    .header.is-overlay .navigation a:hover { background: rgba(255, 255, 255, 0.16); }
+    .header.is-overlay .navigation a[href="#booking"] { border-color: rgba(255, 255, 255, 0.85); background: transparent; color: #FFFFFF; }
+    .header.is-overlay .navigation a[href="#booking"]:hover { background: #FFFFFF; color: #111111; }
+
+    /* Top photos: taller, bigger headline */
+    .hero-image,
+    .has-overlay-header .hero-image { height: calc(clamp(540px, 78vh, 760px) + var(--header-height)); }
+    .has-overlay-header .hero-text { padding-top: calc(var(--header-height) + 72px); }
+    .hero-text { padding-bottom: 100px; }
+    .hero-text h1 { max-width: 18ch; font-size: clamp(50px, 4.8vw, 72px); line-height: 1.04; }
+    .hero-text .lead { max-width: 52ch; margin-top: 18px; font-size: 19px; }
+    .hero-controls { margin-top: 34px; gap: 16px; }
+    .glass-button.hero-nav { width: 48px; height: 48px; }
+    .hero-dot { width: 20px; }
+    .hero-dot[aria-current="true"] { width: 40px; }
+
+    /* Search: one bar - check-in, check-out, guests, button */
+    .search { margin-top: -64px; }
+    .search-card {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+        align-items: center;
+        padding: 12px 12px 12px 14px;
+        border-radius: 24px;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16);
+    }
+    .search-card .btn {
+        grid-column: auto;
+        min-height: 56px;
+        padding: 0 36px;
+    }
+
+    .perks-box { padding: 22px 28px; gap: 32px; }
+
+    .section { padding-top: 80px; }
+
+    /* Rooms: three per row, lift on hover */
+    .room-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+        margin-top: 24px;
+    }
+    .room-image { height: 230px; overflow: hidden; }
+    .room-image img { transition: transform 0.35s ease; }
+    .room-card.has-details:hover {
+        border-color: var(--line-strong);
+        box-shadow: var(--shadow);
+    }
+    .room-card.has-details:hover .room-image img { transform: scale(1.04); }
+
+    /* Booking: the form on the left, price and confirm button on the right */
+    .booking { margin-top: 80px; padding-top: 72px; padding-bottom: 72px; }
+    .booking-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 380px;
+        column-gap: 40px;
+        row-gap: 28px;
+        align-items: start;
+        margin-top: 28px;
+    }
+    .booking-form > .form-block,
+    .booking-form > .payment-options { grid-column: 1; }
+    .booking-aside {
+        grid-column: 2;
+        grid-row: 1 / span 3;
+        position: sticky;
+        top: calc(var(--header-height) + 24px);
+        gap: 16px;
+    }
+    .booking-aside .summary { padding: 20px; }
+
+    /* Photos: all eight in a grid, no sideways scrolling with a mouse */
+    .gallery {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 20px;
+        margin: 24px 0 0;
+        padding: 0;
+        overflow: visible;
+    }
+    .gallery img { height: 210px; }
+    .swipe-hint { display: none; }
+
+    /* About */
+    .about-card img { min-height: 420px; }
+    .about-body { padding: 48px; gap: 12px; }
+    .about-body h2 { font-size: 34px; }
+
+    /* Good to know: check-in times and special requests side by side */
+    .policies {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 24px;
+    }
+    .policies-heading { grid-column: 1 / -1; }
+    .stay-times { grid-row: 2; grid-column: 1; column-gap: 32px; margin-bottom: 24px; padding: 28px 32px; }
+    .special-request { grid-row: 2; grid-column: 2; margin: 0 0 24px; padding: 28px 32px; }
+    .policies-grid { grid-row: 3; grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+
+    /* Find us: map on the left, buttons on the right */
+    #contact {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+        grid-template-rows: auto auto auto auto 1fr;
+        column-gap: 32px;
+        align-items: start;
+    }
+    #contact > h2 { grid-column: 1 / -1; margin-bottom: 20px; }
+    #contact > .map-container { grid-column: 1; grid-row: 2 / span 4; }
+    #contact > .directions-button { grid-column: 2; grid-row: 2; margin-top: 0; padding: 15px 20px; border-radius: var(--radius); }
+    #contact > .contact-actions { grid-column: 2; grid-row: 3; }
+    #contact > .contact-whatsapp { grid-column: 2; grid-row: 4; }
+    #contact .map-container iframe { height: 400px; }
+
+    /* Footer: name and address on the left, menu on the right, small print below */
+    .footer-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 48px;
+        row-gap: 10px;
+        padding-top: 48px;
+    }
+    .footer-logo { grid-column: 1; margin-bottom: 8px; }
+    .footer-name,
+    .footer-address { grid-column: 1; }
+    .footer-nav {
+        grid-column: 2;
+        grid-row: 1 / span 3;
+        align-self: start;
+        gap: 8px 28px;
+    }
+    .footer-nav a { font-size: 15px; }
+    .footer-copy {
+        grid-column: 1 / -1;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    /* Room details window */
+    .room-sheet { width: min(680px, calc(100% - 64px)); }
+}
+
+/* Tablets only: rooms as wide cards, photo on the left, so an odd number of rooms never leaves a gap */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .room-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .room-card { flex-direction: row; }
+    .room-image { flex: 0 0 42%; height: auto; min-height: 240px; }
+    .room-image img { position: absolute; inset: 0; }
+    .room-content { padding: 20px 24px; }
+}
+
+@media (min-width: 768px) and (prefers-reduced-motion: reduce) {
+    .room-image img,
+    .navigation a { transition: none; }
 }
