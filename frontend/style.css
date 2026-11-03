@@ -1664,3 +1664,87 @@ h3 {
 @media (prefers-reduced-motion: reduce) {
     .back-to-top, .back-to-top.is-visible { transition: none; transform: none; }
 }
+
+/* ===== Hero: headline on the photo ===== */
+.hero { position: relative; }
+.hero-image {
+    height: 480px;
+    height: clamp(440px, 64svh, 560px);
+}
+.hero-image img { object-position: 50% 40%; }
+/* soft dark fade so white words stay readable on any part of the photo */
+.hero-image::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.30) 0%, rgba(0, 0, 0, 0) 22%),
+        linear-gradient(to top, rgba(0, 0, 0, 0.80) 0%, rgba(0, 0, 0, 0.50) 38%, rgba(0, 0, 0, 0) 70%);
+}
+/* see-through "glass" badge */
+.hero-badge {
+    z-index: 2;
+    background: rgba(255, 255, 255, 0.16);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+.hero-badge svg { color: #FFFFFF; }
+.hero-text {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    padding: 0 20px 64px; /* leaves room for the date card that overlaps the photo */
+}
+.hero-text h1 {
+    max-width: 14ch;
+    color: #FFFFFF;
+    font-size: clamp(30px, 9vw, 40px);
+    line-height: 1.06;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+}
+.hero-text .lead {
+    max-width: 34ch;
+    margin-top: 12px;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 15.5px;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+}
+/* the date card sits slightly over the bottom of the photo */
+.search {
+    position: relative;
+    z-index: 3;
+    margin-top: -40px;
+    padding-top: 0;
+}
+
+/* ===== See-through header over the photo ===== */
+.header { transition: background-color 0.25s ease, border-color 0.25s ease; }
+.header.is-overlay {
+    background: transparent;
+    border-bottom-color: transparent;
+}
+.header.is-overlay .language-selector select,
+.header.is-overlay .language-selector svg,
+.header.is-overlay .menu-button { color: #FFFFFF; }
+/* keep the language list readable when it opens */
+.header.is-overlay .language-selector select option { color: #111111; }
+/* the photo slides up behind the header */
+.has-overlay-header .hero { margin-top: calc(-1 * var(--header-height)); }
+.has-overlay-header .hero-image {
+    height: calc(480px + var(--header-height));
+    height: calc(clamp(440px, 64svh, 560px) + var(--header-height));
+}
+.has-overlay-header .hero-badge { top: calc(var(--header-height) + 12px); }
+.has-overlay-header .hero-image::after {
+    background:
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.50) 0%, rgba(0, 0, 0, 0) 30%),
+        linear-gradient(to top, rgba(0, 0, 0, 0.80) 0%, rgba(0, 0, 0, 0.50) 38%, rgba(0, 0, 0, 0) 70%);
+}
+@media (prefers-reduced-motion: reduce) {
+    .header { transition: none; }
+}
