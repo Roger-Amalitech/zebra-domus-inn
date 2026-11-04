@@ -3208,20 +3208,21 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 /* =========================================
    TIGHTER SPACING between sections, in Marriott's rhythm:
    even, compact gaps so the page reads as one flow.
-   Phone about 30px, tablet about 40px, computer about 52px.
+   Phone about 26px, tablet about 32px, computer about 40px.
 ========================================= */
-.section { padding-top: 26px; }
-.footer { margin-top: 36px; }
+.section { padding-top: 22px; }
+.footer { margin-top: 28px; }
 @media (max-width: 767px) {
-    .room-grid { padding-bottom: 12px; } /* swipe row: just enough room for the cards' shadow */
+    .room-grid { padding-bottom: 6px; } /* swipe row: just enough room for the cards' shadow */
 }
 @media (min-width: 768px) {
-    .section { padding-top: 40px; }
-    .footer { margin-top: 44px; }
-    .policies-heading { margin-bottom: 24px; }
+    .section { padding-top: 28px; }
+    .footer { margin-top: 34px; }
+    .policies-heading { margin-bottom: 22px; }
 }
 @media (min-width: 1024px) {
-    .section { padding-top: 52px; }
-    .footer { margin-top: 56px; }
-    .policies-heading { margin-bottom: 28px; }
+    .section { padding-top: 34px; }
+    .footer { margin-top: 40px; }
+    .perks { margin-top: 12px; }
+    .policies-heading { margin-bottom: 26px; }
 }
