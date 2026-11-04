@@ -2786,7 +2786,7 @@ h3,
 }
 .map-container {
     position: relative;
-    min-height: 260px;
+    min-height: 190px;
     background: #E8E8E8;
 }
 .map-container iframe {
@@ -2801,8 +2801,8 @@ h3,
 .location-card {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 22px 20px 20px;
+    gap: 9px;
+    padding: 18px 18px 18px;
 }
 .location-mark {
     margin: 0;
@@ -2825,20 +2825,20 @@ h3,
 .location-card .contact-whatsapp { margin-top: 0; }
 
 @media (min-width: 768px) {
-    .location { grid-template-columns: 320px minmax(0, 1fr); }
+    .location { grid-template-columns: 340px minmax(0, 1fr); }
     .location-card {
         grid-column: 1;
         grid-row: 1;
         justify-content: center;
-        padding: 32px 28px;
+        padding: 24px 24px;
     }
-    .map-container { grid-column: 2; min-height: 440px; }
+    .map-container { grid-column: 2; min-height: 300px; }
 }
 @media (min-width: 1024px) {
-    .location { grid-template-columns: 380px minmax(0, 1fr); }
-    .location-card { padding: 44px 40px; gap: 12px; }
-    .location-title { font-size: 24px; }
-    .map-container { min-height: 500px; }
+    .location { grid-template-columns: 420px minmax(0, 1fr); }
+    .location-card { padding: 30px 36px; gap: 10px; }
+    .location-title { font-size: 20px; }
+    .map-container { min-height: 330px; }
 }
 
 /* =========================================
