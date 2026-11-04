@@ -279,16 +279,7 @@ function renderzebradormusRooms() {
     const selectedId = document.getElementById("roomType")?.value || "";
     const fragment = document.createDocumentFragment();
 
-    /* The first card is shown big. The Deluxe Room goes first because its photo
-       is the sharpest (900 px wide); the others keep their order beside it. */
-    const featured = zebradormusRooms.find((room) =>
-        String(room.name || room.roomType || "").toLowerCase().includes("deluxe")
-    );
-    const roomsInView = featured
-        ? [featured, ...zebradormusRooms.filter((room) => room !== featured)]
-        : zebradormusRooms;
-
-    roomsInView.forEach((room) => {
+    zebradormusRooms.forEach((room) => {
         const translated = getRoomTranslations(room);
         const roomId = getRoomId(room);
         const capacity = Number(room.capacity) || 2;
@@ -386,12 +377,6 @@ function renderzebradormusRooms() {
     });
 
     roomGrid.replaceChildren(fragment);
-
-    /* One big card and the rest beside it in two rows (Marriott's layout)
-       works for an odd number of rooms: 3 rooms = 1 big + 2, 5 = 1 big + 4. */
-    const count = zebradormusRooms.length;
-    roomGrid.classList.toggle("is-mosaic", count >= 3 && count % 2 === 1);
-    roomGrid.style.setProperty("--small-columns", String(Math.max(1, (count - 1) / 2)));
 }
 
 
