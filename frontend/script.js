@@ -238,6 +238,26 @@ function getRoomTranslations(room) {
    ROOM CARDS
 ========================================= */
 
+/* Words on the room cards, in the guest's language */
+function roomCardWords() {
+    const words = {
+        en: {
+            upTo: (n) => `Up to ${n} ${n === 1 ? "guest" : "guests"}`,
+            fits: (n) => `Fits up to ${n} ${n === 1 ? "guest" : "guests"}`
+        },
+        rw: {
+            upTo: (n) => (n === 1 ? "Umushyitsi 1 gusa" : `Kugeza ku bashyitsi ${n}`),
+            fits: (n) => (n === 1 ? "Cyakira umushyitsi 1 gusa" : `Cyakira abashyitsi ${n} gusa`)
+        },
+        fr: {
+            upTo: (n) => `Jusqu'à ${n} ${n === 1 ? "voyageur" : "voyageurs"}`,
+            fits: (n) => `Jusqu'à ${n} ${n === 1 ? "voyageur" : "voyageurs"} seulement`
+        }
+    };
+    const language = document.getElementById("languageSelect")?.value;
+    return words[language] || words.en;
+}
+
 function renderzebradormusRooms() {
     const roomGrid = document.getElementById("roomGrid");
 
@@ -259,7 +279,16 @@ function renderzebradormusRooms() {
     const selectedId = document.getElementById("roomType")?.value || "";
     const fragment = document.createDocumentFragment();
 
-    zebradormusRooms.forEach((room) => {
+    /* The first card is shown big. The Deluxe Room goes first because its photo
+       is the sharpest (900 px wide); the others keep their order beside it. */
+    const featured = zebradormusRooms.find((room) =>
+        String(room.name || room.roomType || "").toLowerCase().includes("deluxe")
+    );
+    const roomsInView = featured
+        ? [featured, ...zebradormusRooms.filter((room) => room !== featured)]
+        : zebradormusRooms;
+
+    roomsInView.forEach((room) => {
         const translated = getRoomTranslations(room);
         const roomId = getRoomId(room);
         const capacity = Number(room.capacity) || 2;
@@ -268,6 +297,7 @@ function renderzebradormusRooms() {
 
         const card = document.createElement("article");
         card.className = "room-card" + (isSelected ? " is-selected" : "");
+        card.dataset.roomId = roomId;
 
         /* Room image */
 
@@ -289,7 +319,7 @@ function renderzebradormusRooms() {
             ? fallbackImage
             : suppliedImage;
 
-        image.alt = translated.name;
+        image.alt = "";
         image.loading = "lazy";
         image.decoding = "async";
 
@@ -303,110 +333,65 @@ function renderzebradormusRooms() {
         });
 
         imageWrapper.appendChild(image);
-
-        if (isSelected) {
-            const badge = document.createElement("span");
-            badge.className = "room-badge";
-            badge.textContent = "Your choice";
-            imageWrapper.appendChild(badge);
-        }
-
         card.appendChild(imageWrapper);
 
-        /* Room information */
+        /* Under the photo, as on Marriott's "Trending Curated Collections":
+           the room name, then the price and how many guests it takes.
+           The name is a button, so the whole card opens the room's details
+           (room-details.js), where "Book this room" is. */
 
         const content = document.createElement("div");
         content.className = "room-content";
 
         const title = document.createElement("h3");
         title.className = "room-title";
-        title.textContent = translated.name;
 
-        const features = document.createElement("div");
-        features.className = "room-features";
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "room-open";
+        open.textContent = translated.name;
+        title.appendChild(open);
 
-        const capacityLabel = document.createElement("span");
-        capacityLabel.append(
-            iconElement("guests"),
-            `Up to ${capacity} ${capacity === 1 ? "guest" : "guests"}`
-        );
-        features.appendChild(capacityLabel);
+        const meta = document.createElement("p");
+        meta.className = "room-meta";
 
+        const amount = getRoomPrice(room);
+        const priceText = document.createElement("span");
+        priceText.className = "room-rate";
 
-        const description = document.createElement("p");
-        description.className = "room-description";
-        description.textContent = translated.description;
+        if (amount === null) {
+            priceText.textContent = t.priceUnavailable || "Price unavailable";
+        } else {
+            const perNight = document.createElement("strong");
+            perNight.textContent = formatRwf(amount);
+            priceText.append(perNight, ` ${t.perNight || "/ night"}`);
+        }
 
-        content.append(title, features, description);
+        const guestsText = document.createElement("span");
+        guestsText.className = "room-guests";
+        guestsText.textContent = roomCardWords().upTo(capacity);
+
+        meta.append(priceText, guestsText);
+        content.append(title, meta);
 
         if (tooSmall) {
             const warning = document.createElement("p");
             warning.className = "room-warning";
-            warning.textContent =
-                `Fits ${capacity} ${capacity === 1 ? "guest" : "guests"} — you chose ${stay.guests}.`;
+            warning.textContent = roomCardWords().fits(capacity);
             content.appendChild(warning);
         }
-
-        /* Price and Book Now button */
-
-        const bottom = document.createElement("div");
-        bottom.className = "room-bottom";
-
-        const price = document.createElement("p");
-        price.className = "room-price";
-
-        const amount = getRoomPrice(room);
-
-        if (amount === null) {
-            const unavailable = document.createElement("strong");
-            unavailable.textContent = "Price unavailable";
-            price.appendChild(unavailable);
-        } else {
-            const perNight = document.createElement("strong");
-            perNight.textContent = `${formatRwf(amount)} `;
-
-            const per = document.createElement("span");
-            per.className = "per";
-            per.textContent = t.perNight || "/ night";
-            perNight.appendChild(per);
-
-            price.appendChild(perNight);
-
-            if (stay.nights > 0) {
-                const stayTotal = document.createElement("span");
-                stayTotal.className = "stay-total";
-                stayTotal.textContent =
-                    `${formatRwf(amount * stay.nights)} for ${stay.nights} ${stay.nights === 1 ? "night" : "nights"}`;
-                price.appendChild(stayTotal);
-            }
-        }
-
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "room-button";
-        button.dataset.roomId = roomId;
-        button.dataset.roomName = String(
-            room.name ?? room.roomType ?? translated.name
-        );
-        button.setAttribute("aria-pressed", String(isSelected));
-
-        if (tooSmall) {
-            button.disabled = true;
-            button.textContent = "Too small";
-        } else if (isSelected) {
-            button.append(iconElement("check"), "Selected");
-        } else {
-            button.textContent = t.bookNow || "Select";
-        }
-
-        bottom.append(price, button);
-        content.appendChild(bottom);
 
         card.appendChild(content);
         fragment.appendChild(card);
     });
 
     roomGrid.replaceChildren(fragment);
+
+    /* One big card and the rest beside it in two rows (Marriott's layout)
+       works for an odd number of rooms: 3 rooms = 1 big + 2, 5 = 1 big + 4. */
+    const count = zebradormusRooms.length;
+    roomGrid.classList.toggle("is-mosaic", count >= 3 && count % 2 === 1);
+    roomGrid.style.setProperty("--small-columns", String(Math.max(1, (count - 1) / 2)));
 }
 
 

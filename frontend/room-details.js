@@ -579,11 +579,12 @@
         var t = tx();
 
         Array.prototype.forEach.call(grid.querySelectorAll(".room-card"), function (card) {
-            if (card.querySelector(".room-more")) return;
+            if (card.dataset.roomKey) return;
             var button = card.querySelector(".room-button");
+            var id = card.dataset.roomId || (button && button.dataset.roomId) || "";
             var room = null;
-            if (button) {
-                allRooms().forEach(function (r) { if (idOf(r) === button.dataset.roomId) room = r; });
+            if (id) {
+                allRooms().forEach(function (r) { if (idOf(r) === id) room = r; });
             }
             if (!room) return;
 
@@ -591,11 +592,14 @@
             card.dataset.roomKey = key;
             card.classList.add("has-details");
 
-            var more = el("button", "room-more");
-            more.type = "button";
-            more.append(el("span", null, t.more), icon("arrow", 16));
+            /* older cards with a price row get a "See details" link; the photo cards don't need one */
             var bottom = card.querySelector(".room-bottom");
-            if (bottom && bottom.parentNode) bottom.parentNode.insertBefore(more, bottom);
+            if (bottom && bottom.parentNode) {
+                var more = el("button", "room-more");
+                more.type = "button";
+                more.append(el("span", null, t.more), icon("arrow", 16));
+                bottom.parentNode.insertBefore(more, bottom);
+            }
         });
 
         /* Someone opened a shared room link, e.g. .../#room-deluxe */
