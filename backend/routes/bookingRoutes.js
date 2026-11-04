@@ -156,7 +156,7 @@ router.post("/", async (req, res) => {
     const totalPrice = nights * room.pricePerNight;
 
     const bookingReference =
-      "GHM-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+      "ZDI-" + crypto.randomBytes(4).toString("hex").toUpperCase();
 
     const booking = await Booking.create({
       bookingReference,

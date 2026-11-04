@@ -1,4 +1,4 @@
-/* Zebra Domus Inn: moving around the site without the page sliding by itself.
+/* Zebra Dormus Inn: moving around the site without the page sliding by itself.
 
    1. Booking buttons ("Check availability", "Book Your Stay", "Book now", "Book this room")
       open the booking page (book.html), taking the dates, guests and room the guest already

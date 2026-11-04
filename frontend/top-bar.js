@@ -1,4 +1,4 @@
-/* Zebra Domus Inn: Marriott-style extras at the top of the page.
+/* Zebra Dormus Inn: Marriott-style extras at the top of the page.
    1. The quick links along the bottom of the photo (shown on computers) follow the
       language chosen in the header.
    2. On a computer, once the guest has scrolled past the search box, a slim white

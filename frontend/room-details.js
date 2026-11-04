@@ -1,4 +1,4 @@
-/* Zebra Domus Inn: room details.
+/* Zebra Dormus Inn: room details.
    Tapping a room card (anywhere except "Book now") opens a full-screen view of that room:
    one photo of the room, its price, the guest's dates, what's included and the house rules.
    "Book this room" opens the booking page (book.html) with this room, the dates and the guests.

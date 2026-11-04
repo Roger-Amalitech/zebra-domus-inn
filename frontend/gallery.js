@@ -1,4 +1,4 @@
-/* Zebra Domus Inn: the photo row.
+/* Zebra Dormus Inn: the photo row.
    The photos sit in one row that slides sideways on every screen.
    Phones and tablets: swipe. Computers (or any screen used with a mouse): the round
    arrows beside the "Photos" title move one screenful at a time and turn grey at either end. */

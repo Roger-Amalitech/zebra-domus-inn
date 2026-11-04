@@ -32,7 +32,7 @@ app.use("/api/bookings", bookingRoutes);
 
 app.get("/", (req, res) => {
   res.json({
-    message: "Welcome to Green Haven Motel API",
+    message: "Welcome to Zebra Dormus Inn API",
   });
 });
 
@@ -43,7 +43,7 @@ const startServer = async () => {
     await connectDB();
 
     app.listen(PORT, () => {
-      console.log(`Green Haven Motel server running on port ${PORT}`);
+      console.log(`Zebra Dormus Inn server running on port ${PORT}`);
     });
   } catch (error) {
     console.error("Failed to start server:", error.message);

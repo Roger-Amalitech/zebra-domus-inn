@@ -1,4 +1,4 @@
-/* Zebra Domus Inn: "Back to top" button.
+/* Zebra Dormus Inn: "Back to top" button.
    Appears once the guest has scrolled past the date search, and takes them back to the top.
    Its label follows the language chosen in the header (EN / RW / FR). */
 (function () {

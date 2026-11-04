@@ -1,4 +1,4 @@
-/* Zebra Domus Inn: shows the search-box dates as dd/mm/yyyy in every browser.
+/* Zebra Dormus Inn: shows the search-box dates as dd/mm/yyyy in every browser.
    The real date fields stay underneath, so tapping still opens the phone's own date picker,
    and the booking script keeps reading and setting them exactly as before. */
 (function () {

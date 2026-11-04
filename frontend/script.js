@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DOMUS INN
+   ZEBRA DORMUS INN
    Mobile menu, room cards, room selection,
    price summary and booking submission
 ========================================= */
@@ -41,7 +41,7 @@ const BUILT_IN_ROOMS = [
 
 let zebradormusUsingBuiltInRooms = false;
 
-/* Zebra Domus room photos, kept in the images folder.
+/* Zebra Dormus room photos, kept in the images folder.
    These are shown for the matching room type. To use different
    photos, replace the files or change the names here. */
 const roomImageFallbacks = {
@@ -226,7 +226,7 @@ function getRoomTranslations(room) {
     }
 
     return {
-        name: room.name || room.roomType || "Motel Room",
+        name: room.name || room.roomType || "Room",
         description:
             room.description || "A comfortable room for your stay.",
         image: roomImageFallbacks.standard
@@ -479,14 +479,14 @@ async function loadzebradormusRooms() {
         updateBookingSummary();
 
         console.log(
-            `Zebra Domus: Loaded ${rooms.length} rooms successfully.`
+            `Zebra Dormus: Loaded ${rooms.length} rooms successfully.`
         );
 
     } catch (error) {
         /* No backend running: still show the rooms from the built-in
            list, but don't pretend online booking works (see submit). */
         console.warn(
-            "Zebra Domus: backend not reachable, showing the built-in room list.",
+            "Zebra Dormus: backend not reachable, showing the built-in room list.",
             error
         );
 
@@ -848,7 +848,7 @@ async function handleBookingSubmit(event) {
         showConfirmation(result.booking || {});
 
     } catch (error) {
-        console.error("Zebra Domus booking failed:", error);
+        console.error("Zebra Dormus booking failed:", error);
 
         const text = error instanceof TypeError
             ? "We couldn't reach the booking server. Check your connection and try again."

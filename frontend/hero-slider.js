@@ -1,4 +1,4 @@
-/* Zebra Domus Inn: the photos at the top of the page.
+/* Zebra Dormus Inn: the photos at the top of the page.
    Guests swipe, tap the see-through arrows, or tap one of the small lines under the
    headline to look through the inn's photos; the headline stays in place while the
    photos change. The photos are listed in index.html inside #heroTrack, and one line
@@ -8,9 +8,9 @@
     "use strict";
 
     var TEXT = {
-        en: { prev: "Previous photo", next: "Next photo", region: "Photos of Zebra Domus Inn", photo: function (n, t) { return "Photo " + n + " of " + t; } },
-        rw: { prev: "Ifoto ibanza", next: "Ifoto ikurikira", region: "Amafoto ya Zebra Domus Inn", photo: function (n, t) { return "Ifoto ya " + n + " kuri " + t; } },
-        fr: { prev: "Photo précédente", next: "Photo suivante", region: "Photos de Zebra Domus Inn", photo: function (n, t) { return "Photo " + n + " sur " + t; } }
+        en: { prev: "Previous photo", next: "Next photo", region: "Photos of Zebra Dormus Inn", photo: function (n, t) { return "Photo " + n + " of " + t; } },
+        rw: { prev: "Ifoto ibanza", next: "Ifoto ikurikira", region: "Amafoto ya Zebra Dormus Inn", photo: function (n, t) { return "Ifoto ya " + n + " kuri " + t; } },
+        fr: { prev: "Photo précédente", next: "Photo suivante", region: "Photos de Zebra Dormus Inn", photo: function (n, t) { return "Photo " + n + " sur " + t; } }
     };
 
     function reduceMotion() {

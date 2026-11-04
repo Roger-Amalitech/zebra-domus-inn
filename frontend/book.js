@@ -1,4 +1,4 @@
-/* Zebra Domus Inn: the booking page (book.html).
+/* Zebra Dormus Inn: the booking page (book.html).
    Guests arrive from "Check availability", "Book Your Stay", "Book now" or "Book this room".
    This script:
    - fills in what they already chose, from the address: ?room=…&in=YYYY-MM-DD&out=YYYY-MM-DD&guests=N
@@ -12,7 +12,7 @@
 
     var TEXT = {
         en: {
-            back: "Back to the inn", backHome: "Back to Zebra Domus",
+            back: "Back to the inn", backHome: "Back to Zebra Dormus",
             yourStay: "Your stay", chooseRoom: "Choose your room", yourDetails: "Your details",
             upTo: function (n) { return "Up to " + n + (n === 1 ? " guest" : " guests"); },
             perNight: "per night",
@@ -22,7 +22,7 @@
             addDates: "Add your dates to see the total"
         },
         rw: {
-            back: "Subira ku icumbi", backHome: "Subira kuri Zebra Domus",
+            back: "Subira ku icumbi", backHome: "Subira kuri Zebra Dormus",
             yourStay: "Amakuru y'urugendo rwawe", chooseRoom: "Hitamo icyumba", yourDetails: "Amakuru yawe",
             upTo: function (n) { return n === 1 ? "Umushyitsi 1 gusa" : "Kugeza ku bashyitsi " + n; },
             perNight: "ku ijoro",
@@ -32,7 +32,7 @@
             addDates: "Hitamo amatariki urebe igiteranyo"
         },
         fr: {
-            back: "Retour à l'auberge", backHome: "Retour à Zebra Domus",
+            back: "Retour à l'auberge", backHome: "Retour à Zebra Dormus",
             yourStay: "Votre séjour", chooseRoom: "Choisissez votre chambre", yourDetails: "Vos coordonnées",
             upTo: function (n) { return "Jusqu'à " + n + (n === 1 ? " voyageur" : " voyageurs"); },
             perNight: "par nuit",

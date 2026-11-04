@@ -1,6 +1,6 @@
 
 /* =========================================
-   ZEBRA DOMUS INN
+   ZEBRA DORMUS INN
    English, Kinyarwanda and French
 ========================================= */
 
@@ -27,7 +27,7 @@ const ZEBRA_TRANSLATIONS = {
         roomIntro: "A welcoming place to rest, relax, and feel at home.",
         bookingHeading: "Book your stay",
         bookingIntro: "Pick a room, add your details and choose how to pay.",
-        experience: "The Zebra Domus experience",
+        experience: "The Zebra Dormus experience",
         aboutTitle: "More than a stay. A place to feel at home.",
         aboutDescription: "Relax by the outdoor pool, unwind in the spa and sauna, and end the day at the restaurant, the bar or the lounge with its outdoor fireplace. Free bicycles are available for guests.",
         experiencezebradormus: "Book your stay",
@@ -36,7 +36,7 @@ const ZEBRA_TRANSLATIONS = {
         contactUs: "Email us",
         fullName: "Full name",
         phoneNumber: "Phone number",
-        emailAddress: "Email for your confirmation",
+        emailAddress: "Email address",
         paymentMethod: "How would you like to pay?",
         mtnMobileMoney: "MTN Mobile Money",
         airtelMoney: "Airtel Money",
@@ -91,7 +91,7 @@ const ZEBRA_TRANSLATIONS = {
         chatWhatsapp: "Chat with us on WhatsApp",
         photos: "Photos",
         galleryDescription: "Pools, lounges and rooms. Swipe to see more.",
-        amenities: "At Zebra Domus",
+        amenities: "At Zebra Dormus",
         freeWifi: "Free Wi-Fi",
         swimmingPools: "Swimming pools",
         breakfast: "Breakfast",
@@ -104,7 +104,7 @@ const ZEBRA_TRANSLATIONS = {
         footerBook: "Book",
         footerAbout: "About",
         footerContact: "Contact",
-        bookDirect: "Booked directly with Zebra Domus"
+        bookDirect: "Booked directly with Zebra Dormus"
     },
 
     rw: {
@@ -129,7 +129,7 @@ const ZEBRA_TRANSLATIONS = {
         roomIntro: "Ahantu heza ho kuruhukira no kumva uri iwawe.",
         bookingHeading: "Bika icyumba cyawe",
         bookingIntro: "Hitamo icyumba, utange amakuru yawe kandi uhitemo uburyo bwo kwishyura.",
-        experience: "Uburambe bwa Zebra Domus",
+        experience: "Uburambe bwa Zebra Dormus",
         aboutTitle: "Si ukurara gusa. Ni ahantu wumva uri iwawe.",
         aboutDescription: "Ruhukira hafi y'ikidendezi, uruhukire muri spa na sauna, urangize umunsi muri resitora, akabari cyangwa aho kwicarira. Abashyitsi bashobora no gukoresha amagare ku buntu.",
         experiencezebradormus: "Bika icyumba cyawe",
@@ -138,7 +138,7 @@ const ZEBRA_TRANSLATIONS = {
         contactUs: "Twandikire kuri email",
         fullName: "Amazina yose",
         phoneNumber: "Nimero ya telefoni",
-        emailAddress: "Email yo koherezaho icyemezo",
+        emailAddress: "Email yawe",
         paymentMethod: "Wifuza kwishyura ute?",
         mtnMobileMoney: "MTN Mobile Money",
         airtelMoney: "Airtel Money",
@@ -193,7 +193,7 @@ const ZEBRA_TRANSLATIONS = {
         chatWhatsapp: "Twandikire kuri WhatsApp",
         photos: "Amafoto",
         galleryDescription: "Ibidendezi, aho kwicarira n'ibyumba. Nyereza urebe andi mafoto.",
-        amenities: "Ibyo dusanga kuri Zebra Domus",
+        amenities: "Ibyo dusanga kuri Zebra Dormus",
         freeWifi: "Wi-Fi y'ubuntu",
         swimmingPools: "Ibidendezi byo koga",
         breakfast: "Ifunguro rya mu gitondo",
@@ -206,7 +206,7 @@ const ZEBRA_TRANSLATIONS = {
         footerBook: "Kubika",
         footerAbout: "Ibitwerekeye",
         footerContact: "Twandikire",
-        bookDirect: "Wabikiye kuri Zebra Domus"
+        bookDirect: "Wabikiye kuri Zebra Dormus"
     },
 
     fr: {
@@ -231,7 +231,7 @@ const ZEBRA_TRANSLATIONS = {
         roomIntro: "Un endroit accueillant pour se reposer et se sentir chez soi.",
         bookingHeading: "Réservez votre séjour",
         bookingIntro: "Choisissez une chambre, renseignez vos coordonnées et sélectionnez votre mode de paiement.",
-        experience: "L'expérience Zebra Domus",
+        experience: "L'expérience Zebra Dormus",
         aboutTitle: "Plus qu'un séjour. Un endroit où l'on se sent chez soi.",
         aboutDescription: "Détendez-vous au bord de la piscine, profitez du spa et du sauna, puis terminez la journée au restaurant, au bar ou dans le salon. Des vélos sont mis gratuitement à la disposition des clients.",
         experiencezebradormus: "Réservez votre séjour",
@@ -240,7 +240,7 @@ const ZEBRA_TRANSLATIONS = {
         contactUs: "Nous écrire",
         fullName: "Nom complet",
         phoneNumber: "Numéro de téléphone",
-        emailAddress: "Adresse e-mail de confirmation",
+        emailAddress: "Adresse e-mail",
         paymentMethod: "Comment souhaitez-vous payer ?",
         mtnMobileMoney: "MTN Mobile Money",
         airtelMoney: "Airtel Money",
@@ -295,7 +295,7 @@ const ZEBRA_TRANSLATIONS = {
         chatWhatsapp: "Discutez avec nous sur WhatsApp",
         photos: "Photos",
         galleryDescription: "Piscines, salons et chambres. Faites défiler pour voir plus.",
-        amenities: "À Zebra Domus",
+        amenities: "À Zebra Dormus",
         freeWifi: "Wi-Fi gratuit",
         swimmingPools: "Piscines",
         breakfast: "Petit-déjeuner",
@@ -308,7 +308,7 @@ const ZEBRA_TRANSLATIONS = {
         footerBook: "Réserver",
         footerAbout: "À propos",
         footerContact: "Contact",
-        bookDirect: "Réservation directe auprès de Zebra Domus"
+        bookDirect: "Réservation directe auprès de Zebra Dormus"
     }
 };
 

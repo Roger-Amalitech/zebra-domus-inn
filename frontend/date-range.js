@@ -1,4 +1,4 @@
-/* Zebra Domus Inn: one "Check-in – Check-out" field instead of two.
+/* Zebra Dormus Inn: one "Check-in – Check-out" field instead of two.
    Tapping it opens a calendar: the guest taps the arrival day, then the departure day,
    and sees how many nights. On a phone the calendar slides up from the bottom with one
    month; on a tablet or computer it opens next to the field with two months.
