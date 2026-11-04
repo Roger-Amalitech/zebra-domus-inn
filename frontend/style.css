@@ -3180,3 +3180,33 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     .room-card { transition: box-shadow 0.25s ease; }
     .room-grid .room-card:hover { transform: none; }
 }
+
+/* =========================================
+   PHOTOS DARKEN A LITTLE when pointed at (Marriott's "Unique Ways to Stay"):
+   a see-through dark layer fades in over the photo. On phones, a room photo
+   darkens for a moment when tapped, so the tap feels answered.
+========================================= */
+.room-image::after,
+.gallery figure::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: rgba(0, 0, 0, 0.26);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.gallery figcaption { z-index: 2; }
+
+@media (hover: hover) and (pointer: fine) {
+    .room-grid .room-card:hover .room-image::after,
+    .gallery figure:hover::after { opacity: 1; }
+}
+.room-grid .room-card:active .room-image::after { opacity: 1; transition-duration: 0.1s; }
+.room-grid .room-card:has(.room-open:focus-visible) .room-image::after { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+    .room-image::after,
+    .gallery figure::after { transition: none; }
+}
