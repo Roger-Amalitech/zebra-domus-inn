@@ -7,20 +7,67 @@ const router = express.Router();
 
 const Room = require("../models/Room");
 const Booking = require("../models/Booking");
+const {
+  parseDay,
+  nightsBetween,
+  innToday,
+  availabilityForRooms,
+} = require("../utils/availability");
+
+const MAX_NIGHTS = 60;
+
+const allowedPaymentMethods = [
+  "MTN Mobile Money",
+  "Airtel Money",
+  "Visa/Mastercard",
+  "Pay at the Motel",
+];
+
+function text(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/* Other room types that are free for the same stay and fit the group,
+   so the booking page can offer them straight away. */
+async function freeAlternatives(arrival, departure, guestCount) {
+  const rooms = await Room.find({ available: true }).sort({ pricePerNight: 1 }).lean();
+  const counts = await availabilityForRooms(rooms, arrival, departure);
+
+  return rooms
+    .map((room) => ({
+      _id: room._id,
+      name: room.name,
+      capacity: room.capacity,
+      pricePerNight: room.pricePerNight,
+      available: counts.get(String(room._id)).available,
+    }))
+    .filter((room) => room.available > 0 && room.capacity >= guestCount);
+}
+
+function roomTakenResponse(res, room, alternatives) {
+  return res.status(409).json({
+    success: false,
+    code: "ROOM_TAKEN",
+    roomId: room._id,
+    message: alternatives.length
+      ? `The ${room.name} is no longer free for those dates. Still free: ${alternatives.map((r) => r.name).join(", ")}.`
+      : "All rooms are booked for those dates. Please choose other dates.",
+    alternatives,
+  });
+}
 
 // Create a new booking
 router.post("/", async (req, res) => {
   try {
-    const {
-      guestName,
-      guestEmail,
-      guestPhone,
-      roomId,
-      checkIn,
-      checkOut,
-      guests,
-      paymentMethod,
-    } = req.body;
+    const body = req.body || {};
+    const guestName = text(body.guestName);
+    const guestEmail = text(body.guestEmail).toLowerCase();
+    const guestPhone = text(body.guestPhone);
+    const roomId = text(body.roomId);
+    const checkIn = text(body.checkIn);
+    const checkOut = text(body.checkOut);
+    const paymentMethod = text(body.paymentMethod);
+    const guestCount = Number(body.guests);
 
     // Validate required fields
     if (
@@ -30,12 +77,19 @@ router.post("/", async (req, res) => {
       !roomId ||
       !checkIn ||
       !checkOut ||
-      !guests ||
+      !body.guests ||
       !paymentMethod
     ) {
       return res.status(400).json({
         success: false,
         message: "Please complete all booking fields.",
+      });
+    }
+
+    if (guestName.length > 100 || guestEmail.length > 254 || guestPhone.length > 30) {
+      return res.status(400).json({
+        success: false,
+        message: "Some of the details are too long. Please check them.",
       });
     }
 
@@ -47,14 +101,20 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Validate email and guest count
+    // Validate email, phone and guest count
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const guestCount = Number(guests);
 
     if (!emailPattern.test(guestEmail)) {
       return res.status(400).json({
         success: false,
         message: "Please provide a valid email address.",
+      });
+    }
+
+    if ((guestPhone.match(/\d/g) || []).length < 9) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid phone number.",
       });
     }
 
@@ -65,13 +125,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const allowedPaymentMethods = [
-      "MTN Mobile Money",
-      "Airtel Money",
-      "Visa/Mastercard",
-      "Pay at the Motel",
-    ];
-
     if (!allowedPaymentMethods.includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
@@ -79,24 +132,18 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Validate dates
-    const arrival = new Date(checkIn);
-    const departure = new Date(checkOut);
+    // Validate dates (YYYY-MM-DD, compared with today's date in Rwanda)
+    const arrival = parseDay(checkIn);
+    const departure = parseDay(checkOut);
 
-    if (
-      Number.isNaN(arrival.getTime()) ||
-      Number.isNaN(departure.getTime())
-    ) {
+    if (!arrival || !departure) {
       return res.status(400).json({
         success: false,
         message: "Please provide valid check-in and check-out dates.",
       });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (arrival < today) {
+    if (checkIn < innToday()) {
       return res.status(400).json({
         success: false,
         message: "Check-in cannot be in the past.",
@@ -107,6 +154,15 @@ router.post("/", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Check-out must be after check-in.",
+      });
+    }
+
+    const nights = nightsBetween(arrival, departure);
+
+    if (nights > MAX_NIGHTS) {
+      return res.status(400).json({
+        success: false,
+        message: `Stays can be up to ${MAX_NIGHTS} nights. Please contact us for longer stays.`,
       });
     }
 
@@ -130,29 +186,15 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Count bookings that overlap the requested dates.
+    // Is a room of this type free on every night of the stay?
     // Cancelled bookings do not block availability.
-    const overlappingBookings = await Booking.countDocuments({
-      room: room._id,
-      bookingStatus: { $ne: "cancelled" },
-      checkIn: { $lt: departure },
-      checkOut: { $gt: arrival },
-    });
+    const before = await availabilityForRooms([room], arrival, departure);
 
-    if (overlappingBookings >= room.totalRooms) {
-      return res.status(409).json({
-        success: false,
-        message: "This room is not available for those dates. Please choose other dates.",
-      });
+    if (before.get(String(room._id)).available <= 0) {
+      return roomTakenResponse(res, room, await freeAlternatives(arrival, departure, guestCount));
     }
 
     // Calculate price on the server, not from the browser.
-    const millisecondsPerDay = 1000 * 60 * 60 * 24;
-    const nights = Math.round(
-      (departure.getTime() - arrival.getTime()) /
-        millisecondsPerDay
-    );
-
     const totalPrice = nights * room.pricePerNight;
 
     const bookingReference =
@@ -160,9 +202,9 @@ router.post("/", async (req, res) => {
 
     const booking = await Booking.create({
       bookingReference,
-      guestName: guestName.trim(),
-      guestEmail: guestEmail.trim().toLowerCase(),
-      guestPhone: guestPhone.trim(),
+      guestName,
+      guestEmail,
+      guestPhone,
       room: room._id,
       checkIn: arrival,
       checkOut: departure,
@@ -172,6 +214,19 @@ router.post("/", async (req, res) => {
       paymentStatus: "pending",
       bookingStatus: "pending",
     });
+
+    // Two guests can press "Confirm" for the last room at the same moment.
+    // Count again, this time only the bookings made before this one: if they
+    // already fill the room type on any night, this booking came second, so
+    // it gives way and the guest is offered the rooms that are still free.
+    const earlier = await availabilityForRooms([room], arrival, departure, {
+      beforeId: booking._id,
+    });
+
+    if (earlier.get(String(room._id)).available <= 0) {
+      await Booking.deleteOne({ _id: booking._id });
+      return roomTakenResponse(res, room, await freeAlternatives(arrival, departure, guestCount));
+    }
 
     return res.status(201).json({
       success: true,

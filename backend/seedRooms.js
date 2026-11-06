@@ -46,7 +46,7 @@ async function seedRooms() {
       await Room.findOneAndUpdate(
         { name: roomData.name },
         { $set: roomData },
-        { upsert: true, new: true, runValidators: true }
+        { upsert: true, returnDocument: "after", runValidators: true }
       );
 
       console.log(`Updated: ${roomData.name}`);

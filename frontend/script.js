@@ -4,9 +4,10 @@
    price summary and booking submission
 ========================================= */
 
-const GREEN_HAVEN_API = "http://localhost:5000/api";
+/* The booking server's address comes from api-config.js. */
+const GREEN_HAVEN_API = window.ZD_API || "http://localhost:5000/api";
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = GREEN_HAVEN_API;
 
 let zebradormusRooms = [];
 
@@ -800,6 +801,12 @@ async function handleBookingSubmit(event) {
         return;
     }
 
+    /* The built-in room list is showing: the booking server can't be reached. */
+    if (zebradormusUsingBuiltInRooms || !/^[0-9a-f]{24}$/i.test(roomId)) {
+        showBookingMessage("Online booking isn't connected yet. Please call or WhatsApp the inn to book this room.");
+        return;
+    }
+
     if (stay.nights <= 0) {
         showBookingMessage("Check-out must be after check-in.");
         document.getElementById("checkOut")?.focus();
@@ -838,6 +845,12 @@ async function handleBookingSubmit(event) {
         });
 
         const result = await response.json().catch(() => ({}));
+
+        /* Someone else booked this room first: book.js marks it as booked
+           and shows the rooms that are still free. */
+        if (response.status === 409 && result.code === "ROOM_TAKEN") {
+            document.dispatchEvent(new CustomEvent("zd:room-taken", { detail: result }));
+        }
 
         if (!response.ok || !result.success) {
             throw new Error(

@@ -72,4 +72,7 @@ const bookingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Availability checks look up bookings by room and dates.
+bookingSchema.index({ room: 1, checkIn: 1, checkOut: 1 });
+
 module.exports = mongoose.model("Booking", bookingSchema);

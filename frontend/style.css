@@ -2924,6 +2924,21 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 .room-option-rate b { color: var(--ink); font-weight: 700; }
 .room-option-total { font-size: 13px; font-weight: 600; }
 .room-option-warning { font-size: 12.5px; font-weight: 600; color: #333333; }
+.room-option-status { display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12.5px; font-weight: 700; }
+.room-option-status.is-free::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+.room-option-status.is-booked { align-self: flex-start; padding: 2px 9px; border-radius: 999px; background: var(--ink); color: var(--white); }
+.room-option.is-booked { background: var(--soft); }
+.room-option.is-booked .room-option-photo img { filter: grayscale(1); }
+.room-availability {
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--ink);
+    border-radius: 12px;
+    background: var(--white);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.45;
+}
 .room-option-check {
     display: grid;
     place-items: center;
