@@ -65,6 +65,10 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 <span>Availability</span>
             </a>
+            <a href="#stock" class="tab" data-view="stock">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>
+                <span>Stock</span>
+            </a>
             <a href="#rooms" class="tab" data-view="rooms" data-owner-only hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18V7"/><path d="M3 14h18v4"/><path d="M21 18v-4a3 3 0 0 0-3-3h-7v3"/><circle cx="7" cy="11" r="2"/></svg>
                 <span>Rooms</span>
@@ -180,6 +184,73 @@
             </div>
 
             <div class="night-detail" id="nightDetail" aria-live="polite"></div>
+        </section>
+
+        <!-- STOCK -->
+        <section class="view" id="view-stock" aria-labelledby="stockHeading" hidden>
+            <div class="view-head">
+                <h1 id="stockHeading">Stock</h1>
+                <p class="muted">What the inn has in store, what was used and what is left.</p>
+            </div>
+
+            <div class="stats" id="stockStats"></div>
+            <p class="stock-alert" id="stockAlert" hidden></p>
+
+            <div class="segmented stock-tabs" role="group" aria-label="Stock sections">
+                <button type="button" data-stock-tab="items" aria-pressed="true">Items</button>
+                <button type="button" data-stock-tab="changes" aria-pressed="false">Changes</button>
+                <button type="button" data-stock-tab="report" aria-pressed="false">Report</button>
+            </div>
+
+            <div class="stock-panel" id="stockItemsPanel">
+                <div class="filters stock-filters">
+                    <div class="field-search">
+                        <label for="stockSearch" class="visually-hidden">Search items</label>
+                        <input type="search" id="stockSearch" placeholder="Search items" autocomplete="off" maxlength="60">
+                    </div>
+                    <div class="field-select">
+                        <label for="stockCategory" class="visually-hidden">Category</label>
+                        <select id="stockCategory">
+                            <option value="">All categories</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-small" id="addItemButton" data-owner-only hidden>Add item</button>
+                </div>
+                <p class="count" id="stockCount" aria-live="polite"></p>
+                <div id="itemFormSlot"></div>
+                <div class="list" id="stockList"></div>
+                <label class="switch archived-toggle" data-owner-only hidden>
+                    <input type="checkbox" id="showArchived">
+                    <span class="switch-track" aria-hidden="true"></span>
+                    <span>Show archived items</span>
+                </label>
+            </div>
+
+            <div class="stock-panel" id="stockChangesPanel" hidden>
+                <div class="list" id="stockChanges"></div>
+                <button type="button" class="btn btn-ghost btn-small more-btn" id="moreChanges" hidden>Show older changes</button>
+            </div>
+
+            <div class="stock-panel" id="stockReportPanel" hidden>
+                <div class="report-controls">
+                    <div class="report-quick" role="group" aria-label="Period">
+                        <button type="button" class="btn btn-ghost btn-small" data-period="month">This month</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-period="last-month">Last month</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-period="week">Last 7 days</button>
+                    </div>
+                    <div class="report-dates">
+                        <label for="reportFrom">From</label>
+                        <input type="date" id="reportFrom">
+                        <label for="reportTo">To</label>
+                        <input type="date" id="reportTo">
+                    </div>
+                    <button type="button" class="btn btn-primary btn-small" id="reportDownload">Download for Excel</button>
+                </div>
+                <p class="count" id="reportRange" aria-live="polite"></p>
+                <div class="grid-wrap report-wrap">
+                    <table class="report-table" id="reportTable"></table>
+                </div>
+            </div>
         </section>
 
         <!-- ROOMS -->

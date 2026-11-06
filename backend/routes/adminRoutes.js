@@ -12,6 +12,7 @@
    GET   /api/admin/rooms              every room type, open or closed
    PATCH /api/admin/rooms/:id          { pricePerNight?, totalRooms?, capacity?, available?, description? }  (owner only)
          /api/admin/staff              staff accounts (owner only), see staffRoutes.js
+         /api/admin/stock              store room: items, used, received, counted (see stockRoutes.js)
 ========================================= */
 
 const express = require("express");
@@ -21,6 +22,7 @@ const Room = require("../models/Room");
 const Booking = require("../models/Booking");
 const AdminUser = require("../models/AdminUser");
 const staffRoutes = require("./staffRoutes");
+const stockRoutes = require("./stockRoutes");
 const {
   login,
   requireAdmin,
@@ -53,6 +55,7 @@ router.post("/login", login);
 router.use(requireAdmin);
 
 router.use("/staff", requireOwner, staffRoutes);
+router.use("/stock", stockRoutes);
 
 const BOOKING_STATUSES = ["pending", "confirmed", "cancelled"];
 const PAYMENT_STATUSES = ["pending", "paid", "failed"];
