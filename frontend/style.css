@@ -1080,6 +1080,20 @@ h3 {
     color: var(--muted);
 }
 
+.privacy-note {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    text-align: center;
+    color: var(--muted);
+}
+
+.privacy-note a {
+    color: var(--ink);
+    font-weight: 600;
+    text-underline-offset: 3px;
+}
+
 /* Confirmation */
 .confirmation {
     display: flex;
@@ -3240,4 +3254,70 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     .footer { margin-top: 40px; }
     .perks { margin-top: 12px; }
     .policies-heading { margin-bottom: 26px; }
+}
+
+/* =========================================
+   PRIVACY NOTICE (privacy.html)
+========================================= */
+
+.privacy {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding-top: 28px;
+    padding-bottom: 40px;
+}
+
+.privacy h1 {
+    margin: 0;
+    font-size: 30px;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+}
+
+.privacy h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+}
+
+.privacy p,
+.privacy li {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.privacy ul {
+    display: grid;
+    gap: 6px;
+    margin: 0 0 10px;
+    padding-left: 20px;
+}
+
+.privacy section p + p {
+    margin-top: 10px;
+}
+
+.privacy a:not(.btn) {
+    color: var(--ink);
+    font-weight: 600;
+    text-underline-offset: 3px;
+}
+
+.privacy-updated {
+    margin-top: -12px !important;
+    color: var(--muted);
+    font-size: 13px !important;
+}
+
+.privacy-lead {
+    font-size: 16px !important;
+}
+
+.privacy-cta {
+    align-self: flex-start;
+}
+
+.privacy-page .footer {
+    margin-top: 0;
 }

@@ -1,0 +1,32 @@
+# Zebra Dormus Inn: keep the free Render server awake.
+#
+# Render's free plan puts the server to sleep after 15 minutes without
+# visitors, and the next guest then waits about a minute. This job visits
+# the site every 10 minutes so it stays awake.
+#
+# - It uses almost all of Render's 750 free hours a month, so keep only ONE
+#   free web service in your Render account.
+# - To stop it: GitHub -> Actions -> "Keep the website awake" -> ... -> Disable workflow.
+# - When the domain is connected, you can change SITE_URL below.
+
+name: Keep the website awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      SITE_URL: https://zebra-domus-inn-f5l5.onrender.com/api
+    steps:
+      - name: Visit the website
+        run: |
+          status=$(curl --silent --output /dev/null --write-out "%{http_code}" --max-time 120 --retry 2 --retry-delay 20 "$SITE_URL")
+          echo "The website answered with $status"
+          test "$status" = "200"

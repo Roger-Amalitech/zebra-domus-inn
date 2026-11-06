@@ -428,8 +428,9 @@ function updateRoomsIntro() {
         .filter((price) => price !== null);
 
     if (intro && prices.length > 0) {
-        intro.textContent =
-            `From ${formatRwf(Math.min(...prices))} a night`;
+        const words = typeof getCurrentTranslations === "function" ? getCurrentTranslations() : {};
+        const template = words.roomsFrom || "From {price} a night";
+        intro.textContent = template.replace("{price}", formatRwf(Math.min(...prices)));
     }
 }
 
@@ -571,7 +572,8 @@ function updateBookingSummary() {
     if (!room || price === null || stay.nights <= 0) {
         const empty = document.createElement("p");
         empty.className = "summary-empty";
-        empty.textContent = "Choose a room and your dates to see the total.";
+        const words = typeof getCurrentTranslations === "function" ? getCurrentTranslations() : {};
+        empty.textContent = words.summaryEmpty || "Choose a room and your dates to see the total.";
         summary.replaceChildren(empty);
         return;
     }

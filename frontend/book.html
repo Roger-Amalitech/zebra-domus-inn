@@ -19,8 +19,8 @@
     <meta property="og:site_name" content="Zebra Dormus Inn">
     <meta property="og:title" content="Zebra Dormus Inn | Huye, Rwanda">
     <meta property="og:description" content="Rooms, two outdoor pools, a spa and a restaurant in Huye. Book direct with the inn.">
-    <meta property="og:url" content="https://zebra-domus-inn-website.onrender.com/">
-    <meta property="og:image" content="https://zebra-domus-inn-website.onrender.com/images/pool.jpg">
+    <meta property="og:url" content="https://zebra-domus-inn-f5l5.onrender.com/book.html">
+    <meta property="og:image" content="https://zebra-domus-inn-f5l5.onrender.com/images/pool.jpg">
 </head>
 
 <body class="book-page">
@@ -40,7 +40,7 @@
             <span data-book="back">Back to the inn</span>
         </a>
         <div class="language-selector">
-            <label for="languageSelect" class="visually-hidden">Language</label>
+            <label for="languageSelect" class="visually-hidden" data-i18n="language">Language</label>
             <svg class="globe" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
             <select id="languageSelect">
                 <option value="en">EN</option>
@@ -140,7 +140,7 @@
                     </span>
                     <span class="pay-text">
                         <strong data-i18n="mtnMobileMoney">MTN Mobile Money</strong>
-                        <span>Pay from your MoMo wallet</span>
+                        <span data-i18n="momoNote">Pay from your MoMo wallet</span>
                     </span>
                     <span class="pay-ring" aria-hidden="true"></span>
                 </label>
@@ -152,7 +152,7 @@
                     </span>
                     <span class="pay-text">
                         <strong data-i18n="airtelMoney">Airtel Money</strong>
-                        <span>Pay from your Airtel wallet</span>
+                        <span data-i18n="airtelNote">Pay from your Airtel wallet</span>
                     </span>
                     <span class="pay-ring" aria-hidden="true"></span>
                 </label>
@@ -164,7 +164,7 @@
                     </span>
                     <span class="pay-text">
                         <strong data-i18n="cardPayment">Visa or Mastercard</strong>
-                        <span>Debit or credit card</span>
+                        <span data-i18n="cardNote">Debit or credit card</span>
                     </span>
                     <span class="pay-ring" aria-hidden="true"></span>
                 </label>
@@ -176,7 +176,7 @@
                     </span>
                     <span class="pay-text">
                         <strong data-i18n="payAtMotel">Pay at the inn</strong>
-                        <span>Pay at reception when you arrive</span>
+                        <span data-i18n="payAtInnShort">Pay at reception when you arrive</span>
                     </span>
                     <span class="pay-ring" aria-hidden="true"></span>
                 </label>
@@ -189,7 +189,7 @@
             <div class="summary-room" id="summaryRoom" hidden></div>
             <!-- Price summary -->
             <div class="card summary" id="priceSummary" aria-live="polite">
-                <p class="summary-empty">Choose a room and your dates to see the total.</p>
+                <p class="summary-empty" data-i18n="summaryEmpty">Choose a room and your dates to see the total.</p>
             </div>
 
             <!-- Submit -->
@@ -203,7 +203,12 @@
 
                 <p class="secure-line">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
-                    Booked directly with Zebra Dormus
+                    <span data-i18n="bookDirect">Booked directly with Zebra Dormus</span>
+                </p>
+
+                <p class="privacy-note">
+                    <span data-i18n="privacyNote">By booking, you agree that we use your details to manage your stay.</span>
+                    <a href="privacy.html" data-i18n="privacyLink">Read our privacy notice</a>
                 </p>
             </div>
             </div>
@@ -240,19 +245,20 @@
     <span class="footer-name">Zebra Dormus Inn</span>
         <address class="footer-address">
             [Street address], Huye<br>
-            Southern Province, Rwanda<br>
+            <span data-i18n="province">Southern Province, Rwanda</span><br>
             +250 7XX XXX XXX · [email address]
         </address>
         <nav class="footer-nav" aria-label="Footer">
-            <a href="index.html#rooms">Rooms</a>
-            <a href="index.html#booking">Book</a>
-            <a href="index.html#about">About</a>
-            <a href="index.html#contact">Contact</a>
-            <a href="index.html#policies">Policies</a>
+            <a href="index.html#rooms" data-i18n="footerRooms">Rooms</a>
+            <a href="book.html" data-i18n="footerBook">Book</a>
+            <a href="index.html#about" data-i18n="footerAbout">About</a>
+            <a href="index.html#contact" data-i18n="footerContact">Contact</a>
+            <a href="index.html#policies" data-i18n="policies">Policies</a>
+            <a href="privacy.html" data-i18n="privacy">Privacy</a>
         </nav>
         <p class="footer-copy">
-            © <span id="currentYear"></span> Zebra Dormus Inn. All rights reserved.
-            Bookings go directly to the inn.
+            © <span id="currentYear"></span> Zebra Dormus Inn.
+            <span data-i18n="footerCopy">All rights reserved. Bookings go directly to the inn.</span>
         </p>
     </div>
 </footer>
