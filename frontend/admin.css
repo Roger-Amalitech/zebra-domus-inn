@@ -1397,6 +1397,27 @@ a {
     box-shadow: var(--ring);
 }
 
+.stock-unused,
+.stock-delete-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px 14px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--white);
+    font-size: 14px;
+}
+
+.stock-unused {
+    grid-column: 1 / -1;
+}
+
+.stock-unused p {
+    margin-right: auto;
+}
+
 .stock-empty {
     display: grid;
     gap: 10px;

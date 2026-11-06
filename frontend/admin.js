@@ -1451,6 +1451,14 @@
             return;
         }
 
+        var unused = stock.items.filter(function (item) {
+            return item.quantity === 0 && item.changes === 0;
+        });
+
+        if (isOwner() && unused.length && !stock.only && !stock.q && !stock.category) {
+            list.appendChild(unusedBar(unused.length));
+        }
+
         if (!shown.length) {
             list.appendChild(el("p", { className: "empty", text: "No items match." }));
             return;
@@ -1467,9 +1475,50 @@
         });
     }
 
+    /* Clears items nobody has counted, used or received, e.g. the common items. */
+    function unusedBar(count) {
+        var bar = el("div", { className: "stock-unused" });
+
+        function ask() {
+            bar.textContent = "";
+            bar.appendChild(el("p", {
+                className: "confirm-text",
+                text: "Delete the " + plural(count, "item", "items") + " that " + (count === 1 ? "has" : "have") +
+                    " never been counted, used or received? You can add items again at any time."
+            }));
+            var keep = button("Cancel", "btn-ghost", show);
+            bar.appendChild(button("Yes, delete them", "btn-primary", async function () {
+                this.disabled = true;
+                try {
+                    var data = await api("POST", "/admin/stock/items/remove-unused");
+                    toast(plural(data.removed, "unused item", "unused items") + " deleted.");
+                    load("stock", true);
+                } catch (error) {
+                    if (error.status !== 401) toast(error.message, true);
+                    show();
+                }
+            }));
+            bar.appendChild(keep);
+            keep.focus();
+        }
+
+        function show() {
+            bar.textContent = "";
+            bar.appendChild(el("p", {
+                text: plural(count, "item has", "items have") + " never been counted, used or received."
+            }));
+            bar.appendChild(button("Delete unused items", "btn-ghost btn-danger", ask));
+        }
+
+        show();
+        return bar;
+    }
+
     function replaceItem(updated) {
         stock.items = stock.items.map(function (item) {
-            return item._id === updated._id ? updated : item;
+            if (item._id !== updated._id) return item;
+            if (updated.changes === undefined) updated.changes = (item.changes || 0) + 1;
+            return updated;
         });
     }
 
@@ -1480,6 +1529,14 @@
             stock.summary = data.summary;
             renderStockStats();
             renderStockAlert();
+
+            // keep the "never counted, used or received" bar in step
+            var bar = document.querySelector("#stockList .stock-unused");
+            var unused = stock.items.filter(function (item) {
+                return item.quantity === 0 && item.changes === 0;
+            }).length;
+            if (bar && unused) bar.replaceWith(unusedBar(unused));
+            else if (bar) bar.remove();
         } catch (error) {
             /* the card already shows the change */
         }
@@ -1694,14 +1751,47 @@
         ]);
 
         if (editing) {
-            foot.appendChild(button(item.active ? "Archive item" : "Bring back", "btn-ghost btn-danger", function () {
+            foot.appendChild(button(item.active ? "Archive item" : "Bring back", "btn-ghost", function () {
                 submit({ active: !item.active }, item.active
                     ? item.name + " archived. It stays in old reports."
                     : item.name + " is back in the stock list.");
             }));
+            foot.appendChild(button("Delete item", "btn-ghost btn-danger", askDelete));
         }
 
         foot.appendChild(message);
+
+        function askDelete() {
+            var history = item.changes
+                ? " Its history (" + plural(item.changes, "change", "changes") + ") is deleted too, and it disappears from reports. To keep the history, archive it instead."
+                : "";
+            var box = el("div", { className: "stock-delete-confirm" }, [
+                el("p", { className: "confirm-text", text: "Delete " + item.name + " for good?" + history })
+            ]);
+            var keep = button("Keep it", "btn-ghost", function () {
+                box.remove();
+                foot.hidden = false;
+            });
+
+            box.appendChild(button("Yes, delete", "btn-primary", async function () {
+                this.disabled = true;
+                try {
+                    await api("DELETE", "/admin/stock/items/" + item._id);
+                    slot.textContent = "";
+                    toast(item.name + " deleted.");
+                    load("stock", true);
+                } catch (error) {
+                    if (error.status !== 401) toast(error.message, true);
+                    box.remove();
+                    foot.hidden = false;
+                }
+            }));
+            box.appendChild(keep);
+
+            foot.hidden = true;
+            form.appendChild(box);
+            keep.focus();
+        }
 
         var form = el("form", { className: "form-card item-form", novalidate: true }, [
             el("h2", { text: editing ? "Change " + item.name : "Add an item" }),

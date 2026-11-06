@@ -6,6 +6,8 @@
    POST  /items                      add an item (owner)
    POST  /items/starter              add a list of common inn items (owner)
    PATCH /items/:id                  change name, unit, warning level, price, archive (owner)
+   DELETE /items/:id                 delete an item and its history (owner)
+   POST  /items/remove-unused        delete items never counted, used or received (owner)
    POST  /items/:id/movements        { type: in|out|count, quantity, note?, day?, unitCost? }
    GET   /movements                  ?itemId &before  latest changes
    GET   /report                     ?from=YYYY-MM-DD &to=YYYY-MM-DD  start, received, used, left
@@ -77,7 +79,7 @@ function statusOf(item) {
   return "ok";
 }
 
-function itemForAdmin(item, owner) {
+function itemForAdmin(item, owner, changes) {
   const shown = {
     _id: item._id,
     name: item.name,
@@ -90,6 +92,9 @@ function itemForAdmin(item, owner) {
     status: statusOf(item),
     updatedAt: item.updatedAt,
   };
+
+  // how many times it was counted, used or received (0 = never touched)
+  if (changes !== undefined) shown.changes = changes;
 
   if (owner) {
     shown.unitCost = item.unitCost || 0;
@@ -169,8 +174,12 @@ function readItem(body, partial) {
 router.get("/items", async (req, res) => {
   try {
     const filter = req.query.archived === "1" ? {} : { active: true };
-    const items = await StockItem.find(filter).sort({ category: 1, name: 1 }).lean();
+    const [items, counts] = await Promise.all([
+      StockItem.find(filter).sort({ category: 1, name: 1 }).lean(),
+      StockMovement.aggregate([{ $group: { _id: "$item", n: { $sum: 1 } } }]),
+    ]);
     const owner = isOwner(req);
+    const changesOf = new Map(counts.map((row) => [String(row._id), row.n]));
     const active = items.filter((item) => item.active !== false);
 
     const summary = {
@@ -185,7 +194,7 @@ router.get("/items", async (req, res) => {
       success: true,
       categories: STOCK_CATEGORIES,
       summary,
-      items: items.map((item) => itemForAdmin(item, owner)),
+      items: items.map((item) => itemForAdmin(item, owner, changesOf.get(String(item._id)) || 0)),
     });
   } catch (error) {
     return serverError(res, "Stock list failed", error);
@@ -301,6 +310,44 @@ router.patch("/items/:id", requireOwner, async (req, res) => {
   } catch (error) {
     if (error.code === 11000) return bad(res, "There is already an item with this name.", 409);
     return serverError(res, "Changing a stock item failed", error);
+  }
+});
+
+/* ---------- Delete ---------- */
+
+router.delete("/items/:id", requireOwner, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return bad(res, "Unknown item.");
+
+    const item = await StockItem.findById(req.params.id).lean();
+    if (!item) return bad(res, "This item was already deleted.", 404);
+
+    const removed = await StockMovement.deleteMany({ item: item._id });
+    await StockItem.deleteOne({ _id: item._id });
+
+    return res.json({ success: true, name: item.name, removedChanges: removed.deletedCount || 0 });
+  } catch (error) {
+    return serverError(res, "Deleting a stock item failed", error);
+  }
+});
+
+/* Items nobody has counted, used or received yet (for example the common
+   items added to get started), so the owner can clear them in one go. */
+router.post("/items/remove-unused", requireOwner, async (req, res) => {
+  try {
+    const candidates = await StockItem.find({ quantity: 0 }).select("_id").lean();
+    let removed = 0;
+
+    for (const item of candidates) {
+      if (!(await StockMovement.exists({ item: item._id }))) {
+        await StockItem.deleteOne({ _id: item._id, quantity: 0 });
+        removed += 1;
+      }
+    }
+
+    return res.json({ success: true, removed });
+  } catch (error) {
+    return serverError(res, "Removing unused items failed", error);
   }
 });
 
