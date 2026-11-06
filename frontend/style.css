@@ -3321,3 +3321,35 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 .privacy-page .footer {
     margin-top: 0;
 }
+
+/* Home page room cards: booked or free (home-availability.js) */
+.room-avail {
+    display: inline-flex;
+    align-self: flex-start;
+    width: fit-content;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.room-avail.is-free::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ink);
+}
+
+.room-avail.is-booked {
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--white);
+}
+
+.room-card.is-booked .room-image img {
+    filter: grayscale(1);
+    opacity: 0.8;
+}

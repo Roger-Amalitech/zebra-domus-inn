@@ -158,7 +158,11 @@ const ZEBRA_TRANSLATIONS = {
         payAtInnShort: "Pay at reception when you arrive",
         privacyNote: "By booking, you agree that we use your details to manage your stay.",
         privacyLink: "Read our privacy notice",
-        openMenu: "Open menu"
+        openMenu: "Open menu",
+        freeTonight: "Free tonight",
+        bookedTonight: "Booked tonight",
+        freeForDates: "Free for your dates",
+        bookedForDates: "Booked for your dates"
     },
 
     rw: {
@@ -314,7 +318,11 @@ const ZEBRA_TRANSLATIONS = {
         payAtInnShort: "Ishyura ku biro byakira abashyitsi ugeze",
         privacyNote: "Iyo ubitse, wemera ko dukoresha amakuru yawe mu gucunga urugendo rwawe.",
         privacyLink: "Soma uko turinda amakuru yawe",
-        openMenu: "Fungura urutonde"
+        openMenu: "Fungura urutonde",
+        freeTonight: "Kirahari iri joro",
+        bookedTonight: "Cyafashwe iri joro",
+        freeForDates: "Kirahari kuri ayo matariki",
+        bookedForDates: "Cyafashwe kuri ayo matariki"
     },
 
     fr: {
@@ -470,7 +478,11 @@ const ZEBRA_TRANSLATIONS = {
         payAtInnShort: "Payez à la réception à votre arrivée",
         privacyNote: "En réservant, vous acceptez que nous utilisions vos données pour gérer votre séjour.",
         privacyLink: "Lire notre politique de confidentialité",
-        openMenu: "Ouvrir le menu"
+        openMenu: "Ouvrir le menu",
+        freeTonight: "Libre ce soir",
+        bookedTonight: "Réservée ce soir",
+        freeForDates: "Disponible à vos dates",
+        bookedForDates: "Déjà réservée à vos dates"
     }
 };
 

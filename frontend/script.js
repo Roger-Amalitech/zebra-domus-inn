@@ -366,6 +366,21 @@ function renderzebradormusRooms() {
         meta.append(priceText, guestsText);
         content.append(title, meta);
 
+        /* Booked or free: tonight, or for the dates picked at the top (home-availability.js) */
+        const home = window.ZDHomeAvailability;
+
+        if (home && home.rooms && Object.prototype.hasOwnProperty.call(home.rooms, roomId)) {
+            const free = home.rooms[roomId] > 0;
+            const status = document.createElement("p");
+            status.className = "room-avail " + (free ? "is-free" : "is-booked");
+
+            if (free) status.textContent = home.forDates ? (t.freeForDates || "Free for your dates") : (t.freeTonight || "Free tonight");
+            else status.textContent = home.forDates ? (t.bookedForDates || "Booked for your dates") : (t.bookedTonight || "Booked tonight");
+
+            content.appendChild(status);
+            if (!free) card.classList.add("is-booked");
+        }
+
         if (tooSmall) {
             const warning = document.createElement("p");
             warning.className = "room-warning";
