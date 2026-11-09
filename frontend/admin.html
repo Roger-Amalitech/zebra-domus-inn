@@ -27,7 +27,7 @@
             <img src="images/logo/zebra-domus-logo-white.png" alt="Zebra Dormus Inn" width="90" height="38">
         </span>
         <h1>Staff sign-in</h1>
-        <p class="muted">Only for Zebra Dormus Inn staff. Sign in with the email and password the owner gave you.</p>
+        <p class="muted">Only for Zebra Dormus Inn staff. Sign in with the email and password the manager or owner gave you.</p>
 
         <label for="email">Email</label>
         <input id="email" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254" required>
@@ -45,7 +45,7 @@
 <!-- DASHBOARD -->
 <div class="app" id="app" hidden>
     <header class="topbar">
-        <a class="brand" href="#today">
+        <a class="brand" href="#today" id="brandLink">
             <span class="brand-badge">
                 <img src="images/logo/zebra-domus-logo-white.png" alt="Zebra Dormus Inn" width="90" height="38">
             </span>
@@ -53,29 +53,29 @@
         </a>
 
         <nav class="tabs" aria-label="Admin sections">
-            <a href="#today" class="tab" data-view="today">
+            <a href="#today" class="tab" data-view="today" data-perm="bookings.view">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 15h3v3H8z"/></svg>
                 <span>Today</span>
             </a>
-            <a href="#bookings" class="tab" data-view="bookings">
+            <a href="#bookings" class="tab" data-view="bookings" data-perm="bookings.view">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M8 12h8M8 16h5"/></svg>
                 <span>Bookings</span>
             </a>
-            <a href="#availability" class="tab" data-view="availability">
+            <a href="#availability" class="tab" data-view="availability" data-perm="bookings.view">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 <span>Availability</span>
             </a>
-            <a href="#stock" class="tab" data-view="stock">
+            <a href="#stock" class="tab" data-view="stock" data-perm="stock.view">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>
                 <span>Stock</span>
             </a>
-            <a href="#rooms" class="tab" data-view="rooms" data-owner-only hidden>
+            <a href="#rooms" class="tab" data-view="rooms" data-perm="rooms.manage" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18V7"/><path d="M3 14h18v4"/><path d="M21 18v-4a3 3 0 0 0-3-3h-7v3"/><circle cx="7" cy="11" r="2"/></svg>
                 <span>Rooms</span>
             </a>
-            <a href="#staff" class="tab" data-view="staff" data-owner-only hidden>
+            <a href="#users" class="tab" data-view="users" data-perm="users" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.5a5 5 0 0 1 4.5 5"/></svg>
-                <span>Staff</span>
+                <span>Users</span>
             </a>
         </nav>
 
@@ -190,7 +190,7 @@
         <section class="view" id="view-stock" aria-labelledby="stockHeading" hidden>
             <div class="view-head">
                 <h1 id="stockHeading">Stock</h1>
-                <p class="muted">What the inn has in store, what was used and what is left.</p>
+                <p class="muted">What came into the store, what was used and what remains.</p>
             </div>
 
             <div class="stats" id="stockStats"></div>
@@ -214,12 +214,13 @@
                             <option value="">All categories</option>
                         </select>
                     </div>
-                    <button type="button" class="btn btn-primary btn-small" id="addItemButton" data-owner-only hidden>Add item</button>
+                    <button type="button" class="btn btn-primary btn-small" id="addItemButton" data-perm="stock.items" hidden>Add item</button>
                 </div>
+                <p class="stock-key" id="stockKey"><strong>In stock</strong> everything received since the item was added · <strong>Used</strong> everything used · <strong>Remaining</strong> what is in the store now</p>
                 <p class="count" id="stockCount" aria-live="polite"></p>
                 <div id="itemFormSlot"></div>
                 <div class="list" id="stockList"></div>
-                <label class="switch archived-toggle" data-owner-only hidden>
+                <label class="switch archived-toggle" data-perm="stock.items" hidden>
                     <input type="checkbox" id="showArchived">
                     <span class="switch-track" aria-hidden="true"></span>
                     <span>Show archived items</span>
@@ -237,6 +238,7 @@
                         <button type="button" class="btn btn-ghost btn-small" data-period="month">This month</button>
                         <button type="button" class="btn btn-ghost btn-small" data-period="last-month">Last month</button>
                         <button type="button" class="btn btn-ghost btn-small" data-period="week">Last 7 days</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-period="all">Since the start</button>
                     </div>
                     <div class="report-dates">
                         <label for="reportFrom">From</label>
@@ -262,15 +264,15 @@
             <div class="room-forms" id="roomForms"></div>
         </section>
 
-        <!-- STAFF (owner only) -->
-        <section class="view" id="view-staff" aria-labelledby="staffHeading" hidden>
+        <!-- USERS (owner and managers) -->
+        <section class="view" id="view-users" aria-labelledby="usersHeading" hidden>
             <div class="view-head">
-                <h1 id="staffHeading">Staff</h1>
-                <p class="muted">People who can sign in to this dashboard. Staff can see today, bookings and availability, and confirm or cancel bookings. Only the owner can change rooms, prices and staff.</p>
+                <h1 id="usersHeading">Users</h1>
+                <p class="muted" id="usersIntro">People who can sign in to this dashboard, and what each one may do.</p>
             </div>
 
             <form class="form-card" id="addStaffForm" novalidate>
-                <h2>Add a staff member</h2>
+                <h2>Add a person</h2>
                 <div class="room-fields">
                     <div class="room-field">
                         <label for="staffName">Full name</label>
@@ -285,9 +287,18 @@
                         <input id="staffPassword" type="text" autocomplete="new-password" spellcheck="false" maxlength="200" required aria-describedby="staffPasswordHelp">
                         <p class="help" id="staffPasswordHelp">At least 8 characters. Give it to them in person; they can change it after signing in.</p>
                     </div>
+                    <div class="room-field" id="staffRoleField" hidden>
+                        <label for="staffRole">Role</label>
+                        <select id="staffRole">
+                            <option value="staff">Staff</option>
+                            <option value="manager">Manager</option>
+                        </select>
+                        <p class="help">Managers add staff and choose what they may do.</p>
+                    </div>
                 </div>
+                <div id="staffPerms"></div>
                 <div class="room-form-foot">
-                    <button type="submit" class="btn btn-primary btn-small" id="addStaffButton">Add staff member</button>
+                    <button type="submit" class="btn btn-primary btn-small" id="addStaffButton">Add person</button>
                     <p class="room-form-message" id="addStaffMessage" role="status"></p>
                 </div>
             </form>
@@ -305,8 +316,14 @@
             <div class="form-card account-card">
                 <p class="account-line"><span class="muted">Name</span> <strong id="myName"></strong></p>
                 <p class="account-line"><span class="muted">Email</span> <strong id="myEmail"></strong></p>
-                <p class="account-line"><span class="muted">Access</span> <strong id="myRole"></strong></p>
+                <p class="account-line"><span class="muted">Role</span> <strong id="myRole"></strong></p>
+                <div class="account-perms">
+                    <p class="muted">What you can do</p>
+                    <ul class="perm-list" id="myPerms"></ul>
+                </div>
             </div>
+
+            <p class="room-note no-access" id="noAccessNote" hidden>You can't open any part of the dashboard yet. Ask the manager to tick what you may do, then press Refresh.</p>
 
             <p class="room-note" id="envOwnerNote" hidden>Your password is set in the backend/.env file on the server (ADMIN_PASSWORD). To change it, edit that line and restart the server.</p>
 

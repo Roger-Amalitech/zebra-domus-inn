@@ -1153,9 +1153,9 @@ a {
     font-weight: 500;
 }
 
-/* ---------- Staff and my account ---------- */
+/* ---------- Users and my account ---------- */
 
-#view-staff,
+#view-users,
 #view-account {
     max-width: 860px;
 }
@@ -1264,6 +1264,182 @@ a {
     margin-bottom: 14px;
 }
 
+.booking-actions:empty {
+    display: none;
+}
+
+/* Role and permission tick boxes */
+
+.form-card select,
+.perm-edit select {
+    width: 100%;
+    min-height: 46px;
+    padding: 0 40px 0 14px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right 14px center / 16px no-repeat;
+    font-size: 16px;
+    appearance: none;
+    cursor: pointer;
+}
+
+.form-card select:focus,
+.perm-edit select:focus {
+    border-color: var(--ink);
+    outline: none;
+    box-shadow: var(--ring);
+}
+
+.perm-picker {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin: 0;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #FAFAFA;
+    min-width: 0;
+}
+
+.perm-picker legend {
+    padding: 0 6px;
+    font-size: 13.5px;
+    font-weight: 700;
+}
+
+.perm-tools {
+    display: flex;
+    gap: 16px;
+    font-size: 13.5px;
+}
+
+.perm-group {
+    display: grid;
+    gap: 4px;
+    align-content: start;
+}
+
+.perm-group-title {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.perm-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 7px 0;
+    font-size: 14.5px;
+    line-height: 1.35;
+    cursor: pointer;
+}
+
+.perm-option input,
+.form-card .perm-option input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--ink);
+    cursor: pointer;
+}
+
+.perm-option.is-locked {
+    color: var(--faint);
+    cursor: not-allowed;
+}
+
+.perm-option.is-locked input {
+    cursor: not-allowed;
+}
+
+.perm-picker > .help {
+    color: var(--muted);
+    font-size: 12.5px;
+}
+
+.perm-edit {
+    display: grid;
+    gap: 14px;
+    flex-basis: 100%;
+}
+
+.perm-role {
+    max-width: 320px;
+}
+
+.perm-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 4px;
+    padding: 0;
+    list-style: none;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: var(--soft);
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.chip-solid {
+    background: var(--ink);
+    color: var(--white);
+}
+
+.perm-none {
+    margin: 4px 0;
+    font-style: italic;
+}
+
+.account-perms {
+    display: grid;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.perm-list {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding-left: 20px;
+}
+
+.no-access {
+    margin-bottom: 14px;
+    border: 1.5px solid var(--ink);
+    background: var(--white);
+    color: var(--ink);
+    font-weight: 600;
+}
+
+@media (min-width: 720px) {
+    .perm-picker {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        column-gap: 20px;
+    }
+
+    .perm-picker legend,
+    .perm-tools,
+    .perm-picker > .help {
+        grid-column: 1 / -1;
+    }
+
+}
+
 /* ---------- Stock ---------- */
 
 .pill-low {
@@ -1364,6 +1540,63 @@ a {
 
 .stock-notes {
     font-size: 13.5px;
+}
+
+/* In stock · Used · Remaining */
+
+.stock-key {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.stock-key strong {
+    color: var(--ink);
+}
+
+.stock-figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin: 6px 0 2px;
+}
+
+.stock-figures > div {
+    display: grid;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--soft);
+}
+
+.stock-figures dt {
+    color: var(--muted);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.stock-figures dd {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+}
+
+.stock-figures .is-remaining {
+    background: var(--ink);
+    color: var(--white);
+}
+
+.stock-figures .is-remaining dt {
+    color: #CFCFCF;
+}
+
+.stock-figures .unit {
+    font-size: 13px;
+    font-weight: 500;
 }
 
 .stock-card .booking-actions {

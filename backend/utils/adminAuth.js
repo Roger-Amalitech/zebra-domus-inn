@@ -8,7 +8,8 @@
      ADMIN_NAME=Roger            (optional: the name shown in the dashboard)
    It is created when the server starts, and its password is updated
    from .env on every start (so a forgotten password is fixed there).
-   The owner adds other staff in the dashboard (Staff tab).
+   The owner adds managers and staff in the dashboard (Users tab);
+   managers add staff and choose what they may do (utils/permissions.js).
 
    Signing in gives a token that lasts 12 hours. Turning an account
    off, removing it or resetting its password signs that person out.
@@ -19,6 +20,7 @@ const { promisify } = require("util");
 const mongoose = require("mongoose");
 
 const AdminUser = require("../models/AdminUser");
+const { permissionsOf } = require("./permissions");
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -175,6 +177,7 @@ function publicUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    permissions: permissionsOf(user),
     active: user.active,
     lastLoginAt: user.lastLoginAt || null,
     createdAt: user.createdAt,
@@ -289,7 +292,7 @@ async function login(req, res) {
     if (!user.active) {
       return res.status(403).json({
         success: false,
-        message: "This account has been turned off. Please ask the owner of the inn.",
+        message: "This account has been turned off. Please ask the manager or the owner of the inn.",
       });
     }
 

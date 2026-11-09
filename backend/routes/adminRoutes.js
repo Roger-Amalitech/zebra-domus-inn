@@ -10,9 +10,12 @@
    PATCH /api/admin/bookings/:id       { bookingStatus?, paymentStatus? }
    GET   /api/admin/occupancy          ?from=YYYY-MM-DD &days=14  rooms booked per night
    GET   /api/admin/rooms              every room type, open or closed
-   PATCH /api/admin/rooms/:id          { pricePerNight?, totalRooms?, capacity?, available?, description? }  (owner only)
-         /api/admin/staff              staff accounts (owner only), see staffRoutes.js
+   PATCH /api/admin/rooms/:id          { pricePerNight?, totalRooms?, capacity?, available?, description? }
+         /api/admin/staff              user accounts (owner and managers), see staffRoutes.js
          /api/admin/stock              store room: items, used, received, counted (see stockRoutes.js)
+
+   What each person may do is checked on every request (utils/permissions.js):
+   bookings.view, bookings.manage, rooms.manage, stock.* ...
 ========================================= */
 
 const express = require("express");
@@ -26,7 +29,6 @@ const stockRoutes = require("./stockRoutes");
 const {
   login,
   requireAdmin,
-  requireOwner,
   passwordMatches,
   passwordProblem,
   hashPassword,
@@ -34,6 +36,7 @@ const {
   publicUser,
   ownerEmailFromEnv,
 } = require("../utils/adminAuth");
+const { requirePermission, requireManager } = require("../utils/permissions");
 const {
   parseDay,
   toDay,
@@ -54,8 +57,12 @@ router.post("/login", login);
 
 router.use(requireAdmin);
 
-router.use("/staff", requireOwner, staffRoutes);
-router.use("/stock", stockRoutes);
+router.use("/staff", requireManager, staffRoutes);
+router.use("/stock", requirePermission("stock.view"), stockRoutes);
+
+const seeBookings = requirePermission("bookings.view");
+const changeBookings = requirePermission("bookings.manage");
+const changeRooms = requirePermission("rooms.manage");
 
 const BOOKING_STATUSES = ["pending", "confirmed", "cancelled"];
 const PAYMENT_STATUSES = ["pending", "paid", "failed"];
@@ -132,7 +139,7 @@ router.post("/me/password", async (req, res) => {
 
 /* ---------- Today ---------- */
 
-router.get("/summary", async (req, res) => {
+router.get("/summary", seeBookings, async (req, res) => {
   try {
     const todayText = parseDay(req.query.date) ? req.query.date : innToday();
     const today = parseDay(todayText);
@@ -178,7 +185,7 @@ router.get("/summary", async (req, res) => {
 
 /* ---------- Bookings ---------- */
 
-router.get("/bookings", async (req, res) => {
+router.get("/bookings", seeBookings, async (req, res) => {
   try {
     const when = ["upcoming", "past", "all"].includes(req.query.when) ? req.query.when : "upcoming";
     const status = BOOKING_STATUSES.includes(req.query.status) ? req.query.status : "all";
@@ -213,7 +220,7 @@ router.get("/bookings", async (req, res) => {
   }
 });
 
-router.patch("/bookings/:id", async (req, res) => {
+router.patch("/bookings/:id", changeBookings, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Unknown booking." });
@@ -276,7 +283,7 @@ router.patch("/bookings/:id", async (req, res) => {
 
 /* ---------- Rooms booked per night ---------- */
 
-router.get("/occupancy", async (req, res) => {
+router.get("/occupancy", seeBookings, async (req, res) => {
   try {
     const fromText = parseDay(req.query.from) ? req.query.from : innToday();
     const from = parseDay(fromText);
@@ -338,7 +345,7 @@ router.get("/occupancy", async (req, res) => {
 
 /* ---------- Room types: price, number of rooms, open/closed ---------- */
 
-router.get("/rooms", async (req, res) => {
+router.get("/rooms", changeRooms, async (req, res) => {
   try {
     const rooms = await Room.find().sort({ pricePerNight: 1 }).lean();
     return res.json({ success: true, rooms });
@@ -347,7 +354,7 @@ router.get("/rooms", async (req, res) => {
   }
 });
 
-router.patch("/rooms/:id", requireOwner, async (req, res) => {
+router.patch("/rooms/:id", changeRooms, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Unknown room type." });

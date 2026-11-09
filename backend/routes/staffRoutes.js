@@ -1,11 +1,15 @@
 /* =========================================
    ZEBRA DORMUS INN
-   Staff accounts (owner only), mounted at /api/admin/staff
+   User accounts, mounted at /api/admin/staff (owner and managers)
 
-   GET    /            everyone who can sign in
-   POST   /            { name, email, password }  add a staff member
-   PATCH  /:id         { name?, active?, password? }
+   GET    /            everyone who can sign in, and what each may do
+   POST   /            { name, email, password, role?, permissions? }
+   PATCH  /:id         { name?, active?, password?, role?, permissions? }
    DELETE /:id         remove an account
+
+   The owner adds and changes managers and staff.
+   A manager adds and changes staff, and can give them only
+   what the manager can do (see utils/permissions.js).
 ========================================= */
 
 const express = require("express");
@@ -19,6 +23,14 @@ const {
   publicUser,
   ownerEmailFromEnv,
 } = require("../utils/adminAuth");
+const {
+  PERMISSIONS,
+  ALL,
+  permissionsOf,
+  canManage,
+  grantable,
+  mergeGrant,
+} = require("../utils/permissions");
 
 const router = express.Router();
 
@@ -38,12 +50,45 @@ function serverError(res, label, error) {
 const ENV_OWNER_MESSAGE =
   "This is the owner's account from backend/.env. Change ADMIN_EMAIL or ADMIN_PASSWORD there and restart the server.";
 
+// the roles the signed-in person can give
+function rolesFor(actor) {
+  return actor.role === "owner" ? ["manager", "staff"] : ["staff"];
+}
+
+// why the signed-in person can't change this account ("" if they can)
+function whyNot(actor, user) {
+  if (String(user._id) === String(actor._id)) return "This is your own account. Change your password in My account.";
+  if (user.email === ownerEmailFromEnv()) return ENV_OWNER_MESSAGE;
+  if (user.role === "owner") return "Only the owner can change this account.";
+  if (!canManage(actor, user)) return "Only the owner can change a manager's account.";
+  return "";
+}
+
+function userForList(actor, user) {
+  return { ...publicUser(user), canEdit: !whyNot(actor, user) };
+}
+
+function readPermissions(value) {
+  if (!Array.isArray(value) || value.some((key) => typeof key !== "string")) return null;
+  return value;
+}
+
 router.get("/", async (req, res) => {
   try {
-    const users = await AdminUser.find().sort({ role: 1, name: 1 });
-    return res.json({ success: true, staff: users.map(publicUser) });
+    const users = await AdminUser.find();
+    const order = { owner: 0, manager: 1, staff: 2 };
+
+    users.sort((a, b) => (order[a.role] - order[b.role]) || a.name.localeCompare(b.name));
+
+    return res.json({
+      success: true,
+      staff: users.map((user) => userForList(req.admin, user)),
+      permissionList: PERMISSIONS,
+      grantable: grantable(req.admin),
+      roles: rolesFor(req.admin),
+    });
   } catch (error) {
-    return serverError(res, "Staff list failed", error);
+    return serverError(res, "User list failed", error);
   }
 });
 
@@ -53,12 +98,22 @@ router.post("/", async (req, res) => {
     const name = text(body.name);
     const email = text(body.email).toLowerCase();
     const password = typeof body.password === "string" ? body.password : "";
+    const role = body.role === undefined ? "staff" : body.role;
 
     if (!name || name.length > 80) return bad(res, "Please enter a name (up to 80 characters).");
     if (!isEmail(email)) return bad(res, "Please enter a valid email address.");
 
     const weak = passwordProblem(password);
     if (weak) return bad(res, weak);
+
+    if (!["manager", "staff"].includes(role)) return bad(res, "Choose Manager or Staff.");
+    if (!rolesFor(req.admin).includes(role)) return bad(res, "Only the owner can add a manager.", 403);
+
+    let wanted = role === "manager" ? ALL : [];
+    if (body.permissions !== undefined) {
+      wanted = readPermissions(body.permissions);
+      if (!wanted) return bad(res, "Permissions must be a list.");
+    }
 
     if (await AdminUser.exists({ email })) {
       return bad(res, "There is already an account with this email.", 409);
@@ -68,14 +123,15 @@ router.post("/", async (req, res) => {
       name,
       email,
       passwordHash: await hashPassword(password),
-      role: "staff",
+      role,
+      permissions: mergeGrant(req.admin, [], wanted),
       active: true,
     });
 
-    return res.status(201).json({ success: true, user: publicUser(user) });
+    return res.status(201).json({ success: true, user: userForList(req.admin, user) });
   } catch (error) {
     if (error.code === 11000) return bad(res, "There is already an account with this email.", 409);
-    return serverError(res, "Adding staff failed", error);
+    return serverError(res, "Adding a user failed", error);
   }
 });
 
@@ -86,9 +142,11 @@ router.patch("/:id", async (req, res) => {
     const user = await AdminUser.findById(req.params.id);
     if (!user) return bad(res, "Account not found.", 404);
 
+    const reason = whyNot(req.admin, user);
+    if (reason) return bad(res, reason, 403);
+
     const body = req.body || {};
-    const isSelf = String(user._id) === String(req.admin._id);
-    const isEnvOwner = user.email === ownerEmailFromEnv();
+    const before = permissionsOf(user);
     let signOut = false;
 
     if (body.name !== undefined) {
@@ -97,16 +155,26 @@ router.patch("/:id", async (req, res) => {
       user.name = name;
     }
 
+    if (body.role !== undefined && body.role !== user.role) {
+      if (!["manager", "staff"].includes(body.role)) return bad(res, "Choose Manager or Staff.");
+      if (!rolesFor(req.admin).includes(body.role)) return bad(res, "Only the owner can change someone's role.", 403);
+      user.role = body.role;
+      user.permissions = before; // the role alone doesn't change what they may do
+    }
+
+    if (body.permissions !== undefined) {
+      const wanted = readPermissions(body.permissions);
+      if (!wanted) return bad(res, "Permissions must be a list.");
+      user.permissions = mergeGrant(req.admin, before, wanted);
+    }
+
     if (body.active !== undefined) {
       if (typeof body.active !== "boolean") return bad(res, "Active must be yes or no.");
-      if (isEnvOwner) return bad(res, ENV_OWNER_MESSAGE);
-      if (isSelf && body.active === false) return bad(res, "You can't turn off your own account.");
       if (user.active && body.active === false) signOut = true;
       user.active = body.active;
     }
 
     if (body.password !== undefined) {
-      if (isEnvOwner) return bad(res, ENV_OWNER_MESSAGE);
       const weak = passwordProblem(body.password);
       if (weak) return bad(res, weak);
       user.passwordHash = await hashPassword(body.password);
@@ -116,9 +184,9 @@ router.patch("/:id", async (req, res) => {
     if (signOut) user.tokenVersion = (user.tokenVersion || 0) + 1;
 
     await user.save();
-    return res.json({ success: true, user: publicUser(user) });
+    return res.json({ success: true, user: userForList(req.admin, user) });
   } catch (error) {
-    return serverError(res, "Staff update failed", error);
+    return serverError(res, "User update failed", error);
   }
 });
 
@@ -129,13 +197,13 @@ router.delete("/:id", async (req, res) => {
     const user = await AdminUser.findById(req.params.id);
     if (!user) return bad(res, "Account not found.", 404);
 
-    if (String(user._id) === String(req.admin._id)) return bad(res, "You can't remove your own account.");
-    if (user.email === ownerEmailFromEnv()) return bad(res, ENV_OWNER_MESSAGE);
+    const reason = whyNot(req.admin, user);
+    if (reason) return bad(res, reason, 403);
 
     await AdminUser.deleteOne({ _id: user._id });
     return res.json({ success: true });
   } catch (error) {
-    return serverError(res, "Removing staff failed", error);
+    return serverError(res, "Removing a user failed", error);
   }
 });
 

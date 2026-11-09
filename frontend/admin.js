@@ -1,7 +1,9 @@
 /* =========================================
    ZEBRA DORMUS INN
    Staff dashboard: sign in, today, bookings,
-   availability grid and room settings.
+   availability grid, stock, rooms and users.
+   Each person sees only what they may do
+   (owner, manager, or the staff permissions a manager ticked).
    Talks to /api/admin on the booking server.
 ========================================= */
 
@@ -10,14 +12,23 @@
 
     var API = window.ZD_API || "/api";
     var TOKEN_KEY = "zdAdminToken";
-    var VIEWS = ["today", "bookings", "availability", "stock", "rooms", "staff", "account"];
-    var OWNER_VIEWS = ["rooms", "staff"];
+    var VIEWS = ["today", "bookings", "availability", "stock", "rooms", "users", "account"];
+    // what each section needs ("" = everyone, "users" = owner or manager)
+    var VIEW_NEEDS = {
+        today: "bookings.view",
+        bookings: "bookings.view",
+        availability: "bookings.view",
+        stock: "stock.view",
+        rooms: "rooms.manage",
+        users: "users",
+        account: ""
+    };
     var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     var AUTO_REFRESH_MS = 60 * 1000;
 
     var memoryToken = "";
     var signedIn = false;
-    var user = null; /* { _id, name, email, role, fromEnv } */
+    var user = null; /* { _id, name, email, role, permissions, fromEnv } */
     var current = "today";
     var bookingRequest = 0;
     var searchTimer = null;
@@ -223,6 +234,11 @@
             throw new AdminError("", 401);
         }
 
+        // Not allowed: what this person may do has probably just changed.
+        if (response.status === 403 && path !== "/admin/me") {
+            setTimeout(syncMe, 0);
+        }
+
         if (!response.ok || !data || data.success === false) {
             var message = data && data.message;
 
@@ -267,11 +283,83 @@
         container.appendChild(el("p", { className: className || "loading", text: text }));
     }
 
-    /* ---------- Sign in / out ---------- */
+    /* ---------- What each person may do ---------- */
+
+    var PERMISSIONS = [
+        { key: "bookings.view", group: "Bookings", label: "See today, bookings and availability", short: "See bookings" },
+        { key: "bookings.manage", group: "Bookings", label: "Confirm, cancel and mark bookings paid", short: "Change bookings", needs: "bookings.view" },
+        { key: "stock.view", group: "Stock", label: "See stock: in stock, used, remaining", short: "See stock" },
+        { key: "stock.use", group: "Stock", label: "Record what was used", short: "Record used", needs: "stock.view" },
+        { key: "stock.receive", group: "Stock", label: "Record what came in", short: "Record received", needs: "stock.view" },
+        { key: "stock.count", group: "Stock", label: "Correct numbers after counting", short: "Count", needs: "stock.view" },
+        { key: "stock.items", group: "Stock", label: "Add, change and delete items", short: "Manage items", needs: "stock.view" },
+        { key: "stock.prices", group: "Stock", label: "See prices and value", short: "See prices", needs: "stock.view" },
+        { key: "rooms.manage", group: "Rooms", label: "Change rooms, prices and online booking", short: "Rooms & prices" }
+    ];
+
+    var ROLE_NAMES = { owner: "Owner", manager: "Manager", staff: "Staff" };
+
+    function can(key) {
+        return Boolean(user && user.permissions && user.permissions.indexOf(key) >= 0);
+    }
 
     function isOwner() {
         return Boolean(user && user.role === "owner");
     }
+
+    // the owner and managers look after the user accounts
+    function managesUsers() {
+        return Boolean(user && (user.role === "owner" || user.role === "manager"));
+    }
+
+    function allowed(view) {
+        var need = VIEW_NEEDS[view];
+        if (need === undefined) return false;
+        if (need === "") return true;
+        if (need === "users") return managesUsers();
+        return can(need);
+    }
+
+    // the first section this person may open (My account if none)
+    function firstView() {
+        for (var i = 0; i < VIEWS.length; i += 1) {
+            if (VIEWS[i] !== "account" && allowed(VIEWS[i])) return VIEWS[i];
+        }
+        return "account";
+    }
+
+    function accessKey(person) {
+        return person ? person.role + "|" + (person.permissions || []).join(",") : "";
+    }
+
+    /* Asks the server what this person may do now, and redraws the
+       dashboard if a manager or the owner has changed it. */
+    var syncing = null;
+
+    function syncMe() {
+        if (!signedIn || syncing) return syncing;
+
+        syncing = api("GET", "/admin/me")
+            .then(function (data) {
+                var changed = accessKey(data.user) !== accessKey(user);
+                applyUser(data.user);
+
+                if (changed) {
+                    toast("What you can do here has been changed.");
+                    show(viewFromHash(), true);
+                }
+            })
+            .catch(function () {
+                /* signed out or offline: handled elsewhere */
+            })
+            .then(function () {
+                syncing = null;
+            });
+
+        return syncing;
+    }
+
+    /* ---------- Sign in / out ---------- */
 
     function showSignin(message) {
         signedIn = false;
@@ -288,14 +376,23 @@
         }
     }
 
-    /* Show the signed-in person's name, and the owner-only tabs to the owner. */
+    /* Show the signed-in person's name, and only the tabs and buttons they may use. */
     function applyUser(nextUser) {
         user = nextUser;
+        if (!Array.isArray(user.permissions)) user.permissions = [];
+
         $("accountName").textContent = user.name;
         $("accountButton").setAttribute("aria-label", "My account: " + user.name);
-        document.querySelectorAll("[data-owner-only]").forEach(function (node) {
-            node.hidden = !isOwner();
+
+        document.querySelectorAll("[data-perm]").forEach(function (node) {
+            var need = node.getAttribute("data-perm");
+            node.hidden = need === "users" ? !managesUsers() : !can(need);
         });
+
+        // no tabs at all (nothing ticked yet): hide the empty tab bar
+        document.querySelector(".tabs").hidden = firstView() === "account";
+
+        $("brandLink").setAttribute("href", "#" + firstView());
     }
 
     function showApp(nextUser) {
@@ -357,16 +454,21 @@
 
     function viewFromHash() {
         var view = window.location.hash.replace("#", "");
-        if (VIEWS.indexOf(view) < 0) return "today";
-        if (OWNER_VIEWS.indexOf(view) >= 0 && !isOwner()) return "today";
+        if (view === "staff") view = "users"; // its earlier name
+        if (VIEWS.indexOf(view) < 0 || !allowed(view)) return firstView();
         return view;
     }
 
-    var TITLES = { today: "Today", bookings: "Bookings", availability: "Availability", stock: "Stock", rooms: "Rooms", staff: "Staff", account: "My account" };
+    var TITLES = { today: "Today", bookings: "Bookings", availability: "Availability", stock: "Stock", rooms: "Rooms", users: "Users", account: "My account" };
 
     function show(view, first) {
         var changed = view !== current || first;
         current = view;
+
+        // keep the address in step (for example #today when Today isn't allowed)
+        if (window.location.hash !== "#" + view && window.history && window.history.replaceState) {
+            window.history.replaceState(null, "", "#" + view);
+        }
 
         VIEWS.forEach(function (name) {
             $("view-" + name).hidden = name !== view;
@@ -397,7 +499,7 @@
         availability: loadAvailability,
         rooms: loadRooms,
         stock: loadStock,
-        staff: loadStaff,
+        users: loadUsers,
         account: loadAccount
     };
 
@@ -414,7 +516,10 @@
     $("refreshButton").addEventListener("click", function () {
         var button = this;
         button.classList.add("is-spinning");
-        load(current, false).then(function () {
+        // first pick up any new permissions, then reload what is on screen
+        Promise.resolve(syncMe()).then(function () {
+            return load(current, false);
+        }).then(function () {
             button.classList.remove("is-spinning");
         });
     });
@@ -422,7 +527,8 @@
     // New bookings show up on their own while the page is open.
     setInterval(function () {
         if (!signedIn || document.visibilityState !== "visible") return;
-        if (["stock", "rooms", "staff", "account"].indexOf(current) >= 0) return;
+        syncMe();
+        if (["stock", "rooms", "users", "account"].indexOf(current) >= 0) return;
         if (document.querySelector(".confirm-text")) return;
         if (document.activeElement === $("searchBox")) return;
         load(current, true);
@@ -547,6 +653,9 @@
 
         function renderActions() {
             actions.textContent = "";
+
+            // seeing a booking and changing it are separate permissions
+            if (!can("bookings.manage")) return;
 
             if (cancelled) {
                 actions.appendChild(button("Bring back", "btn-ghost", function () {
@@ -1012,37 +1121,147 @@
         });
     }
 
-    /* ---------- Staff accounts (owner only) ---------- */
+    /* ---------- Users (owner and managers) ---------- */
+
+    // what the signed-in person may hand out, from the server
+    var people = { roles: ["staff"], grantable: [] };
+    var addPicker = null;
 
     function lastSignIn(iso) {
         return iso ? "Last signed in " + bookedAt(iso) : "Hasn't signed in yet";
     }
+
+    /* Tick boxes for what someone may do. Boxes the signed-in person
+       can't give are shown greyed out and can't be changed. */
+    function permissionPicker(prefix, selected, grantable) {
+        var boxes = {};
+        var groups = {};
+        var locked = false;
+
+        var wrap = el("fieldset", { className: "perm-picker" }, [
+            el("legend", { text: "What they may do" })
+        ]);
+
+        function setAll(on) {
+            PERMISSIONS.forEach(function (p) {
+                if (!boxes[p.key].disabled) boxes[p.key].checked = on;
+            });
+            keepNeeds();
+        }
+
+        // a box that something ticked needs stays ticked (recording use needs seeing stock)
+        function keepNeeds() {
+            PERMISSIONS.forEach(function (p) {
+                if (p.needs && boxes[p.key].checked) boxes[p.needs].checked = true;
+            });
+        }
+
+        wrap.appendChild(el("div", { className: "perm-tools" }, [
+            el("button", { type: "button", className: "link-btn", text: "Tick all", onclick: function () { setAll(true); } }),
+            el("button", { type: "button", className: "link-btn", text: "Untick all", onclick: function () { setAll(false); } })
+        ]));
+
+        PERMISSIONS.forEach(function (p) {
+            if (!groups[p.group]) {
+                groups[p.group] = el("div", { className: "perm-group" }, [
+                    el("p", { className: "perm-group-title", text: p.group })
+                ]);
+                wrap.appendChild(groups[p.group]);
+            }
+
+            var id = prefix + "-" + p.key.replace(".", "-");
+            var box = el("input", { type: "checkbox", id: id, value: p.key });
+            box.checked = (selected || []).indexOf(p.key) >= 0;
+
+            if (grantable.indexOf(p.key) < 0) {
+                box.disabled = true;
+                locked = true;
+            }
+
+            box.addEventListener("change", function () {
+                if (box.checked && p.needs && !boxes[p.needs].disabled) boxes[p.needs].checked = true;
+
+                if (!box.checked) {
+                    PERMISSIONS.forEach(function (other) {
+                        if (other.needs === p.key && !boxes[other.key].disabled) boxes[other.key].checked = false;
+                    });
+                }
+
+                keepNeeds();
+            });
+
+            boxes[p.key] = box;
+            groups[p.group].appendChild(el("label", { className: "perm-option" + (box.disabled ? " is-locked" : ""), for: id }, [
+                box,
+                el("span", { text: p.label })
+            ]));
+        });
+
+        if (locked) {
+            wrap.appendChild(el("p", { className: "help", text: "Greyed-out boxes can only be changed by the owner." }));
+        }
+
+        return {
+            node: wrap,
+            value: function () {
+                return PERMISSIONS.filter(function (p) {
+                    return boxes[p.key].checked;
+                }).map(function (p) {
+                    return p.key;
+                });
+            }
+        };
+    }
+
+    function permissionChips(account) {
+        if (account.role === "owner") {
+            return el("ul", { className: "perm-chips", "aria-label": account.name + " can do" }, [
+                el("li", { className: "chip chip-solid", text: "Everything" })
+            ]);
+        }
+
+        var list = account.permissions || [];
+
+        if (!list.length) {
+            return el("p", { className: "staff-meta perm-none", text: "Can't open anything yet." });
+        }
+
+        return el("ul", { className: "perm-chips", "aria-label": account.name + " can" }, PERMISSIONS.filter(function (p) {
+            return list.indexOf(p.key) >= 0;
+        }).map(function (p) {
+            return el("li", { className: "chip", text: p.short });
+        }));
+    }
+
+    var ROLE_BADGE = {
+        owner: "badge badge-solid",
+        manager: "badge badge-dashed",
+        staff: "badge"
+    };
 
     function staffCard(account) {
         var isSelf = user && String(account._id) === String(user._id);
         var actions = el("div", { className: "booking-actions" });
 
         var card = el("article", { className: "staff-card" + (account.active ? "" : " is-off") }, [
-            el("div", {}, [
+            el("div", { className: "staff-body" }, [
                 el("div", { className: "staff-top" }, [
                     el("h3", { className: "staff-name", text: account.name }),
                     el("div", { className: "badges" }, [
-                        el("span", {
-                            className: account.role === "owner" ? "badge badge-solid" : "badge",
-                            text: account.role === "owner" ? "Owner" : "Staff"
-                        }),
+                        el("span", { className: ROLE_BADGE[account.role] || "badge", text: ROLE_NAMES[account.role] || account.role }),
                         account.active ? null : el("span", { className: "badge badge-muted", text: "Turned off" }),
                         isSelf ? el("span", { className: "badge badge-dashed", text: "You" }) : null
                     ])
                 ]),
                 el("p", { className: "staff-email", text: account.email }),
+                permissionChips(account),
                 el("p", { className: "staff-meta", text: lastSignIn(account.lastLoginAt) })
             ]),
             actions
         ]);
 
         function setBusy(busy) {
-            actions.querySelectorAll("button, input").forEach(function (b) {
+            actions.querySelectorAll("button, input, select").forEach(function (b) {
                 b.disabled = busy;
             });
         }
@@ -1059,6 +1278,44 @@
                 if (error.status !== 401) toast(error.message, true);
                 renderActions();
             }
+        }
+
+        function editPermissions() {
+            actions.textContent = "";
+
+            var roleSelect = null;
+            var picker = permissionPicker("perm-" + account._id, account.permissions, people.grantable);
+            var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Save" });
+            var form = el("form", { className: "perm-edit", novalidate: true });
+
+            if (people.roles.indexOf("manager") >= 0) {
+                var roleId = "role-" + account._id;
+                roleSelect = el("select", { id: roleId });
+                ["staff", "manager"].forEach(function (role) {
+                    roleSelect.appendChild(el("option", { value: role, text: ROLE_NAMES[role] }));
+                });
+                roleSelect.value = account.role;
+
+                form.appendChild(el("div", { className: "room-field perm-role" }, [
+                    el("label", { for: roleId, text: "Role" }),
+                    roleSelect,
+                    el("p", { className: "help", text: "Managers add staff and choose what they may do." })
+                ]));
+            }
+
+            form.appendChild(picker.node);
+            form.appendChild(el("div", { className: "room-form-foot" }, [save, button("Cancel", "btn-ghost", renderActions)]));
+
+            form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                var body = { permissions: picker.value() };
+                if (roleSelect) body.role = roleSelect.value;
+                change("PATCH", body, "Saved. " + account.name + " can use the changes straight away.");
+            });
+
+            actions.appendChild(form);
+            var first = form.querySelector("select, input:not([disabled])");
+            if (first) first.focus();
         }
 
         function askNewPassword() {
@@ -1108,16 +1365,17 @@
         function renderActions() {
             actions.textContent = "";
 
-            if (account.fromEnv) {
-                actions.appendChild(el("p", { className: "staff-meta", text: "The owner's sign-in comes from backend/.env on the server. Change it there." }));
+            if (!account.canEdit) {
+                var why = "";
+                if (isSelf) why = "This is you. Change your password in My account.";
+                else if (account.fromEnv && isOwner()) why = "The owner's sign-in comes from backend/.env on the server. Change it there.";
+                else if (account.role === "manager") why = "Only the owner can change a manager.";
+                if (why) actions.appendChild(el("p", { className: "staff-meta", text: why }));
+                else actions.hidden = true;
                 return;
             }
 
-            if (isSelf) {
-                actions.appendChild(el("p", { className: "staff-meta", text: "This is you. Change your password in My account." }));
-                return;
-            }
-
+            actions.appendChild(button("Permissions", "btn-primary", editPermissions));
             actions.appendChild(button("Reset password", "btn-ghost", askNewPassword));
             actions.appendChild(button(account.active ? "Turn off" : "Turn on", "btn-ghost", function () {
                 change(
@@ -1133,12 +1391,36 @@
         return card;
     }
 
-    async function loadStaff(quiet) {
+    /* The add form: the owner chooses Manager or Staff (managers can only add
+       staff), then ticks what they may do. New staff start with nothing ticked;
+       new managers with everything. */
+    function renderAddPicker() {
+        var role = people.roles.indexOf("manager") >= 0 ? $("staffRole").value : "staff";
+        addPicker = permissionPicker("new", role === "manager" ? people.grantable : [], people.grantable);
+        $("staffPerms").textContent = "";
+        $("staffPerms").appendChild(addPicker.node);
+    }
+
+    $("staffRole").addEventListener("change", renderAddPicker);
+
+    async function loadUsers(quiet) {
         var list = $("staffList");
 
         if (!quiet) placeholder(list, "Loading accounts…");
 
         var data = await api("GET", "/admin/staff");
+        var canAddManagers = (data.roles || []).indexOf("manager") >= 0;
+
+        people.roles = data.roles || ["staff"];
+        people.grantable = data.grantable || [];
+
+        $("usersIntro").textContent = canAddManagers
+            ? "People who can sign in to this dashboard. Add managers and staff, and tick what each one may do. Managers can add staff and give them only what the managers can do themselves."
+            : "Add staff and tick what each person may do. You can give only what you can do yourself. Only the owner can change managers.";
+
+        $("staffRoleField").hidden = !canAddManagers;
+        if (!canAddManagers) $("staffRole").value = "staff";
+        renderAddPicker();
 
         list.textContent = "";
         data.staff.forEach(function (account) {
@@ -1178,19 +1460,25 @@
             return;
         }
 
+        var body = {
+            name: name.value.trim(),
+            email: email.value.trim(),
+            password: password.value,
+            role: $("staffRoleField").hidden ? "staff" : $("staffRole").value,
+            permissions: addPicker ? addPicker.value() : []
+        };
+
         add.disabled = true;
         message.textContent = "Adding…";
 
         try {
-            var data = await api("POST", "/admin/staff", {
-                name: name.value.trim(),
-                email: email.value.trim(),
-                password: password.value
-            });
+            var data = await api("POST", "/admin/staff", body);
             form.reset();
             message.textContent = "";
-            toast(data.user.name + " can now sign in with " + data.user.email + ".");
-            load("staff", true);
+            toast(data.user.permissions.length
+                ? data.user.name + " can now sign in with " + data.user.email + "."
+                : data.user.name + " can sign in, but can't open anything until you tick what they may do.");
+            load("users", true);
         } catch (error) {
             message.textContent = error.status === 401 ? "" : error.message;
         } finally {
@@ -1201,16 +1489,35 @@
     /* ---------- My account ---------- */
 
     async function loadAccount() {
+        var hadNothing = firstView() === "account";
         var data = await api("GET", "/admin/me");
         applyUser(data.user);
 
         $("myName").textContent = user.name;
         $("myEmail").textContent = user.email;
-        $("myRole").textContent = isOwner()
-            ? "Owner: everything, including rooms, prices and staff"
-            : "Staff: today, bookings and availability";
+        $("myRole").textContent = ROLE_NAMES[user.role] || user.role;
+
+        var list = $("myPerms");
+        list.textContent = "";
+
+        if (isOwner()) {
+            list.appendChild(el("li", { text: "Everything, including managers' and staff accounts" }));
+        } else {
+            if (managesUsers()) list.appendChild(el("li", { text: "Add staff and choose what they may do" }));
+
+            PERMISSIONS.forEach(function (p) {
+                if (can(p.key)) list.appendChild(el("li", { text: p.label }));
+            });
+
+            if (!list.children.length) list.appendChild(el("li", { className: "muted", text: "Nothing yet" }));
+        }
+
+        var nothing = firstView() === "account";
+        $("noAccessNote").hidden = !nothing;
         $("envOwnerNote").hidden = !user.fromEnv;
         $("passwordForm").hidden = Boolean(user.fromEnv);
+
+        if (hadNothing && !nothing) toast("You can now open " + TITLES[firstView()] + ". Use the tabs at the top.");
     }
 
     $("passwordForm").addEventListener("input", function () {
@@ -1293,7 +1600,7 @@
     }
 
     var STOCK_STATUS = {
-        ok: { text: "In stock", className: "pill" },
+        ok: { text: "Enough", className: "pill" },
         low: { text: "Running low", className: "pill pill-low" },
         out: { text: "Out of stock", className: "pill pill-full" }
     };
@@ -1430,7 +1737,7 @@
                 el("p", { text: "Nothing is in the stock list yet." })
             ]);
 
-            if (isOwner()) {
+            if (can("stock.items")) {
                 empty.appendChild(el("p", { text: "Add your own items, or start with a list of common things an inn keeps (toilet paper, soap, towels, water…). You can change or archive any of them." }));
                 empty.appendChild(button("Add common items", "btn-primary", async function () {
                     this.disabled = true;
@@ -1444,7 +1751,7 @@
                     }
                 }));
             } else {
-                empty.appendChild(el("p", { text: "The owner adds the items to keep track of." }));
+                empty.appendChild(el("p", { text: "Someone who manages items adds them. Ask the manager." }));
             }
 
             list.appendChild(empty);
@@ -1455,7 +1762,7 @@
             return item.quantity === 0 && item.changes === 0;
         });
 
-        if (isOwner() && unused.length && !stock.only && !stock.q && !stock.category) {
+        if (can("stock.items") && unused.length && !stock.only && !stock.q && !stock.category) {
             list.appendChild(unusedBar(unused.length));
         }
 
@@ -1542,6 +1849,24 @@
         }
     }
 
+    /* In stock (everything received since the item was added), used, and remaining now */
+    function stockFigures(item) {
+        return el("dl", { className: "stock-figures" }, [
+            el("div", {}, [
+                el("dt", { text: "In stock" }),
+                el("dd", { text: qty(item.received) })
+            ]),
+            el("div", {}, [
+                el("dt", { text: "Used" }),
+                el("dd", { text: qty(item.used) })
+            ]),
+            el("div", { className: "is-remaining" }, [
+                el("dt", { text: "Remaining" }),
+                el("dd", {}, [el("span", { className: "figure", text: qty(item.quantity) }), el("span", { className: "unit", text: " " + item.unit })])
+            ])
+        ]);
+    }
+
     function stockCard(item) {
         var info = STOCK_STATUS[item.status] || STOCK_STATUS.ok;
         var formBox = el("div", { className: "stock-form-box" });
@@ -1559,10 +1884,10 @@
                     ? el("span", { className: info.className, text: info.text })
                     : el("span", { className: "pill pill-closed", text: "Archived" })
             ]),
-            el("p", { className: "stock-qty" }, [
-                el("strong", { text: qty(item.quantity) }),
-                " " + item.unit
-            ]),
+            stockFigures(item),
+            item.corrections
+                ? el("p", { className: "stock-meta", text: "Corrections after counting: " + signed(item.corrections) + " " + item.unit })
+                : null,
             item.unitCost !== undefined && item.unitCost > 0
                 ? el("p", { className: "stock-meta", text: formatRwf(item.unitCost) + " each · " + formatRwf(item.value) + " in store" })
                 : null,
@@ -1576,18 +1901,21 @@
             formBox.textContent = "";
 
             if (item.active) {
-                actions.appendChild(button("− Used", "btn-ghost", function () { openMove("out"); }));
-                actions.appendChild(button("+ Received", "btn-ghost", function () { openMove("in"); }));
-                actions.appendChild(button("Count", "btn-ghost", function () { openMove("count"); }));
+                if (can("stock.use")) actions.appendChild(button("− Used", "btn-ghost", function () { openMove("out"); }));
+                if (can("stock.receive")) actions.appendChild(button("+ Received", "btn-ghost", function () { openMove("in"); }));
+                if (can("stock.count")) actions.appendChild(button("Count", "btn-ghost", function () { openMove("count"); }));
             }
 
-            if (isOwner()) {
+            if (can("stock.items")) {
                 actions.appendChild(button("Edit", "btn-ghost", function () { openItemForm(item); }));
             }
+
+            actions.hidden = !actions.children.length;
         }
 
         function openMove(type) {
             actions.textContent = "";
+            actions.hidden = false;
             formBox.textContent = "";
 
             var id = "move-" + item._id;
@@ -1614,7 +1942,7 @@
                 el("div", { className: "room-field" }, [el("label", { for: id + "-day", text: "Day" }), day])
             ];
 
-            if (type === "in" && isOwner()) {
+            if (type === "in" && can("stock.prices")) {
                 price = el("input", { id: id + "-price", type: "number", inputmode: "numeric", min: "0", step: "1", placeholder: item.unitCost ? String(item.unitCost) : "" });
                 fields.push(el("div", { className: "room-field" }, [el("label", { for: id + "-price", text: "Price paid for one (RWF, optional)" }), price]));
             }
@@ -1685,7 +2013,7 @@
         return card;
     }
 
-    /* Add or change an item (owner) */
+    /* Add or change an item (people who manage items) */
     function openItemForm(item) {
         var slot = $("itemFormSlot");
         var editing = Boolean(item);
@@ -1723,6 +2051,8 @@
         var message = el("p", { className: "room-form-message", role: "status" });
         var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: editing ? "Save changes" : "Add item" });
 
+        var showPrice = can("stock.prices");
+
         var fields = [
             el("div", { className: "room-field" }, [el("label", { for: "itemName", text: "Name" }), name]),
             el("div", { className: "room-field" }, [el("label", { for: "itemCategory", text: "Category" }), category]),
@@ -1739,7 +2069,7 @@
                 low,
                 el("p", { className: "help", id: "itemLowHelp", text: "…or fewer left. 0 = never warn." })
             ]),
-            el("div", { className: "room-field" }, [el("label", { for: "itemCost", text: "Price for one (RWF)" }), cost]),
+            showPrice ? el("div", { className: "room-field" }, [el("label", { for: "itemCost", text: "Price for one (RWF)" }), cost]) : null,
             el("div", { className: "room-field room-field-wide" }, [el("label", { for: "itemNotes", text: "Notes (optional)" }), notes])
         );
 
@@ -1829,9 +2159,10 @@
                 category: category.value,
                 unit: unit.value.trim() || "pieces",
                 lowStockAt: low.value === "" ? 0 : Number(low.value),
-                unitCost: cost.value === "" ? 0 : Number(cost.value),
                 notes: notes.value.trim()
             };
+
+            if (showPrice) body.unitCost = cost.value === "" ? 0 : Number(cost.value);
 
             if (!editing) body.quantity = start.value === "" ? 0 : Number(start.value);
 
@@ -1911,12 +2242,15 @@
             var lastDay = addDays(first, -1);
             stock.reportFrom = lastDay.slice(0, 8) + "01";
             stock.reportTo = lastDay;
+        } else if (kind === "all") {
+            stock.reportFrom = "all"; // the server starts at the first change ever recorded
+            stock.reportTo = today;
         } else {
             stock.reportFrom = addDays(today, -6);
             stock.reportTo = today;
         }
 
-        $("reportFrom").value = stock.reportFrom;
+        $("reportFrom").value = stock.reportFrom === "all" ? "" : stock.reportFrom;
         $("reportTo").value = stock.reportTo;
     }
 
@@ -1944,16 +2278,18 @@
 
         var data = await api("GET", "/admin/stock/report?from=" + stock.reportFrom + "&to=" + stock.reportTo);
         stock.report = data;
+        $("reportFrom").value = data.from;
+        $("reportTo").value = data.to;
 
-        var owner = isOwner();
+        var prices = can("stock.prices");
         $("reportRange").textContent = formatDay(data.from, { day: "numeric", month: "short", year: "numeric" }) + " – " +
             formatDay(data.to, { day: "numeric", month: "short", year: "numeric" }) + " · " + plural(data.rows.length, "item", "items");
 
         table.textContent = "";
         table.appendChild(el("caption", { className: "visually-hidden", text: "Stock used and left for the period" }));
 
-        var heads = ["Item", "At start", "Received", "Used", "Corrections", "Left"];
-        if (owner) heads.push("Value used", "Value left");
+        var heads = ["Item", "At start", "Received", "Used", "Corrections", "Remaining"];
+        if (prices) heads.push("Value used", "Value remaining");
 
         table.appendChild(el("thead", {}, [el("tr", {}, heads.map(function (h, i) {
             return el("th", { scope: "col", className: i === 0 ? "room-col" : null, text: h });
@@ -1989,7 +2325,7 @@
                 el("td", { className: lowNow ? "is-low" : null, text: qty(row.remaining) + (lowNow ? " ⚠" : "") })
             ];
 
-            if (owner) {
+            if (prices) {
                 cells.push(el("td", { text: formatRwf(row.usedValue) }), el("td", { text: formatRwf(row.remainingValue) }));
                 totalUsed += row.usedValue;
                 totalLeft += row.remainingValue;
@@ -2000,7 +2336,7 @@
 
         table.appendChild(body);
 
-        if (owner && data.rows.length) {
+        if (prices && data.rows.length) {
             var foot = el("tr", { className: "total-row" }, [el("th", { scope: "row", className: "room-col", text: "Total" })]);
             for (var i = 0; i < 5; i += 1) foot.appendChild(el("td", { text: "" }));
             foot.appendChild(el("td", { text: formatRwf(totalUsed) }));
@@ -2021,13 +2357,13 @@
         var data = stock.report;
         if (!data) return;
 
-        var owner = isOwner();
-        var head = ["Item", "Category", "Counted in", "At start", "Received", "Used", "Corrections", "Left", "Warn at"];
-        if (owner) head.push("Price for one (RWF)", "Value used (RWF)", "Value left (RWF)");
+        var prices = can("stock.prices");
+        var head = ["Item", "Category", "Counted in", "At start", "Received", "Used", "Corrections", "Remaining", "Warn at"];
+        if (prices) head.push("Price for one (RWF)", "Value used (RWF)", "Value remaining (RWF)");
 
         var lines = [head].concat(data.rows.map(function (row) {
             var line = [row.name, row.category, row.unit, row.atStart, row.received, row.used, row.corrections, row.remaining, row.lowStockAt];
-            if (owner) line.push(row.unitCost, row.usedValue, row.remainingValue);
+            if (prices) line.push(row.unitCost, row.usedValue, row.remainingValue);
             return line;
         }));
 

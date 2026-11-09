@@ -2,18 +2,21 @@
    ZEBRA DORMUS INN
    Stock (store room), mounted at /api/admin/stock
 
-   GET   /items                      everything in store (?archived=1 to include archived)
-   POST  /items                      add an item (owner)
-   POST  /items/starter              add a list of common inn items (owner)
-   PATCH /items/:id                  change name, unit, warning level, price, archive (owner)
-   DELETE /items/:id                 delete an item and its history (owner)
-   POST  /items/remove-unused        delete items never counted, used or received (owner)
+   GET   /items                      everything in store, with in stock / used / remaining
+                                     since each item was added (?archived=1 to include archived)
+   POST  /items                      add an item                              (stock.items)
+   POST  /items/starter              add a list of common inn items           (stock.items)
+   PATCH /items/:id                  change name, unit, warning level, archive (stock.items)
+   DELETE /items/:id                 delete an item and its history           (stock.items)
+   POST  /items/remove-unused        delete items never counted, used or received (stock.items)
    POST  /items/:id/movements        { type: in|out|count, quantity, note?, day?, unitCost? }
+                                     out needs stock.use, in stock.receive, count stock.count
    GET   /movements                  ?itemId &before  latest changes
-   GET   /report                     ?from=YYYY-MM-DD &to=YYYY-MM-DD  start, received, used, left
+   GET   /report                     ?from=YYYY-MM-DD|all &to=YYYY-MM-DD  start, received, used, left
+                                     (from=all: since the first change ever recorded)
 
-   Staff can record what was used, received or counted.
-   Only the owner adds or changes items and sees prices.
+   Everything here needs stock.view (checked in adminRoutes.js).
+   Prices and value are only shown to people with stock.prices.
 ========================================= */
 
 const express = require("express");
@@ -21,7 +24,7 @@ const mongoose = require("mongoose");
 
 const StockItem = require("../models/StockItem");
 const StockMovement = require("../models/StockMovement");
-const { requireOwner } = require("../utils/adminAuth");
+const { can, requirePermission, denied } = require("../utils/permissions");
 const { parseDay, toDay, addDays, innToday } = require("../utils/availability");
 
 const { STOCK_CATEGORIES } = StockItem;
@@ -69,9 +72,41 @@ function kigaliDay(date) {
   }).format(date);
 }
 
-function isOwner(req) {
-  return req.admin && req.admin.role === "owner";
+// prices and the value of the stock are only for people with stock.prices
+function seesPrices(req) {
+  return can(req.admin, "stock.prices");
 }
+
+const manageItems = requirePermission("stock.items");
+
+const MOVE_PERMISSION = {
+  out: ["stock.use", "record what was used"],
+  in: ["stock.receive", "record what came in"],
+  count: ["stock.count", "correct numbers after counting"],
+};
+
+/* In stock, used and corrections since each item was added.
+   Starting stock is saved as "received", so for every item:
+   remaining now = in stock - used + corrections. */
+async function totalsFor(itemIds) {
+  const match = itemIds ? [{ $match: { item: { $in: itemIds } } }] : [];
+  const rows = await StockMovement.aggregate([
+    ...match,
+    {
+      $group: {
+        _id: "$item",
+        changes: { $sum: 1 },
+        received: { $sum: { $cond: [{ $eq: ["$type", "in"] }, "$change", 0] } },
+        used: { $sum: { $cond: [{ $eq: ["$type", "out"] }, { $multiply: ["$change", -1] }, 0] } },
+        corrections: { $sum: { $cond: [{ $eq: ["$type", "count"] }, "$change", 0] } },
+      },
+    },
+  ]);
+
+  return new Map(rows.map((row) => [String(row._id), row]));
+}
+
+const NO_TOTALS = { changes: 0, received: 0, used: 0, corrections: 0 };
 
 function statusOf(item) {
   if (item.quantity <= 0) return "out";
@@ -79,7 +114,7 @@ function statusOf(item) {
   return "ok";
 }
 
-function itemForAdmin(item, owner, changes) {
+function itemForAdmin(item, prices, totals) {
   const shown = {
     _id: item._id,
     name: item.name,
@@ -93,10 +128,16 @@ function itemForAdmin(item, owner, changes) {
     updatedAt: item.updatedAt,
   };
 
-  // how many times it was counted, used or received (0 = never touched)
-  if (changes !== undefined) shown.changes = changes;
+  // since the item was added: how many times it was counted, used or
+  // received (0 = never touched), and the amounts
+  if (totals) {
+    shown.changes = totals.changes;
+    shown.received = round(totals.received);
+    shown.used = round(totals.used);
+    shown.corrections = round(totals.corrections);
+  }
 
-  if (owner) {
+  if (prices) {
     shown.unitCost = item.unitCost || 0;
     shown.value = round((item.unitCost || 0) * item.quantity);
   }
@@ -104,7 +145,7 @@ function itemForAdmin(item, owner, changes) {
   return shown;
 }
 
-function movementForAdmin(move, owner) {
+function movementForAdmin(move, prices) {
   const shown = {
     _id: move._id,
     itemId: move.item,
@@ -119,12 +160,12 @@ function movementForAdmin(move, owner) {
     createdAt: move.createdAt,
   };
 
-  if (owner && move.unitCost !== undefined) shown.unitCost = move.unitCost;
+  if (prices && move.unitCost !== undefined) shown.unitCost = move.unitCost;
 
   return shown;
 }
 
-/* Reads the item fields the owner sends. */
+/* Reads the item fields sent by someone who manages items. */
 function readItem(body, partial) {
   const values = {};
   const has = (key) => body[key] !== undefined;
@@ -174,12 +215,11 @@ function readItem(body, partial) {
 router.get("/items", async (req, res) => {
   try {
     const filter = req.query.archived === "1" ? {} : { active: true };
-    const [items, counts] = await Promise.all([
+    const [items, totals] = await Promise.all([
       StockItem.find(filter).sort({ category: 1, name: 1 }).lean(),
-      StockMovement.aggregate([{ $group: { _id: "$item", n: { $sum: 1 } } }]),
+      totalsFor(null),
     ]);
-    const owner = isOwner(req);
-    const changesOf = new Map(counts.map((row) => [String(row._id), row.n]));
+    const prices = seesPrices(req);
     const active = items.filter((item) => item.active !== false);
 
     const summary = {
@@ -188,13 +228,13 @@ router.get("/items", async (req, res) => {
       out: active.filter((item) => statusOf(item) === "out").length,
     };
 
-    if (owner) summary.value = round(active.reduce((sum, item) => sum + (item.unitCost || 0) * item.quantity, 0));
+    if (prices) summary.value = round(active.reduce((sum, item) => sum + (item.unitCost || 0) * item.quantity, 0));
 
     return res.json({
       success: true,
       categories: STOCK_CATEGORIES,
       summary,
-      items: items.map((item) => itemForAdmin(item, owner, changesOf.get(String(item._id)) || 0)),
+      items: items.map((item) => itemForAdmin(item, prices, totals.get(String(item._id)) || NO_TOTALS)),
     });
   } catch (error) {
     return serverError(res, "Stock list failed", error);
@@ -223,11 +263,12 @@ async function createItem(values, quantity, req) {
   return item;
 }
 
-router.post("/items", requireOwner, async (req, res) => {
+router.post("/items", manageItems, async (req, res) => {
   try {
     const body = req.body || {};
     const { values, error } = readItem(body, false);
     if (error) return bad(res, error);
+    if (!seesPrices(req)) values.unitCost = 0;
 
     const quantity = body.quantity === undefined || body.quantity === "" ? 0 : amount(body.quantity, 0, MAX_AMOUNT);
     if (quantity === null) return bad(res, "The starting quantity must be a number, 0 or more.");
@@ -237,7 +278,8 @@ router.post("/items", requireOwner, async (req, res) => {
     }
 
     const item = await createItem(values, quantity, req);
-    return res.status(201).json({ success: true, item: itemForAdmin(item.toObject(), true) });
+    const totals = quantity > 0 ? { changes: 1, received: quantity, used: 0, corrections: 0 } : NO_TOTALS;
+    return res.status(201).json({ success: true, item: itemForAdmin(item.toObject(), seesPrices(req), totals) });
   } catch (error) {
     if (error.code === 11000) return bad(res, "There is already an item with this name.", 409);
     return serverError(res, "Adding a stock item failed", error);
@@ -266,7 +308,7 @@ const STARTER_ITEMS = [
   ["Light bulbs", "Maintenance", "pieces", 3],
 ];
 
-router.post("/items/starter", requireOwner, async (req, res) => {
+router.post("/items/starter", manageItems, async (req, res) => {
   try {
     let added = 0;
 
@@ -283,12 +325,13 @@ router.post("/items/starter", requireOwner, async (req, res) => {
   }
 });
 
-router.patch("/items/:id", requireOwner, async (req, res) => {
+router.patch("/items/:id", manageItems, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return bad(res, "Unknown item.");
 
     const { values, error } = readItem(req.body || {}, true);
     if (error) return bad(res, error);
+    if (!seesPrices(req)) delete values.unitCost; // only people who see prices change them
     if (!Object.keys(values).length) return bad(res, "Nothing to change.");
 
     if (values.name) {
@@ -306,7 +349,8 @@ router.patch("/items/:id", requireOwner, async (req, res) => {
 
     if (values.name) await StockMovement.updateMany({ item: item._id }, { $set: { itemName: item.name } });
 
-    return res.json({ success: true, item: itemForAdmin(item, true) });
+    const totals = (await totalsFor([item._id])).get(String(item._id)) || NO_TOTALS;
+    return res.json({ success: true, item: itemForAdmin(item, seesPrices(req), totals) });
   } catch (error) {
     if (error.code === 11000) return bad(res, "There is already an item with this name.", 409);
     return serverError(res, "Changing a stock item failed", error);
@@ -315,7 +359,7 @@ router.patch("/items/:id", requireOwner, async (req, res) => {
 
 /* ---------- Delete ---------- */
 
-router.delete("/items/:id", requireOwner, async (req, res) => {
+router.delete("/items/:id", manageItems, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return bad(res, "Unknown item.");
 
@@ -332,8 +376,8 @@ router.delete("/items/:id", requireOwner, async (req, res) => {
 });
 
 /* Items nobody has counted, used or received yet (for example the common
-   items added to get started), so the owner can clear them in one go. */
-router.post("/items/remove-unused", requireOwner, async (req, res) => {
+   items added to get started), so they can be cleared in one go. */
+router.post("/items/remove-unused", manageItems, async (req, res) => {
   try {
     const candidates = await StockItem.find({ quantity: 0 }).select("_id").lean();
     let removed = 0;
@@ -361,6 +405,11 @@ router.post("/items/:id/movements", async (req, res) => {
     const type = body.type;
     if (!["in", "out", "count"].includes(type)) return bad(res, "Choose used, received or counted.");
 
+    const [permission, action] = MOVE_PERMISSION[type];
+    if (!can(req.admin, permission)) {
+      return denied(res, `You don't have permission to ${action}. Ask the manager.`);
+    }
+
     const quantity = amount(body.quantity, type === "count" ? 0 : 0.01, MAX_AMOUNT);
     if (quantity === null) {
       return bad(res, type === "count" ? "Enter how many there are now (0 or more)." : "Enter how many (more than 0).");
@@ -377,7 +426,7 @@ router.post("/items/:id/movements", async (req, res) => {
     if (day < addDays(parseDay(todayText), -DAYS_BACK)) return bad(res, `The day can be up to ${DAYS_BACK} days ago.`);
 
     let unitCost;
-    if (type === "in" && body.unitCost !== undefined && body.unitCost !== "" && isOwner(req)) {
+    if (type === "in" && body.unitCost !== undefined && body.unitCost !== "" && seesPrices(req)) {
       unitCost = amount(body.unitCost, 0, 100000000);
       if (unitCost === null || !Number.isInteger(unitCost)) return bad(res, "The price must be a whole number of RWF.");
     }
@@ -386,7 +435,7 @@ router.post("/items/:id/movements", async (req, res) => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const item = await StockItem.findById(req.params.id).lean();
       if (!item) return bad(res, "Item not found.", 404);
-      if (item.active === false) return bad(res, "This item is archived. The owner can bring it back first.");
+      if (item.active === false) return bad(res, "This item is archived. Someone who manages items can bring it back first.");
 
       const addedOn = kigaliDay(item.createdAt);
       if (dayText < addedOn) return bad(res, `${item.name} was added on ${addedOn}. Choose that day or later.`);
@@ -431,10 +480,12 @@ router.post("/items/:id/movements", async (req, res) => {
         userName: req.admin.name,
       });
 
+      const totals = (await totalsFor([item._id])).get(String(item._id)) || NO_TOTALS;
+
       return res.status(201).json({
         success: true,
-        item: itemForAdmin(updated, isOwner(req)),
-        movement: movementForAdmin(move.toObject(), isOwner(req)),
+        item: itemForAdmin(updated, seesPrices(req), totals),
+        movement: movementForAdmin(move.toObject(), seesPrices(req)),
       });
     }
 
@@ -453,9 +504,9 @@ router.get("/movements", async (req, res) => {
     if (before && !Number.isNaN(before.getTime())) filter.createdAt = { $lt: before };
 
     const moves = await StockMovement.find(filter).sort({ createdAt: -1 }).limit(100).lean();
-    const owner = isOwner(req);
+    const prices = seesPrices(req);
 
-    return res.json({ success: true, movements: moves.map((move) => movementForAdmin(move, owner)) });
+    return res.json({ success: true, movements: moves.map((move) => movementForAdmin(move, prices)) });
   } catch (error) {
     return serverError(res, "Stock history failed", error);
   }
@@ -466,14 +517,21 @@ router.get("/movements", async (req, res) => {
 router.get("/report", async (req, res) => {
   try {
     const todayText = innToday();
-    const fromText = parseDay(req.query.from) ? req.query.from : `${todayText.slice(0, 8)}01`;
+    let fromText = parseDay(req.query.from) ? req.query.from : `${todayText.slice(0, 8)}01`;
+
+    if (req.query.from === "all") {
+      const first = await StockMovement.findOne().sort({ day: 1 }).select("day").lean();
+      fromText = first ? toDay(first.day) : todayText;
+      if (fromText > todayText) fromText = todayText;
+    }
+
     const toText = parseDay(req.query.to) ? req.query.to : todayText;
 
     if (toText < fromText) return bad(res, "The end date can't be before the start date.");
 
     const from = parseDay(fromText);
     const to = parseDay(toText);
-    const owner = isOwner(req);
+    const prices = seesPrices(req);
 
     const [items, moves] = await Promise.all([
       StockItem.find().sort({ category: 1, name: 1 }).lean(),
@@ -508,7 +566,7 @@ router.get("/report", async (req, res) => {
           lowStockAt: item.lowStockAt,
         };
 
-        if (owner) {
+        if (prices) {
           row.unitCost = item.unitCost || 0;
           row.usedValue = round(used * (item.unitCost || 0));
           row.remainingValue = round(remaining * (item.unitCost || 0));

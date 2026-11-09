@@ -25,12 +25,21 @@ const adminUserSchema = new mongoose.Schema(
       required: true,
     },
 
-    // owner: everything, including rooms, prices and staff accounts
-    // staff: today, bookings and availability
+    // owner:   everything, and manages managers and staff
+    // manager: manages staff and what they may do (see utils/permissions.js)
+    // staff:   only what a manager or the owner ticked
     role: {
       type: String,
-      enum: ["owner", "staff"],
+      enum: ["owner", "manager", "staff"],
       default: "staff",
+    },
+
+    // What this person may do, for example "stock.use" (see utils/permissions.js).
+    // Not set on accounts made before roles existed: they keep what staff
+    // could do then, until someone changes their permissions.
+    permissions: {
+      type: [String],
+      default: undefined,
     },
 
     active: {
