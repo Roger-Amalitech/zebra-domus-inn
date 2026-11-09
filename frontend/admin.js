@@ -24,7 +24,7 @@
         account: ""
     };
     var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    var AUTO_REFRESH_MS = 60 * 1000;
+    var AUTO_REFRESH_MS = 30 * 1000;
 
     var memoryToken = "";
     var signedIn = false;
@@ -539,15 +539,33 @@
         });
     });
 
-    // New bookings show up on their own while the page is open.
+    /* Stock is only refreshed on its own when nobody is in the middle of
+       something there: a form open, a question asked, or typing. */
+    function stockCanRefresh() {
+        if (["items", "requests", "purchases"].indexOf(stock.tab) < 0) return false;
+        if (document.querySelector("#view-stock form:not(#budgetForm), #view-stock .confirm-text")) return false;
+        var active = document.activeElement;
+        if (active && $("view-stock").contains(active) && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName)) return false;
+        return true;
+    }
+
+    // New bookings, and stock changed by someone else, show up on their own
+    // while the page is open.
     setInterval(function () {
         if (!signedIn || document.visibilityState !== "visible") return;
         syncMe();
-        if (["stock", "rooms", "users", "account"].indexOf(current) >= 0) return;
+        if (["rooms", "users", "account"].indexOf(current) >= 0) return;
+        if (current === "stock" && !stockCanRefresh()) return;
         if (document.querySelector(".confirm-text, .doc-form")) return;
         if (document.activeElement === $("searchBox")) return;
         load(current, true);
     }, AUTO_REFRESH_MS);
+
+    // Coming back to the page (another app, another tab): show the latest at once.
+    document.addEventListener("visibilitychange", function () {
+        if (!signedIn || document.visibilityState !== "visible") return;
+        if (current === "stock" && stockCanRefresh()) load("stock", true);
+    });
 
     /* ---------- One booking ---------- */
 
@@ -1485,6 +1503,8 @@
         q: "",
         category: "",
         only: "",          /* "", "low" or "out" */
+        changed: {},       /* items whose remaining changed since the last refresh */
+        updatedAt: null,
         changesBefore: "",
         reportFrom: "",
         reportTo: "",
@@ -1812,7 +1832,7 @@
                 }
             }));
         } else if (stock.items.length) {
-            count.textContent = plural(shown.length, "item", "items");
+            count.textContent = plural(shown.length, "item", "items") + (stock.updatedAt ? " · updated " + clock(stock.updatedAt) : "");
         }
 
         if (!stock.items.length) {
@@ -1861,6 +1881,8 @@
             }
             list.appendChild(stockCard(item));
         });
+
+        stock.changed = {};
     }
 
     /* Clears items nobody has counted, used or received, e.g. the common items. */
@@ -1929,6 +1951,10 @@
     }
 
     /* In stock (everything received since the item was added), used, and remaining now */
+    function clock(date) {
+        return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Kigali" });
+    }
+
     function stockFigures(item) {
         return el("dl", { className: "stock-figures" }, [
             el("div", {}, [
@@ -1939,7 +1965,7 @@
                 el("dt", { text: "Used" }),
                 el("dd", { text: qty(item.used) })
             ]),
-            el("div", { className: "is-remaining" }, [
+            el("div", { className: "is-remaining" + (stock.changed[item._id] ? " is-updated" : "") }, [
                 el("dt", { text: "Remaining" }),
                 el("dd", {}, [el("span", { className: "figure", text: qty(item.quantity) }), el("span", { className: "unit", text: " " + item.unit })])
             ])
@@ -3496,7 +3522,21 @@
             }
 
             var data = await api("GET", "/admin/stock/items" + (stock.archived ? "?archived=1" : ""));
+            var before = {};
+            stock.items.forEach(function (item) {
+                before[item._id] = item.quantity;
+            });
+
+            // highlight remaining numbers someone else changed since the last look
+            stock.changed = {};
+            if (quiet) {
+                data.items.forEach(function (item) {
+                    if (before[item._id] !== undefined && before[item._id] !== item.quantity) stock.changed[item._id] = true;
+                });
+            }
+
             stock.items = data.items;
+            stock.updatedAt = new Date();
             stock.categories = data.categories;
             stock.departments = data.departments;
             stock.summary = data.summary;
