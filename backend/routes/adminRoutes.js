@@ -12,10 +12,13 @@
    GET   /api/admin/rooms              every room type, open or closed
    PATCH /api/admin/rooms/:id          { pricePerNight?, totalRooms?, capacity?, available?, description? }
          /api/admin/staff              user accounts (owner and managers), see staffRoutes.js
-         /api/admin/stock              store room: items, used, received, counted (see stockRoutes.js)
+         /api/admin/stock              store room: items, issues, counts, budgets (stockRoutes.js)
+         /api/admin/purchases          what the owner bought; the manager checks it in (purchaseRoutes.js)
+         /api/admin/requests           staff ask for supplies; the manager issues them (requestRoutes.js)
+         /api/admin/audit              who did what (owner), see auditRoutes.js
 
-   What each person may do is checked on every request (utils/permissions.js):
-   bookings.view, bookings.manage, rooms.manage, stock.* ...
+   What each role may do is checked on every request (utils/permissions.js).
+   Every change is written to the audit log (utils/audit.js).
 ========================================= */
 
 const express = require("express");
@@ -26,6 +29,10 @@ const Booking = require("../models/Booking");
 const AdminUser = require("../models/AdminUser");
 const staffRoutes = require("./staffRoutes");
 const stockRoutes = require("./stockRoutes");
+const purchaseRoutes = require("./purchaseRoutes");
+const requestRoutes = require("./requestRoutes");
+const auditRoutes = require("./auditRoutes");
+const { audit } = require("../utils/audit");
 const {
   login,
   requireAdmin,
@@ -58,7 +65,10 @@ router.post("/login", login);
 router.use(requireAdmin);
 
 router.use("/staff", requireManager, staffRoutes);
-router.use("/stock", requirePermission("stock.view"), stockRoutes);
+router.use("/stock", stockRoutes);
+router.use("/purchases", purchaseRoutes);
+router.use("/requests", requestRoutes);
+router.use("/audit", requirePermission("audit.view"), auditRoutes);
 
 const seeBookings = requirePermission("bookings.view");
 const changeBookings = requirePermission("bookings.manage");
@@ -272,8 +282,16 @@ router.patch("/bookings/:id", changeBookings, async (req, res) => {
       }
     }
 
+    const said = [];
+    if (changes.bookingStatus && changes.bookingStatus !== booking.bookingStatus) said.push(`status ${changes.bookingStatus}`);
+    if (changes.paymentStatus && changes.paymentStatus !== booking.paymentStatus) said.push(`payment ${changes.paymentStatus}`);
+
     Object.assign(booking, changes);
     await booking.save();
+
+    if (said.length) {
+      await audit(req.admin, "bookings", `Booking ${booking.bookingReference} (${booking.guestName}): ${said.join(", ")}`);
+    }
 
     return res.json({ success: true, booking: bookingForAdmin(booking.toObject()) });
   } catch (error) {
@@ -406,6 +424,7 @@ router.patch("/rooms/:id", changeRooms, async (req, res) => {
       return res.status(400).json({ success: false, message: "Nothing to change." });
     }
 
+    const before = await Room.findById(req.params.id).lean();
     const room = await Room.findByIdAndUpdate(req.params.id, { $set: changes }, {
       returnDocument: "after",
       runValidators: true,
@@ -414,6 +433,18 @@ router.patch("/rooms/:id", changeRooms, async (req, res) => {
     if (!room) {
       return res.status(404).json({ success: false, message: "Room type not found." });
     }
+
+    const said = [];
+    if (changes.pricePerNight !== undefined && changes.pricePerNight !== before.pricePerNight) {
+      said.push(`price RWF ${before.pricePerNight} to RWF ${changes.pricePerNight}`);
+    }
+    if (changes.totalRooms !== undefined && changes.totalRooms !== before.totalRooms) said.push(`rooms ${before.totalRooms} to ${changes.totalRooms}`);
+    if (changes.capacity !== undefined && changes.capacity !== before.capacity) said.push(`guests per room ${changes.capacity}`);
+    if (changes.available !== undefined && changes.available !== (before.available !== false)) {
+      said.push(changes.available ? "open for online booking" : "closed to online booking");
+    }
+    if (changes.description !== undefined && changes.description !== (before.description || "")) said.push("description changed");
+    if (said.length) await audit(req.admin, "rooms", `${room.name}: ${said.join(", ")}`);
 
     return res.json({ success: true, room });
   } catch (error) {

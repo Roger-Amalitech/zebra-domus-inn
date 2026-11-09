@@ -1,52 +1,61 @@
 /* =========================================
    ZEBRA DORMUS INN
-   Roles and permissions for the admin dashboard
+   Roles for the admin dashboard
 
-   owner    can do everything, and manages managers and staff
-   manager  manages staff accounts and ticks what each one may do;
-            does what the owner ticked for them (all, to start with)
-   staff    does only what a manager or the owner ticked (nothing, to start with)
-
-   A manager can only give staff the things they can do themselves.
+   owner    purchases, budgets, approvals, money reports, audit log,
+            rooms and prices, and everything a manager does
+   manager  daily stock: checks purchases into the store, issues
+            supplies, counts (differences wait for the owner),
+            handles staff requests; bookings; adds staff
+   staff    asks for supplies and confirms they received them;
+            can't change stock numbers
 ========================================= */
 
 const PERMISSIONS = [
-  { key: "bookings.view", group: "Bookings", label: "See today, bookings and availability" },
-  { key: "bookings.manage", group: "Bookings", label: "Confirm, cancel and mark bookings paid", needs: "bookings.view" },
-  { key: "stock.view", group: "Stock", label: "See stock: in stock, used, remaining" },
-  { key: "stock.use", group: "Stock", label: "Record what was used", needs: "stock.view" },
-  { key: "stock.receive", group: "Stock", label: "Record what came in", needs: "stock.view" },
-  { key: "stock.count", group: "Stock", label: "Correct numbers after counting", needs: "stock.view" },
-  { key: "stock.items", group: "Stock", label: "Add, change and delete items", needs: "stock.view" },
-  { key: "stock.prices", group: "Stock", label: "See prices and value", needs: "stock.view" },
-  { key: "rooms.manage", group: "Rooms", label: "Change rooms, prices and online booking" },
+  { key: "bookings.view", label: "See today, bookings and availability" },
+  { key: "bookings.manage", label: "Confirm, cancel and mark bookings paid" },
+  { key: "rooms.manage", label: "Change rooms, prices and online booking" },
+  { key: "users.manage", label: "Add staff and manage their accounts" },
+  { key: "stock.view", label: "See stock: in stock, used, remaining" },
+  { key: "stock.items", label: "Add and change stock items" },
+  { key: "stock.delete", label: "Delete stock items" },
+  { key: "stock.issue", label: "Issue supplies to departments" },
+  { key: "stock.count", label: "Count stock" },
+  { key: "stock.approve", label: "Approve count differences" },
+  { key: "stock.prices", label: "See prices, values and money reports" },
+  { key: "purchases.view", label: "See purchases" },
+  { key: "purchases.record", label: "Record and cancel purchases" },
+  { key: "purchases.receive", label: "Check purchases into the store" },
+  { key: "budget.manage", label: "Set monthly budgets" },
+  { key: "requests.make", label: "Ask for supplies" },
+  { key: "requests.manage", label: "Issue or turn down supply requests" },
+  { key: "audit.view", label: "See the audit log" },
 ];
 
 const ALL = PERMISSIONS.map((p) => p.key);
 
-const ROLES = ["owner", "manager", "staff"];
+const ROLE_PERMISSIONS = {
+  owner: ALL.filter((key) => key !== "requests.make"),
+  manager: [
+    "bookings.view",
+    "bookings.manage",
+    "users.manage",
+    "stock.view",
+    "stock.items",
+    "stock.issue",
+    "stock.count",
+    "purchases.view",
+    "purchases.receive",
+    "requests.manage",
+  ],
+  staff: ["requests.make"],
+};
 
-/* What staff could do before roles existed. Accounts made then keep it
-   until a manager or the owner changes their permissions. */
-const EARLIER_STAFF = ["bookings.view", "bookings.manage", "stock.view", "stock.use", "stock.receive", "stock.count"];
-
-/* Keeps known permissions only, in a fixed order, and adds what they need
-   (recording what was used needs seeing the stock, and so on). */
-function normalize(list) {
-  const wanted = new Set(Array.isArray(list) ? list.filter((key) => typeof key === "string") : []);
-
-  PERMISSIONS.forEach((p) => {
-    if (wanted.has(p.key) && p.needs) wanted.add(p.needs);
-  });
-
-  return ALL.filter((key) => wanted.has(key));
-}
+const ROLES = Object.keys(ROLE_PERMISSIONS);
 
 function permissionsOf(user) {
   if (!user) return [];
-  if (user.role === "owner") return ALL.slice();
-  if (Array.isArray(user.permissions)) return normalize(user.permissions);
-  return user.role === "manager" ? ALL.slice() : EARLIER_STAFF.slice();
+  return (ROLE_PERMISSIONS[user.role] || []).slice();
 }
 
 function can(user, key) {
@@ -66,31 +75,10 @@ function canManage(actor, target) {
   return actor.role === "manager" && target.role === "staff";
 }
 
-/* The permissions a person may hand out: the owner any, a manager their own. */
-function grantable(actor) {
-  return actor && actor.role === "owner" ? ALL.slice() : permissionsOf(actor);
-}
-
-/* A manager's ticks only change what they could give themselves; anything
-   else the person already had (given by the owner) stays as it was. */
-function mergeGrant(actor, current, wanted) {
-  const mine = new Set(grantable(actor));
-  const result = new Set();
-
-  normalize(wanted).forEach((key) => {
-    if (mine.has(key)) result.add(key);
-  });
-  normalize(current).forEach((key) => {
-    if (!mine.has(key)) result.add(key);
-  });
-
-  return normalize([...result]);
-}
-
 function denied(res, message) {
   return res.status(403).json({
     success: false,
-    message: message || "You don't have permission to do this. Ask the manager.",
+    message: message || "Your role can't do this. Ask the manager or the owner.",
   });
 }
 
@@ -104,8 +92,16 @@ function requirePermission(...keys) {
   };
 }
 
+/* Route guard: the signed-in person needs at least one of them. */
+function requireAny(...keys) {
+  return (req, res, next) => {
+    if (keys.some((key) => can(req.admin, key))) return next();
+    return denied(res);
+  };
+}
+
 function requireManager(req, res, next) {
-  if (!isManager(req.admin)) return denied(res, "Only the manager or the owner can do this.");
+  if (!can(req.admin, "users.manage")) return denied(res, "Only the manager or the owner can do this.");
   return next();
 }
 
@@ -113,15 +109,13 @@ module.exports = {
   PERMISSIONS,
   ALL,
   ROLES,
-  EARLIER_STAFF,
-  normalize,
+  ROLE_PERMISSIONS,
   permissionsOf,
   can,
   isManager,
   canManage,
-  grantable,
-  mergeGrant,
   denied,
   requirePermission,
+  requireAny,
   requireManager,
 };

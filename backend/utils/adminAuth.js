@@ -9,7 +9,7 @@
    It is created when the server starts, and its password is updated
    from .env on every start (so a forgotten password is fixed there).
    The owner adds managers and staff in the dashboard (Users tab);
-   managers add staff and choose what they may do (utils/permissions.js).
+   managers add staff. What each role may do: utils/permissions.js.
 
    Signing in gives a token that lasts 12 hours. Turning an account
    off, removing it or resetting its password signs that person out.
@@ -21,6 +21,7 @@ const mongoose = require("mongoose");
 
 const AdminUser = require("../models/AdminUser");
 const { permissionsOf } = require("./permissions");
+const { audit } = require("./audit");
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -178,6 +179,7 @@ function publicUser(user) {
     email: user.email,
     role: user.role,
     permissions: permissionsOf(user),
+    department: user.department || "",
     active: user.active,
     lastLoginAt: user.lastLoginAt || null,
     createdAt: user.createdAt,
@@ -298,6 +300,7 @@ async function login(req, res) {
 
     user.lastLoginAt = new Date();
     await user.save();
+    await audit(user, "sign-in", "Signed in");
 
     return res.status(200).json({
       success: true,

@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { DEPARTMENTS } = require("../utils/departments");
 
 /* People who can sign in to the admin dashboard.
    Passwords are never stored, only a scrypt hash of them. */
@@ -25,21 +26,21 @@ const adminUserSchema = new mongoose.Schema(
       required: true,
     },
 
-    // owner:   everything, and manages managers and staff
-    // manager: manages staff and what they may do (see utils/permissions.js)
-    // staff:   only what a manager or the owner ticked
+    // owner:   purchases, budgets, approvals, money reports, audit, rooms
+    // manager: daily stock, supply requests, bookings, staff accounts
+    // staff:   asks for supplies (see utils/permissions.js)
     role: {
       type: String,
       enum: ["owner", "manager", "staff"],
       default: "staff",
     },
 
-    // What this person may do, for example "stock.use" (see utils/permissions.js).
-    // Not set on accounts made before roles existed: they keep what staff
-    // could do then, until someone changes their permissions.
-    permissions: {
-      type: [String],
-      default: undefined,
+    // where a staff member works (Housekeeping, Kitchen...); their
+    // supply requests start with it
+    department: {
+      type: String,
+      enum: ["", ...DEPARTMENTS],
+      default: "",
     },
 
     active: {

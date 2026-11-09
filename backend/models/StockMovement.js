@@ -1,9 +1,10 @@
 const mongoose = require("mongoose");
 
 /* Every change to the stock:
-   in    - received or bought
-   out   - used
-   count - someone counted the shelf and corrected the number */
+   in    - checked in from a purchase (or the starting stock)
+   out   - issued to a department or used
+   count - the shelf was counted and the number corrected
+           (a manager's difference only counts once the owner approves it) */
 const stockMovementSchema = new mongoose.Schema(
   {
     item: {
@@ -50,6 +51,16 @@ const stockMovementSchema = new mongoose.Schema(
     day: {
       type: Date,
       required: true,
+    },
+    // who it went to (for "out")
+    department: {
+      type: String,
+      default: "",
+    },
+    // the purchase (P-0001) or request (R-0001) it belongs to
+    ref: {
+      type: String,
+      default: "",
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,

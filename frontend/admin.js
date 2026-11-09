@@ -2,8 +2,8 @@
    ZEBRA DORMUS INN
    Staff dashboard: sign in, today, bookings,
    availability grid, stock, rooms and users.
-   Each person sees only what they may do
-   (owner, manager, or the staff permissions a manager ticked).
+   Each person sees only what their role may do:
+   owner, manager or staff (see backend/utils/permissions.js).
    Talks to /api/admin on the booking server.
 ========================================= */
 
@@ -13,14 +13,14 @@
     var API = window.ZD_API || "/api";
     var TOKEN_KEY = "zdAdminToken";
     var VIEWS = ["today", "bookings", "availability", "stock", "rooms", "users", "account"];
-    // what each section needs ("" = everyone, "users" = owner or manager)
+    // what each section needs ("" = everyone, "a|b" = either)
     var VIEW_NEEDS = {
         today: "bookings.view",
         bookings: "bookings.view",
         availability: "bookings.view",
-        stock: "stock.view",
+        stock: "stock.view|requests.make",
         rooms: "rooms.manage",
-        users: "users",
+        users: "users.manage",
         account: ""
     };
     var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -283,41 +283,52 @@
         container.appendChild(el("p", { className: className || "loading", text: text }));
     }
 
-    /* ---------- What each person may do ---------- */
-
-    var PERMISSIONS = [
-        { key: "bookings.view", group: "Bookings", label: "See today, bookings and availability", short: "See bookings" },
-        { key: "bookings.manage", group: "Bookings", label: "Confirm, cancel and mark bookings paid", short: "Change bookings", needs: "bookings.view" },
-        { key: "stock.view", group: "Stock", label: "See stock: in stock, used, remaining", short: "See stock" },
-        { key: "stock.use", group: "Stock", label: "Record what was used", short: "Record used", needs: "stock.view" },
-        { key: "stock.receive", group: "Stock", label: "Record what came in", short: "Record received", needs: "stock.view" },
-        { key: "stock.count", group: "Stock", label: "Correct numbers after counting", short: "Count", needs: "stock.view" },
-        { key: "stock.items", group: "Stock", label: "Add, change and delete items", short: "Manage items", needs: "stock.view" },
-        { key: "stock.prices", group: "Stock", label: "See prices and value", short: "See prices", needs: "stock.view" },
-        { key: "rooms.manage", group: "Rooms", label: "Change rooms, prices and online booking", short: "Rooms & prices" }
-    ];
+    /* ---------- What each role may do ---------- */
 
     var ROLE_NAMES = { owner: "Owner", manager: "Manager", staff: "Staff" };
 
+    var ROLE_DUTIES = {
+        owner: [
+            "Record purchases and set monthly budgets",
+            "Approve stock count differences",
+            "See prices, money reports and the audit log",
+            "Change rooms and prices",
+            "Add managers and staff",
+            "Everything a manager does"
+        ],
+        manager: [
+            "Check purchases into the store",
+            "Issue supplies and handle staff requests",
+            "Count stock (differences go to the owner for approval)",
+            "See and change bookings",
+            "Add staff accounts"
+        ],
+        staff: [
+            "Ask for supplies for your department",
+            "Confirm when you receive them"
+        ]
+    };
+
     function can(key) {
         return Boolean(user && user.permissions && user.permissions.indexOf(key) >= 0);
+    }
+
+    // "a|b": either one
+    function canAny(needs) {
+        return String(needs).split("|").some(function (key) {
+            return can(key);
+        });
     }
 
     function isOwner() {
         return Boolean(user && user.role === "owner");
     }
 
-    // the owner and managers look after the user accounts
-    function managesUsers() {
-        return Boolean(user && (user.role === "owner" || user.role === "manager"));
-    }
-
     function allowed(view) {
         var need = VIEW_NEEDS[view];
         if (need === undefined) return false;
         if (need === "") return true;
-        if (need === "users") return managesUsers();
-        return can(need);
+        return canAny(need);
     }
 
     // the first section this person may open (My account if none)
@@ -385,11 +396,15 @@
         $("accountButton").setAttribute("aria-label", "My account: " + user.name);
 
         document.querySelectorAll("[data-perm]").forEach(function (node) {
-            var need = node.getAttribute("data-perm");
-            node.hidden = need === "users" ? !managesUsers() : !can(need);
+            node.hidden = !canAny(node.getAttribute("data-perm"));
         });
 
-        // no tabs at all (nothing ticked yet): hide the empty tab bar
+        // staff only ask for supplies: call the section Supplies
+        var supplies = !can("stock.view");
+        document.querySelector('.tab[data-view="stock"] span').textContent = supplies ? "Supplies" : "Stock";
+        TITLES.stock = supplies ? "Supplies" : "Stock";
+
+        // no tabs at all: hide the empty tab bar
         document.querySelector(".tabs").hidden = firstView() === "account";
 
         $("brandLink").setAttribute("href", "#" + firstView());
@@ -529,7 +544,7 @@
         if (!signedIn || document.visibilityState !== "visible") return;
         syncMe();
         if (["stock", "rooms", "users", "account"].indexOf(current) >= 0) return;
-        if (document.querySelector(".confirm-text")) return;
+        if (document.querySelector(".confirm-text, .doc-form")) return;
         if (document.activeElement === $("searchBox")) return;
         load(current, true);
     }, AUTO_REFRESH_MS);
@@ -1123,120 +1138,32 @@
 
     /* ---------- Users (owner and managers) ---------- */
 
-    // what the signed-in person may hand out, from the server
-    var people = { roles: ["staff"], grantable: [] };
-    var addPicker = null;
+    // what the signed-in person may give, from the server
+    var people = { roles: ["staff"], departments: [] };
 
     function lastSignIn(iso) {
         return iso ? "Last signed in " + bookedAt(iso) : "Hasn't signed in yet";
     }
 
-    /* Tick boxes for what someone may do. Boxes the signed-in person
-       can't give are shown greyed out and can't be changed. */
-    function permissionPicker(prefix, selected, grantable) {
-        var boxes = {};
-        var groups = {};
-        var locked = false;
-
-        var wrap = el("fieldset", { className: "perm-picker" }, [
-            el("legend", { text: "What they may do" })
-        ]);
-
-        function setAll(on) {
-            PERMISSIONS.forEach(function (p) {
-                if (!boxes[p.key].disabled) boxes[p.key].checked = on;
-            });
-            keepNeeds();
-        }
-
-        // a box that something ticked needs stays ticked (recording use needs seeing stock)
-        function keepNeeds() {
-            PERMISSIONS.forEach(function (p) {
-                if (p.needs && boxes[p.key].checked) boxes[p.needs].checked = true;
-            });
-        }
-
-        wrap.appendChild(el("div", { className: "perm-tools" }, [
-            el("button", { type: "button", className: "link-btn", text: "Tick all", onclick: function () { setAll(true); } }),
-            el("button", { type: "button", className: "link-btn", text: "Untick all", onclick: function () { setAll(false); } })
-        ]));
-
-        PERMISSIONS.forEach(function (p) {
-            if (!groups[p.group]) {
-                groups[p.group] = el("div", { className: "perm-group" }, [
-                    el("p", { className: "perm-group-title", text: p.group })
-                ]);
-                wrap.appendChild(groups[p.group]);
-            }
-
-            var id = prefix + "-" + p.key.replace(".", "-");
-            var box = el("input", { type: "checkbox", id: id, value: p.key });
-            box.checked = (selected || []).indexOf(p.key) >= 0;
-
-            if (grantable.indexOf(p.key) < 0) {
-                box.disabled = true;
-                locked = true;
-            }
-
-            box.addEventListener("change", function () {
-                if (box.checked && p.needs && !boxes[p.needs].disabled) boxes[p.needs].checked = true;
-
-                if (!box.checked) {
-                    PERMISSIONS.forEach(function (other) {
-                        if (other.needs === p.key && !boxes[other.key].disabled) boxes[other.key].checked = false;
-                    });
-                }
-
-                keepNeeds();
-            });
-
-            boxes[p.key] = box;
-            groups[p.group].appendChild(el("label", { className: "perm-option" + (box.disabled ? " is-locked" : ""), for: id }, [
-                box,
-                el("span", { text: p.label })
-            ]));
+    function fillSelect(select, values, emptyLabel, chosen) {
+        select.textContent = "";
+        if (emptyLabel !== null) select.appendChild(el("option", { value: "", text: emptyLabel }));
+        values.forEach(function (value) {
+            select.appendChild(el("option", { value: value, text: value }));
         });
-
-        if (locked) {
-            wrap.appendChild(el("p", { className: "help", text: "Greyed-out boxes can only be changed by the owner." }));
-        }
-
-        return {
-            node: wrap,
-            value: function () {
-                return PERMISSIONS.filter(function (p) {
-                    return boxes[p.key].checked;
-                }).map(function (p) {
-                    return p.key;
-                });
-            }
-        };
-    }
-
-    function permissionChips(account) {
-        if (account.role === "owner") {
-            return el("ul", { className: "perm-chips", "aria-label": account.name + " can do" }, [
-                el("li", { className: "chip chip-solid", text: "Everything" })
-            ]);
-        }
-
-        var list = account.permissions || [];
-
-        if (!list.length) {
-            return el("p", { className: "staff-meta perm-none", text: "Can't open anything yet." });
-        }
-
-        return el("ul", { className: "perm-chips", "aria-label": account.name + " can" }, PERMISSIONS.filter(function (p) {
-            return list.indexOf(p.key) >= 0;
-        }).map(function (p) {
-            return el("li", { className: "chip", text: p.short });
-        }));
+        select.value = chosen || "";
     }
 
     var ROLE_BADGE = {
         owner: "badge badge-solid",
         manager: "badge badge-dashed",
         staff: "badge"
+    };
+
+    var ROLE_SHORT = {
+        owner: "Purchases, budgets, approvals, money reports, audit",
+        manager: "Daily stock, supply requests, bookings",
+        staff: "Asks for supplies"
     };
 
     function staffCard(account) {
@@ -1254,7 +1181,7 @@
                     ])
                 ]),
                 el("p", { className: "staff-email", text: account.email }),
-                permissionChips(account),
+                el("p", { className: "staff-role", text: ROLE_SHORT[account.role] + (account.department ? " · " + account.department : "") }),
                 el("p", { className: "staff-meta", text: lastSignIn(account.lastLoginAt) })
             ]),
             actions
@@ -1280,42 +1207,42 @@
             }
         }
 
-        function editPermissions() {
+        /* Role (owner only) and department */
+        function editAccount() {
             actions.textContent = "";
 
+            var form = el("form", { className: "staff-edit", novalidate: true });
+            var fields = el("div", { className: "room-fields" });
             var roleSelect = null;
-            var picker = permissionPicker("perm-" + account._id, account.permissions, people.grantable);
-            var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Save" });
-            var form = el("form", { className: "perm-edit", novalidate: true });
 
             if (people.roles.indexOf("manager") >= 0) {
-                var roleId = "role-" + account._id;
-                roleSelect = el("select", { id: roleId });
+                roleSelect = el("select", { id: "role-" + account._id });
                 ["staff", "manager"].forEach(function (role) {
                     roleSelect.appendChild(el("option", { value: role, text: ROLE_NAMES[role] }));
                 });
                 roleSelect.value = account.role;
-
-                form.appendChild(el("div", { className: "room-field perm-role" }, [
-                    el("label", { for: roleId, text: "Role" }),
-                    roleSelect,
-                    el("p", { className: "help", text: "Managers add staff and choose what they may do." })
-                ]));
+                fields.appendChild(el("div", { className: "room-field" }, [el("label", { for: "role-" + account._id, text: "Role" }), roleSelect]));
             }
 
-            form.appendChild(picker.node);
-            form.appendChild(el("div", { className: "room-form-foot" }, [save, button("Cancel", "btn-ghost", renderActions)]));
+            var dept = el("select", { id: "dept-" + account._id });
+            fillSelect(dept, people.departments, "No department", account.department);
+            fields.appendChild(el("div", { className: "room-field" }, [el("label", { for: "dept-" + account._id, text: "Department" }), dept]));
+
+            form.appendChild(fields);
+            form.appendChild(el("div", { className: "room-form-foot" }, [
+                el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Save" }),
+                button("Cancel", "btn-ghost", renderActions)
+            ]));
 
             form.addEventListener("submit", function (event) {
                 event.preventDefault();
-                var body = { permissions: picker.value() };
+                var body = { department: dept.value };
                 if (roleSelect) body.role = roleSelect.value;
-                change("PATCH", body, "Saved. " + account.name + " can use the changes straight away.");
+                change("PATCH", body, account.name + " saved.");
             });
 
             actions.appendChild(form);
-            var first = form.querySelector("select, input:not([disabled])");
-            if (first) first.focus();
+            (roleSelect || dept).focus();
         }
 
         function askNewPassword() {
@@ -1375,7 +1302,7 @@
                 return;
             }
 
-            actions.appendChild(button("Permissions", "btn-primary", editPermissions));
+            actions.appendChild(button(people.roles.indexOf("manager") >= 0 ? "Role & department" : "Department", "btn-ghost", editAccount));
             actions.appendChild(button("Reset password", "btn-ghost", askNewPassword));
             actions.appendChild(button(account.active ? "Turn off" : "Turn on", "btn-ghost", function () {
                 change(
@@ -1391,18 +1318,6 @@
         return card;
     }
 
-    /* The add form: the owner chooses Manager or Staff (managers can only add
-       staff), then ticks what they may do. New staff start with nothing ticked;
-       new managers with everything. */
-    function renderAddPicker() {
-        var role = people.roles.indexOf("manager") >= 0 ? $("staffRole").value : "staff";
-        addPicker = permissionPicker("new", role === "manager" ? people.grantable : [], people.grantable);
-        $("staffPerms").textContent = "";
-        $("staffPerms").appendChild(addPicker.node);
-    }
-
-    $("staffRole").addEventListener("change", renderAddPicker);
-
     async function loadUsers(quiet) {
         var list = $("staffList");
 
@@ -1412,15 +1327,17 @@
         var canAddManagers = (data.roles || []).indexOf("manager") >= 0;
 
         people.roles = data.roles || ["staff"];
-        people.grantable = data.grantable || [];
+        people.departments = data.departments || [];
 
         $("usersIntro").textContent = canAddManagers
-            ? "People who can sign in to this dashboard. Add managers and staff, and tick what each one may do. Managers can add staff and give them only what the managers can do themselves."
-            : "Add staff and tick what each person may do. You can give only what you can do yourself. Only the owner can change managers.";
+            ? "People who can sign in to this dashboard. Their role decides what they can do."
+            : "Add staff so they can ask for supplies. Only the owner can add or change managers.";
 
         $("staffRoleField").hidden = !canAddManagers;
         if (!canAddManagers) $("staffRole").value = "staff";
-        renderAddPicker();
+
+        var dept = $("staffDept");
+        if (dept.options.length <= 1) fillSelect(dept, people.departments, "No department", dept.value);
 
         list.textContent = "";
         data.staff.forEach(function (account) {
@@ -1465,7 +1382,7 @@
             email: email.value.trim(),
             password: password.value,
             role: $("staffRoleField").hidden ? "staff" : $("staffRole").value,
-            permissions: addPicker ? addPicker.value() : []
+            department: $("staffDept").value
         };
 
         add.disabled = true;
@@ -1475,9 +1392,7 @@
             var data = await api("POST", "/admin/staff", body);
             form.reset();
             message.textContent = "";
-            toast(data.user.permissions.length
-                ? data.user.name + " can now sign in with " + data.user.email + "."
-                : data.user.name + " can sign in, but can't open anything until you tick what they may do.");
+            toast(data.user.name + " can now sign in with " + data.user.email + " as " + ROLE_NAMES[data.user.role].toLowerCase() + ".");
             load("users", true);
         } catch (error) {
             message.textContent = error.status === 401 ? "" : error.message;
@@ -1489,35 +1404,21 @@
     /* ---------- My account ---------- */
 
     async function loadAccount() {
-        var hadNothing = firstView() === "account";
         var data = await api("GET", "/admin/me");
         applyUser(data.user);
 
         $("myName").textContent = user.name;
         $("myEmail").textContent = user.email;
-        $("myRole").textContent = ROLE_NAMES[user.role] || user.role;
+        $("myRole").textContent = (ROLE_NAMES[user.role] || user.role) + (user.department ? " · " + user.department : "");
 
         var list = $("myPerms");
         list.textContent = "";
+        (ROLE_DUTIES[user.role] || []).forEach(function (duty) {
+            list.appendChild(el("li", { text: duty }));
+        });
 
-        if (isOwner()) {
-            list.appendChild(el("li", { text: "Everything, including managers' and staff accounts" }));
-        } else {
-            if (managesUsers()) list.appendChild(el("li", { text: "Add staff and choose what they may do" }));
-
-            PERMISSIONS.forEach(function (p) {
-                if (can(p.key)) list.appendChild(el("li", { text: p.label }));
-            });
-
-            if (!list.children.length) list.appendChild(el("li", { className: "muted", text: "Nothing yet" }));
-        }
-
-        var nothing = firstView() === "account";
-        $("noAccessNote").hidden = !nothing;
         $("envOwnerNote").hidden = !user.fromEnv;
         $("passwordForm").hidden = Boolean(user.fromEnv);
-
-        if (hadNothing && !nothing) toast("You can now open " + TITLES[firstView()] + ". Use the tabs at the top.");
     }
 
     $("passwordForm").addEventListener("input", function () {
@@ -1574,10 +1475,12 @@
     /* ---------- Stock ---------- */
 
     var stock = {
-        tab: "items",
+        tab: "",
         items: [],
         categories: [],
+        departments: [],
         summary: null,
+        counts: [],
         archived: false,
         q: "",
         category: "",
@@ -1585,10 +1488,30 @@
         changesBefore: "",
         reportFrom: "",
         reportTo: "",
-        report: null
+        report: null,
+        catalog: [],
+        requests: [],
+        purchases: [],
+        budgetMonth: "",
+        auditArea: "",
+        auditQ: "",
+        auditBefore: "",
+        auditEntries: []
     };
 
     var STOCK_UNITS = ["pieces", "rolls", "bottles", "bars", "packs", "boxes", "kits", "kg", "litres", "sets", "cans"];
+
+    // the sections inside Stock, and what each needs
+    var STOCK_TABS = ["items", "requests", "purchases", "budget", "changes", "report", "audit"];
+    var STOCK_TAB_NEEDS = {
+        items: "stock.view",
+        requests: "requests.make|requests.manage",
+        purchases: "purchases.view",
+        budget: "budget.manage",
+        changes: "stock.view",
+        report: "stock.view",
+        audit: "audit.view"
+    };
 
     function qty(value) {
         return Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -1599,11 +1522,31 @@
         return (number > 0 ? "+" : number < 0 ? "−" : "") + qty(Math.abs(number));
     }
 
+    function signedRwf(value) {
+        var number = Math.round(Number(value || 0));
+        return (number > 0 ? "+" : number < 0 ? "−" : "") + formatRwf(Math.abs(number));
+    }
+
+    function monthName(month) {
+        return new Date(month + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+    }
+
+    function shortDay(text) {
+        return formatDay(text, { day: "numeric", month: "short", year: "numeric" });
+    }
+
     var STOCK_STATUS = {
         ok: { text: "Enough", className: "pill" },
         low: { text: "Running low", className: "pill pill-low" },
         out: { text: "Out of stock", className: "pill pill-full" }
     };
+
+    function itemById(id) {
+        for (var i = 0; i < stock.items.length; i += 1) {
+            if (stock.items[i]._id === id) return stock.items[i];
+        }
+        return null;
+    }
 
     function stockMatches(item) {
         if (stock.category && item.category !== stock.category) return false;
@@ -1613,23 +1556,64 @@
         return true;
     }
 
-    function showStockTab(tab) {
-        stock.tab = tab;
-        document.querySelectorAll("[data-stock-tab]").forEach(function (b) {
-            b.setAttribute("aria-pressed", String(b.getAttribute("data-stock-tab") === tab));
-        });
-        $("stockItemsPanel").hidden = tab !== "items";
-        $("stockChangesPanel").hidden = tab !== "changes";
-        $("stockReportPanel").hidden = tab !== "report";
+    function stockTabAllowed(tab) {
+        return Boolean(STOCK_TAB_NEEDS[tab]) && canAny(STOCK_TAB_NEEDS[tab]);
     }
 
+    function defaultStockTab() {
+        for (var i = 0; i < STOCK_TABS.length; i += 1) {
+            if (stockTabAllowed(STOCK_TABS[i])) return STOCK_TABS[i];
+        }
+        return "requests";
+    }
+
+    function showStockTab(tab) {
+        if (!stockTabAllowed(tab)) tab = defaultStockTab();
+        stock.tab = tab;
+
+        document.querySelectorAll("[data-stock-tab]").forEach(function (b) {
+            var on = b.getAttribute("data-stock-tab") === tab;
+            b.setAttribute("aria-pressed", String(on));
+            // on a phone the row of sections scrolls: keep the chosen one in view
+            if (on && b.parentNode.scrollWidth > b.parentNode.clientWidth) {
+                b.parentNode.scrollLeft = Math.max(0, b.offsetLeft - 24);
+            }
+        });
+
+        STOCK_TABS.forEach(function (name) {
+            $("stock-" + name).hidden = name !== tab;
+        });
+    }
+
+    function loadStockTab(tab, quiet) {
+        if (tab === "items") {
+            renderApprovals();
+            renderStockList();
+            return Promise.resolve();
+        }
+        if (tab === "requests") return loadRequests(quiet);
+        if (tab === "purchases") return loadPurchases(quiet);
+        if (tab === "budget") return loadBudget();
+        if (tab === "changes") return loadChanges(false);
+        if (tab === "report") return loadReport();
+        return loadAudit(false);
+    }
+
+    // switching section also refreshes the numbers and badges
     document.querySelectorAll("[data-stock-tab]").forEach(function (b) {
         b.addEventListener("click", function () {
             showStockTab(b.getAttribute("data-stock-tab"));
-            if (stock.tab === "items") renderStockList();
-            else load("stock", false);
+            load("stock", false);
         });
     });
+
+    /* A small number on a section button, e.g. Requests (3) */
+    function setTabCount(tab, count) {
+        var badge = document.querySelector('[data-stock-tab="' + tab + '"] .seg-count');
+        if (!badge) return;
+        badge.textContent = count ? String(count) : "";
+        badge.hidden = !count;
+    }
 
     function renderStockStats() {
         var box = $("stockStats");
@@ -1659,9 +1643,18 @@
         if (s.value !== undefined) {
             box.appendChild(stat(formatRwf(s.value), "Value in store", "At the last price paid", function () {
                 showStockTab("report");
-                load("stock", false);
+                loadReport().catch(showLoadError);
             }));
+        } else if (s.requestsWaiting !== undefined) {
+            box.appendChild(stat(s.requestsWaiting, "Requests waiting", "Tap to see them", function () {
+                showStockTab("requests");
+                loadRequests(false).catch(showLoadError);
+            }, s.requestsWaiting > 0));
         }
+
+        setTabCount("requests", s.requestsWaiting || 0);
+        setTabCount("purchases", s.purchasesWaiting || 0);
+        setTabCount("items", can("stock.approve") ? s.countsWaiting : 0);
     }
 
     function renderStockAlert() {
@@ -1707,6 +1700,96 @@
         load("stock", false);
     });
 
+    /* ----- Count differences waiting for the owner ----- */
+
+    function renderApprovals() {
+        var box = $("approvalsBox");
+        box.textContent = "";
+
+        if (!can("stock.approve") || !stock.counts.length) {
+            box.hidden = true;
+            return;
+        }
+
+        box.hidden = false;
+        box.appendChild(el("h2", { className: "approvals-title", text: "Waiting for your approval" }));
+        box.appendChild(el("p", {
+            className: "stock-meta",
+            text: "A manager counted these and found a different number. The stock only changes when you approve."
+        }));
+
+        stock.counts.forEach(function (count) {
+            box.appendChild(approvalRow(count));
+        });
+    }
+
+    function approvalRow(count) {
+        var row = el("article", { className: "approval-row" });
+        var actions = el("div", { className: "booking-actions" });
+
+        function busy(on) {
+            actions.querySelectorAll("button, input").forEach(function (b) {
+                b.disabled = on;
+            });
+        }
+
+        async function decide(path, body, done) {
+            busy(true);
+            try {
+                await api("POST", "/admin/stock/counts/" + count._id + "/" + path, body);
+                toast(done);
+                load("stock", true);
+            } catch (error) {
+                if (error.status !== 401) toast(error.message, true);
+                renderActions();
+            }
+        }
+
+        function askReason() {
+            actions.textContent = "";
+            var id = "reason-" + count._id;
+            var input = el("input", { id: id, type: "text", maxlength: "200", placeholder: "For example: please count again", autocomplete: "off" });
+            var form = el("form", { className: "staff-reset", novalidate: true }, [
+                el("div", { className: "room-field" }, [el("label", { for: id, text: "Why? (optional)" }), input]),
+                el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Turn down" }),
+                button("Cancel", "btn-ghost", renderActions)
+            ]);
+            form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                decide("reject", { reason: input.value.trim() }, "Count turned down. The stock stays at " + qty(count.recorded) + " " + count.unit + ".");
+            });
+            actions.appendChild(form);
+            input.focus();
+        }
+
+        function renderActions() {
+            actions.textContent = "";
+            actions.appendChild(button("Approve " + signed(count.change), "btn-primary", function () {
+                decide("approve", null, count.itemName + " is now " + qty(count.counted) + " " + count.unit + ".");
+            }));
+            actions.appendChild(button("Turn down", "btn-ghost", askReason));
+        }
+
+        row.appendChild(el("div", {}, [
+            el("p", { className: "approval-what" }, [
+                el("strong", { text: count.itemName }),
+                " · counted " + qty(count.counted) + " " + count.unit + ", record says " + qty(count.recorded)
+            ]),
+            el("p", {
+                className: "stock-meta",
+                text: "Difference " + signed(count.change) + " " + count.unit +
+                    (count.value !== undefined ? " (" + signedRwf(count.value) + ")" : "") +
+                    " · by " + count.countedByName + " · " + shortDay(count.day)
+            }),
+            count.note ? el("p", { className: "stock-notes", text: count.note }) : null
+        ]));
+        row.appendChild(actions);
+        renderActions();
+        return row;
+    }
+
+    /* ----- Items ----- */
+
     function renderStockList() {
         var list = $("stockList");
         var shown = stock.items.filter(stockMatches);
@@ -1743,15 +1826,13 @@
                     this.disabled = true;
                     try {
                         var data = await api("POST", "/admin/stock/items/starter");
-                        toast(plural(data.added, "item", "items") + " added. Now count what you have and press “Count” on each.");
+                        toast(plural(data.added, "item", "items") + " added. They come into stock when a purchase is checked in.");
                         load("stock", true);
                     } catch (error) {
                         if (error.status !== 401) toast(error.message, true);
                         this.disabled = false;
                     }
                 }));
-            } else {
-                empty.appendChild(el("p", { text: "Someone who manages items adds them. Ask the manager." }));
             }
 
             list.appendChild(empty);
@@ -1762,7 +1843,7 @@
             return item.quantity === 0 && item.changes === 0;
         });
 
-        if (can("stock.items") && unused.length && !stock.only && !stock.q && !stock.category) {
+        if (can("stock.delete") && unused.length && !stock.only && !stock.q && !stock.category) {
             list.appendChild(unusedBar(unused.length));
         }
 
@@ -1823,9 +1904,7 @@
 
     function replaceItem(updated) {
         stock.items = stock.items.map(function (item) {
-            if (item._id !== updated._id) return item;
-            if (updated.changes === undefined) updated.changes = (item.changes || 0) + 1;
-            return updated;
+            return item._id === updated._id ? updated : item;
         });
     }
 
@@ -1867,10 +1946,17 @@
         ]);
     }
 
+    function departmentSelect(id, chosen) {
+        var select = el("select", { id: id, required: true });
+        fillSelect(select, stock.departments, "Choose…", chosen);
+        return select;
+    }
+
     function stockCard(item) {
         var info = STOCK_STATUS[item.status] || STOCK_STATUS.ok;
         var formBox = el("div", { className: "stock-form-box" });
         var actions = el("div", { className: "booking-actions" });
+        var waiting = item.waitingCount;
 
         var meta = item.category + (item.lowStockAt > 0 ? " · warn at " + qty(item.lowStockAt) + " " + item.unit : "");
 
@@ -1888,6 +1974,12 @@
             item.corrections
                 ? el("p", { className: "stock-meta", text: "Corrections after counting: " + signed(item.corrections) + " " + item.unit })
                 : null,
+            waiting
+                ? el("p", {
+                    className: "count-waiting",
+                    text: "Count waiting for the owner: " + qty(waiting.counted) + " " + item.unit + " (" + signed(waiting.change) + "), by " + waiting.countedByName
+                })
+                : null,
             item.unitCost !== undefined && item.unitCost > 0
                 ? el("p", { className: "stock-meta", text: formatRwf(item.unitCost) + " each · " + formatRwf(item.value) + " in store" })
                 : null,
@@ -1901,8 +1993,7 @@
             formBox.textContent = "";
 
             if (item.active) {
-                if (can("stock.use")) actions.appendChild(button("− Used", "btn-ghost", function () { openMove("out"); }));
-                if (can("stock.receive")) actions.appendChild(button("+ Received", "btn-ghost", function () { openMove("in"); }));
+                if (can("stock.issue")) actions.appendChild(button("− Issue", "btn-ghost", function () { openMove("out"); }));
                 if (can("stock.count")) actions.appendChild(button("Count", "btn-ghost", function () { openMove("count"); }));
             }
 
@@ -1919,39 +2010,30 @@
             formBox.textContent = "";
 
             var id = "move-" + item._id;
-            var question = {
-                out: "How many " + item.unit + " were used?",
-                "in": "How many " + item.unit + " came in?",
-                count: "How many " + item.unit + " are there now?"
-            }[type];
-            var hint = {
-                out: "What for? For example: rooms 1–3, kitchen",
-                "in": "From where? For example: Simba market",
-                count: "For example: monthly count"
-            }[type];
+            var question = type === "out" ? "How many " + item.unit + " to issue?" : "How many " + item.unit + " are there now?";
+            var hint = type === "out" ? "What for? For example: rooms 1–3" : "For example: monthly count";
 
             var amount = el("input", { id: id + "-qty", type: "number", inputmode: "decimal", min: "0", step: "0.01", required: true });
             if (type === "count") amount.value = String(item.quantity);
             var note = el("input", { id: id + "-note", type: "text", maxlength: "200", placeholder: hint, autocomplete: "off" });
             var day = el("input", { id: id + "-day", type: "date", max: kigaliToday(), value: kigaliToday() });
-            var price = null;
+            var dept = type === "out" ? departmentSelect(id + "-dept", "") : null;
 
-            var fields = [
-                el("div", { className: "room-field" }, [el("label", { for: id + "-qty", text: question }), amount]),
+            var fields = [el("div", { className: "room-field" }, [el("label", { for: id + "-qty", text: question }), amount])];
+            if (dept) fields.push(el("div", { className: "room-field" }, [el("label", { for: id + "-dept", text: "Which department?" }), dept]));
+            fields.push(
                 el("div", { className: "room-field" }, [el("label", { for: id + "-note", text: "Note (optional)" }), note]),
                 el("div", { className: "room-field" }, [el("label", { for: id + "-day", text: "Day" }), day])
-            ];
-
-            if (type === "in" && can("stock.prices")) {
-                price = el("input", { id: id + "-price", type: "number", inputmode: "numeric", min: "0", step: "1", placeholder: item.unitCost ? String(item.unitCost) : "" });
-                fields.push(el("div", { className: "room-field" }, [el("label", { for: id + "-price", text: "Price paid for one (RWF, optional)" }), price]));
-            }
+            );
 
             var message = el("p", { className: "room-form-message", role: "status" });
-            var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Save" });
+            var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: type === "out" ? "Issue" : "Save count" });
 
             var form = el("form", { className: "stock-move", novalidate: true }, [
                 el("div", { className: "room-fields" }, fields),
+                type === "count" && !can("stock.approve")
+                    ? el("p", { className: "help", text: "If the number is different from the record, the owner approves it before the stock changes." })
+                    : null,
                 el("div", { className: "room-form-foot" }, [
                     save,
                     button("Cancel", "btn-ghost", renderActions),
@@ -1970,13 +2052,19 @@
                 }
 
                 if (type === "out" && number > item.quantity) {
-                    message.textContent = "Only " + qty(item.quantity) + " " + item.unit + " are in stock. If that's wrong, use Count.";
+                    message.textContent = "Only " + qty(item.quantity) + " " + item.unit + " are in stock. If that's wrong, count it.";
                     amount.focus();
                     return;
                 }
 
+                if (dept && !dept.value) {
+                    message.textContent = "Choose the department.";
+                    dept.focus();
+                    return;
+                }
+
                 var body = { type: type, quantity: number, note: note.value.trim(), day: day.value };
-                if (price && price.value !== "") body.unitCost = Number(price.value);
+                if (dept) body.department = dept.value;
 
                 save.disabled = true;
                 message.textContent = "Saving…";
@@ -1986,9 +2074,11 @@
                     var updated = data.item;
                     var done;
 
-                    if (type === "out") done = "Used " + qty(number) + " " + item.unit + " of " + item.name + ". " + qty(updated.quantity) + " left.";
-                    else if (type === "in") done = "Added " + qty(number) + " " + item.unit + " of " + item.name + ". " + qty(updated.quantity) + " in stock.";
-                    else {
+                    if (data.waiting) {
+                        done = "Count saved: " + qty(number) + " " + item.unit + ". It waits for the owner's approval.";
+                    } else if (type === "out") {
+                        done = "Issued " + qty(number) + " " + item.unit + " of " + item.name + " to " + body.department + ". " + qty(updated.quantity) + " left.";
+                    } else {
                         var diff = data.movement.change;
                         done = item.name + " counted: " + qty(updated.quantity) + " " + item.unit +
                             (diff === 0 ? ", same as recorded." : " (" + signed(diff) + " compared with the record).");
@@ -2013,7 +2103,7 @@
         return card;
     }
 
-    /* Add or change an item (people who manage items) */
+    /* Add or change an item */
     function openItemForm(item) {
         var slot = $("itemFormSlot");
         var editing = Boolean(item);
@@ -2050,8 +2140,8 @@
 
         var message = el("p", { className: "room-form-message", role: "status" });
         var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: editing ? "Save changes" : "Add item" });
-
         var showPrice = can("stock.prices");
+        var showStart = !editing && can("stock.approve"); // stock without a purchase is the owner's call
 
         var fields = [
             el("div", { className: "room-field" }, [el("label", { for: "itemName", text: "Name" }), name]),
@@ -2059,7 +2149,7 @@
             el("div", { className: "room-field" }, [el("label", { for: "itemUnit", text: "Counted in" }), unit, unitList])
         ];
 
-        if (!editing) {
+        if (showStart) {
             fields.push(el("div", { className: "room-field" }, [el("label", { for: "itemStart", text: "How many you have now" }), start]));
         }
 
@@ -2086,7 +2176,7 @@
                     ? item.name + " archived. It stays in old reports."
                     : item.name + " is back in the stock list.");
             }));
-            foot.appendChild(button("Delete item", "btn-ghost btn-danger", askDelete));
+            if (can("stock.delete")) foot.appendChild(button("Delete item", "btn-ghost btn-danger", askDelete));
         }
 
         foot.appendChild(message);
@@ -2126,6 +2216,9 @@
         var form = el("form", { className: "form-card item-form", novalidate: true }, [
             el("h2", { text: editing ? "Change " + item.name : "Add an item" }),
             el("div", { className: "room-fields" }, fields),
+            !editing && !showStart
+                ? el("p", { className: "help", text: "New items start at 0. Stock comes in when the owner's purchase is checked in, or count it and the owner approves the number." })
+                : null,
             foot
         ]);
 
@@ -2163,8 +2256,7 @@
             };
 
             if (showPrice) body.unitCost = cost.value === "" ? 0 : Number(cost.value);
-
-            if (!editing) body.quantity = start.value === "" ? 0 : Number(start.value);
+            if (showStart) body.quantity = start.value === "" ? 0 : Number(start.value);
 
             submit(body, editing ? body.name + " saved." : body.name + " added.");
         });
@@ -2178,16 +2270,870 @@
         openItemForm(null);
     });
 
-    /* Changes: what was used, received or counted, newest first */
-    var MOVE_WORDS = { out: "Used", "in": "Received", count: "Counted" };
+    /* ----- Lines of items, used by requests and purchases ----- */
+
+    // a select of items grouped by category; `left` shows how many are in stock
+    function itemSelect(id, items, chosen, left) {
+        var select = el("select", { id: id, required: true });
+        select.appendChild(el("option", { value: "", text: "Choose an item…" }));
+        var group = null;
+        var lastCategory = "";
+
+        items.forEach(function (item) {
+            if (item.category !== lastCategory) {
+                lastCategory = item.category;
+                group = el("optgroup", { label: item.category });
+                select.appendChild(group);
+            }
+            group.appendChild(el("option", {
+                value: item._id,
+                text: item.name + (left ? " (" + qty(item.quantity) + " " + item.unit + " left)" : "")
+            }));
+        });
+
+        select.value = chosen || "";
+        return select;
+    }
+
+    /* ----- Requests ----- */
+
+    var REQUEST_BADGE = {
+        waiting: { text: "Waiting", className: "badge badge-dashed" },
+        issued: { text: "Given", className: "badge" },
+        received: { text: "Received", className: "badge badge-solid" },
+        rejected: { text: "Turned down", className: "badge badge-muted" },
+        cancelled: { text: "Cancelled", className: "badge badge-muted" }
+    };
+
+    async function loadRequests(quiet) {
+        var list = $("requestList");
+        if (!quiet) placeholder(list, "Loading requests…");
+
+        var calls = [api("GET", "/admin/requests")];
+        if (can("requests.make")) calls.push(api("GET", "/admin/stock/catalog"));
+
+        var results = await Promise.all(calls);
+        stock.requests = results[0].requests;
+        stock.departments = results[0].departments || stock.departments;
+        if (results[1]) stock.catalog = results[1].items;
+
+        renderRequests();
+    }
+
+    function renderRequests() {
+        var list = $("requestList");
+        list.textContent = "";
+
+        if (can("requests.manage")) {
+            var waiting = stock.requests.filter(function (r) { return r.status === "waiting"; });
+            var given = stock.requests.filter(function (r) { return r.status === "issued"; });
+            var done = stock.requests.filter(function (r) { return r.status !== "waiting" && r.status !== "issued"; });
+
+            list.appendChild(el("h2", { className: "section-title first", text: "Waiting to be issued (" + waiting.length + ")" }));
+            if (!waiting.length) list.appendChild(el("p", { className: "empty", text: "No requests are waiting." }));
+            waiting.forEach(function (r) { list.appendChild(requestCard(r)); });
+
+            if (given.length) {
+                list.appendChild(el("h2", { className: "section-title", text: "Given, waiting for staff to confirm (" + given.length + ")" }));
+                given.forEach(function (r) { list.appendChild(requestCard(r)); });
+            }
+
+            if (done.length) {
+                list.appendChild(el("h2", { className: "section-title", text: "Done" }));
+                done.forEach(function (r) { list.appendChild(requestCard(r)); });
+            }
+            return;
+        }
+
+        list.appendChild(el("h2", { className: "section-title first", text: "My requests" }));
+        if (!stock.requests.length) {
+            list.appendChild(el("p", { className: "empty", text: "You haven't asked for anything yet." }));
+            return;
+        }
+        stock.requests.forEach(function (r) { list.appendChild(requestCard(r)); });
+    }
+
+    function requestCard(request) {
+        var actions = el("div", { className: "booking-actions" });
+        var badge = REQUEST_BADGE[request.status] || { text: request.status, className: "badge" };
+        var manager = can("requests.manage");
+
+        var lines = el("ul", { className: "doc-lines" }, request.lines.map(function (line) {
+            var text = line.itemName + ": " + qty(line.quantity) + " " + line.unit;
+            if (line.issued !== null && line.issued !== undefined) {
+                text += line.issued === line.quantity ? " · given" : " · given " + qty(line.issued);
+            }
+            return el("li", { text: text });
+        }));
+
+        var info = [];
+        if (request.status === "issued" || request.status === "received") {
+            info.push("Given by " + request.issuedByName + " · " + bookedAt(request.issuedAt) + (request.issueNote ? ": " + request.issueNote : ""));
+        }
+        if (request.status === "received") info.push("Received " + bookedAt(request.receivedAt));
+        if (request.status === "rejected") {
+            info.push("Turned down by " + request.issuedByName + (request.rejectReason ? ": " + request.rejectReason : ""));
+        }
+
+        var card = el("article", { className: "doc-card is-" + request.status }, [
+            el("div", { className: "staff-top" }, [
+                el("h3", { className: "staff-name", text: request.ref + " · " + request.department }),
+                el("div", { className: "badges" }, [el("span", { className: badge.className, text: badge.text })])
+            ]),
+            el("p", {
+                className: "stock-meta",
+                text: (request.mine ? "Asked " : "Asked by " + request.requestedByName + " · ") + bookedAt(request.createdAt)
+            }),
+            lines,
+            request.note ? el("p", { className: "stock-notes", text: "Note: " + request.note }) : null,
+            info.length ? el("p", { className: "doc-info", text: info.join(" · ") }) : null,
+            actions
+        ]);
+
+        function busy(on) {
+            actions.querySelectorAll("button, input").forEach(function (b) {
+                b.disabled = on;
+            });
+        }
+
+        async function send(path, body, done) {
+            busy(true);
+            try {
+                await api("POST", "/admin/requests/" + request._id + "/" + path, body);
+                toast(done);
+                if (manager) load("stock", true);
+                else loadRequests(true).catch(showLoadError);
+            } catch (error) {
+                if (error.status !== 401) toast(error.message, true);
+                renderActions();
+            }
+        }
+
+        function openIssue() {
+            actions.textContent = "";
+            var inputs = [];
+            var fields = el("div", { className: "room-fields" });
+
+            request.lines.forEach(function (line, index) {
+                var item = itemById(String(line.itemId));
+                var inStock = item ? item.quantity : 0;
+                var id = "issue-" + request._id + "-" + index;
+                var input = el("input", { id: id, type: "number", inputmode: "decimal", min: "0", max: String(line.quantity), step: "0.01" });
+                input.value = String(Math.min(line.quantity, inStock));
+                inputs.push(input);
+                fields.appendChild(el("div", { className: "room-field" }, [
+                    el("label", { for: id, text: line.itemName + " (" + qty(inStock) + " " + line.unit + " in stock)" }),
+                    input,
+                    el("p", { className: "help", text: "Asked for " + qty(line.quantity) + " " + line.unit })
+                ]));
+            });
+
+            var noteId = "issue-note-" + request._id;
+            var note = el("input", { id: noteId, type: "text", maxlength: "200", autocomplete: "off", placeholder: "For example: only 1 soap left" });
+            fields.appendChild(el("div", { className: "room-field room-field-wide" }, [el("label", { for: noteId, text: "Note (optional)" }), note]));
+
+            var message = el("p", { className: "room-form-message", role: "status" });
+            var form = el("form", { className: "doc-form", novalidate: true }, [
+                fields,
+                el("div", { className: "room-form-foot" }, [
+                    el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Give these" }),
+                    button("Cancel", "btn-ghost", renderActions),
+                    message
+                ])
+            ]);
+
+            form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                var body = { note: note.value.trim(), lines: [] };
+
+                for (var i = 0; i < request.lines.length; i += 1) {
+                    var number = Number(inputs[i].value);
+                    if (inputs[i].value === "" || !isFinite(number) || number < 0 || number > request.lines[i].quantity) {
+                        message.textContent = "For " + request.lines[i].itemName + ", give 0 to " + qty(request.lines[i].quantity) + ".";
+                        inputs[i].focus();
+                        return;
+                    }
+                    body.lines.push({ itemId: request.lines[i].itemId, issued: number });
+                }
+
+                send("issue", body, request.ref + " given to " + request.requestedByName + ". The stock has gone down.");
+            });
+
+            actions.appendChild(form);
+            if (inputs[0]) inputs[0].focus();
+        }
+
+        function askReject() {
+            actions.textContent = "";
+            var id = "reject-" + request._id;
+            var input = el("input", { id: id, type: "text", maxlength: "200", autocomplete: "off", placeholder: "For example: ask again next week" });
+            var form = el("form", { className: "staff-reset", novalidate: true }, [
+                el("div", { className: "room-field" }, [el("label", { for: id, text: "Why? They will see this." }), input]),
+                el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Turn down" }),
+                button("Cancel", "btn-ghost", renderActions)
+            ]);
+            form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                send("reject", { reason: input.value.trim() }, request.ref + " turned down.");
+            });
+            actions.appendChild(form);
+            input.focus();
+        }
+
+        function askCancel() {
+            actions.textContent = "";
+            var keep = button("Keep it", "btn-ghost", renderActions);
+            actions.appendChild(el("p", { className: "confirm-text", text: "Cancel " + request.ref + "?" }));
+            actions.appendChild(button("Yes, cancel", "btn-primary", function () {
+                send("cancel", null, request.ref + " cancelled.");
+            }));
+            actions.appendChild(keep);
+            keep.focus();
+        }
+
+        function renderActions() {
+            actions.textContent = "";
+
+            if (request.mine && request.status === "issued") {
+                actions.appendChild(button("I received it", "btn-primary", function () {
+                    send("received", null, "Thank you. " + request.ref + " is marked as received.");
+                }));
+            }
+            if (request.mine && request.status === "waiting") actions.appendChild(button("Cancel request", "btn-ghost", askCancel));
+            if (manager && request.status === "waiting") {
+                actions.appendChild(button("Issue", "btn-primary", openIssue));
+                actions.appendChild(button("Turn down", "btn-ghost", askReject));
+            }
+
+            actions.hidden = !actions.children.length;
+        }
+
+        renderActions();
+        return card;
+    }
+
+    /* Staff: ask for supplies */
+    function openRequestForm() {
+        var slot = $("requestFormSlot");
+        slot.textContent = "";
+
+        if (!stock.catalog.length) {
+            slot.appendChild(el("p", { className: "room-note", text: "There are no items to ask for yet. Ask the manager to add them." }));
+            return;
+        }
+
+        var dept = el("select", { id: "requestDept" });
+        fillSelect(dept, stock.departments, "Choose…", user.department || "");
+
+        var linesBox = el("div", { className: "line-rows" });
+        var count = 0;
+
+        function addLine() {
+            count += 1;
+            var id = "requestItem-" + count;
+            var select = itemSelect(id, stock.catalog, "", true);
+            var amount = el("input", { id: id + "-qty", type: "number", inputmode: "decimal", min: "0.01", step: "0.01", placeholder: "How many" });
+            var unit = el("span", { className: "line-unit", text: "" });
+
+            select.addEventListener("change", function () {
+                var item = stock.catalog.filter(function (i) { return i._id === select.value; })[0];
+                unit.textContent = item ? item.unit : "";
+            });
+
+            var row = el("div", { className: "line-row" }, [
+                el("div", { className: "room-field line-item" }, [el("label", { for: id, text: "Item" }), select]),
+                el("div", { className: "room-field line-qty" }, [el("label", { for: id + "-qty", text: "How many" }), el("div", { className: "qty-with-unit" }, [amount, unit])]),
+                el("button", {
+                    type: "button",
+                    className: "line-remove",
+                    "aria-label": "Remove this item",
+                    text: "×",
+                    onclick: function () {
+                        if (linesBox.children.length > 1) row.remove();
+                    }
+                })
+            ]);
+            linesBox.appendChild(row);
+            return select;
+        }
+
+        addLine();
+
+        var note = el("input", { id: "requestNote", type: "text", maxlength: "200", autocomplete: "off", placeholder: "For example: for rooms 1–6" });
+        var message = el("p", { className: "room-form-message", role: "status" });
+        var send = el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Send request" });
+
+        var form = el("form", { className: "form-card doc-form", novalidate: true }, [
+            el("h2", { text: "Ask for supplies" }),
+            el("div", { className: "room-field" }, [el("label", { for: "requestDept", text: "For which department?" }), dept]),
+            linesBox,
+            el("button", { type: "button", className: "link-btn add-line", text: "+ Add another item", onclick: function () { addLine().focus(); } }),
+            el("div", { className: "room-field" }, [el("label", { for: "requestNote", text: "Note (optional)" }), note]),
+            el("div", { className: "room-form-foot" }, [
+                send,
+                button("Cancel", "btn-ghost", function () { slot.textContent = ""; }),
+                message
+            ])
+        ]);
+
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            if (!dept.value) {
+                message.textContent = "Choose the department.";
+                dept.focus();
+                return;
+            }
+
+            var lines = [];
+            var rows = linesBox.querySelectorAll(".line-row");
+
+            for (var i = 0; i < rows.length; i += 1) {
+                var select = rows[i].querySelector("select");
+                var amount = rows[i].querySelector("input");
+                if (!select.value && !amount.value) continue;
+                if (!select.value) {
+                    message.textContent = "Choose the item.";
+                    select.focus();
+                    return;
+                }
+                var number = Number(amount.value);
+                if (!amount.value || !isFinite(number) || number <= 0) {
+                    message.textContent = "Enter how many you need.";
+                    amount.focus();
+                    return;
+                }
+                lines.push({ itemId: select.value, quantity: number });
+            }
+
+            if (!lines.length) {
+                message.textContent = "Choose at least one item.";
+                rows[0].querySelector("select").focus();
+                return;
+            }
+
+            send.disabled = true;
+            message.textContent = "Sending…";
+
+            try {
+                var data = await api("POST", "/admin/requests", { department: dept.value, note: note.value.trim(), lines: lines });
+                slot.textContent = "";
+                toast(data.request.ref + " sent. The manager will issue it.");
+                loadRequests(true).catch(showLoadError);
+            } catch (error) {
+                message.textContent = error.status === 401 ? "" : error.message;
+                send.disabled = false;
+            }
+        });
+
+        slot.appendChild(form);
+        (dept.value ? form.querySelector(".line-row select") : dept).focus();
+    }
+
+    $("newRequestButton").addEventListener("click", openRequestForm);
+
+    /* ----- Purchases ----- */
+
+    async function loadPurchases(quiet) {
+        var list = $("purchaseList");
+        if (!quiet) placeholder(list, "Loading purchases…");
+
+        var data = await api("GET", "/admin/purchases");
+        stock.purchases = data.purchases;
+        renderPurchases();
+    }
+
+    function renderPurchases() {
+        var list = $("purchaseList");
+        var waiting = stock.purchases.filter(function (p) { return p.status === "waiting"; });
+        var done = stock.purchases.filter(function (p) { return p.status !== "waiting"; });
+
+        list.textContent = "";
+        list.appendChild(el("h2", { className: "section-title first", text: "Waiting to be checked in (" + waiting.length + ")" }));
+        if (!waiting.length) {
+            list.appendChild(el("p", {
+                className: "empty",
+                text: can("purchases.record") ? "Nothing is waiting. Record a purchase when you buy stock." : "Nothing is waiting. The owner records purchases; you check them in here when they arrive."
+            }));
+        }
+        waiting.forEach(function (p) { list.appendChild(purchaseCard(p)); });
+
+        if (done.length) {
+            list.appendChild(el("h2", { className: "section-title", text: "Earlier purchases" }));
+            done.forEach(function (p) { list.appendChild(purchaseCard(p)); });
+        }
+    }
+
+    function purchaseCard(purchase) {
+        var actions = el("div", { className: "booking-actions" });
+        var prices = purchase.total !== undefined;
+        var badges = [];
+
+        if (purchase.status === "waiting") badges.push(el("span", { className: "badge badge-dashed", text: "Waiting to be checked in" }));
+        if (purchase.status === "received") badges.push(el("span", { className: "badge badge-solid", text: "Checked in" }));
+        if (purchase.short) badges.push(el("span", { className: "badge badge-dashed", text: "Short" }));
+        if (purchase.status === "cancelled") badges.push(el("span", { className: "badge badge-muted", text: "Cancelled" }));
+
+        var lines = el("ul", { className: "doc-lines" }, purchase.lines.map(function (line) {
+            var text = line.itemName + ": " + qty(line.quantity) + " " + line.unit;
+            if (prices) text += " × " + formatRwf(line.unitCost) + " = " + formatRwf(Math.round(line.quantity * line.unitCost));
+            if (line.received !== null && line.received !== undefined) {
+                text += line.received === line.quantity ? " · all came in" : " · came in: " + qty(line.received);
+            }
+            return el("li", { className: line.received !== null && line.received < line.quantity ? "is-short" : null, text: text });
+        }));
+
+        var info = [];
+        if (purchase.status === "received") {
+            info.push("Checked in by " + purchase.receivedByName + " · " + bookedAt(purchase.receivedAt) + (purchase.receiveNote ? ": " + purchase.receiveNote : ""));
+        }
+        if (purchase.status === "cancelled") info.push("Cancelled by " + purchase.cancelledByName + " · " + bookedAt(purchase.cancelledAt));
+
+        var card = el("article", { className: "doc-card is-" + purchase.status }, [
+            el("div", { className: "staff-top" }, [
+                el("h3", { className: "staff-name", text: purchase.ref + " · " + purchase.supplier }),
+                el("div", { className: "badges" }, badges)
+            ]),
+            el("p", {
+                className: "stock-meta",
+                text: "Bought " + shortDay(purchase.day) + " · recorded by " + purchase.createdByName + (prices ? " · total " + formatRwf(purchase.total) : "")
+            }),
+            lines,
+            purchase.note ? el("p", { className: "stock-notes", text: "Note: " + purchase.note }) : null,
+            info.length ? el("p", { className: "doc-info", text: info.join(" · ") }) : null,
+            actions
+        ]);
+
+        function busy(on) {
+            actions.querySelectorAll("button, input").forEach(function (b) {
+                b.disabled = on;
+            });
+        }
+
+        async function send(path, body, done) {
+            busy(true);
+            try {
+                await api("POST", "/admin/purchases/" + purchase._id + "/" + path, body);
+                toast(done);
+                load("stock", true);
+            } catch (error) {
+                if (error.status !== 401) toast(error.message, true);
+                renderActions();
+            }
+        }
+
+        function openReceive() {
+            actions.textContent = "";
+            var inputs = [];
+            var fields = el("div", { className: "room-fields" });
+
+            purchase.lines.forEach(function (line, index) {
+                var id = "receive-" + purchase._id + "-" + index;
+                var input = el("input", { id: id, type: "number", inputmode: "decimal", min: "0", max: String(line.quantity), step: "0.01", value: String(line.quantity) });
+                inputs.push(input);
+                fields.appendChild(el("div", { className: "room-field" }, [
+                    el("label", { for: id, text: line.itemName + ": how many came in?" }),
+                    input,
+                    el("p", { className: "help", text: "Bought " + qty(line.quantity) + " " + line.unit })
+                ]));
+            });
+
+            var noteId = "receive-note-" + purchase._id;
+            var note = el("input", { id: noteId, type: "text", maxlength: "300", autocomplete: "off", placeholder: "Anything missing or damaged?" });
+            fields.appendChild(el("div", { className: "room-field room-field-wide" }, [el("label", { for: noteId, text: "Note (optional)" }), note]));
+
+            var message = el("p", { className: "room-form-message", role: "status" });
+            var form = el("form", { className: "doc-form", novalidate: true }, [
+                fields,
+                el("div", { className: "room-form-foot" }, [
+                    el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Add to stock" }),
+                    button("Cancel", "btn-ghost", renderActions),
+                    message
+                ])
+            ]);
+
+            form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                var body = { note: note.value.trim(), lines: [] };
+
+                for (var i = 0; i < purchase.lines.length; i += 1) {
+                    var number = Number(inputs[i].value);
+                    if (inputs[i].value === "" || !isFinite(number) || number < 0 || number > purchase.lines[i].quantity) {
+                        message.textContent = "For " + purchase.lines[i].itemName + ", enter 0 to " + qty(purchase.lines[i].quantity) + ".";
+                        inputs[i].focus();
+                        return;
+                    }
+                    body.lines.push({ itemId: purchase.lines[i].itemId, received: number });
+                }
+
+                send("receive", body, purchase.ref + " checked in. The stock has gone up.");
+            });
+
+            actions.appendChild(form);
+            if (inputs[0]) inputs[0].focus();
+        }
+
+        function askCancel() {
+            actions.textContent = "";
+            var keep = button("Keep it", "btn-ghost", renderActions);
+            actions.appendChild(el("p", { className: "confirm-text", text: "Cancel " + purchase.ref + "? It won't count towards the budget." }));
+            actions.appendChild(button("Yes, cancel", "btn-primary", function () {
+                send("cancel", null, purchase.ref + " cancelled.");
+            }));
+            actions.appendChild(keep);
+            keep.focus();
+        }
+
+        function renderActions() {
+            actions.textContent = "";
+            if (purchase.status === "waiting" && can("purchases.receive")) actions.appendChild(button("Check in", "btn-primary", openReceive));
+            if (purchase.status === "waiting" && can("purchases.record")) actions.appendChild(button("Cancel purchase", "btn-ghost", askCancel));
+            actions.hidden = !actions.children.length;
+        }
+
+        renderActions();
+        return card;
+    }
+
+    /* Owner: record what was bought */
+    function openPurchaseForm() {
+        var slot = $("purchaseFormSlot");
+        var items = stock.items.filter(function (i) { return i.active; });
+        var budget = null;
+        var budgetMonth = "";
+        slot.textContent = "";
+
+        if (!items.length) {
+            slot.appendChild(el("p", { className: "room-note", text: "Add the items to the stock list first (Items, then Add item)." }));
+            return;
+        }
+
+        var supplier = el("input", { id: "purchaseSupplier", type: "text", maxlength: "80", autocomplete: "off", placeholder: "For example: Simba Supermarket" });
+        var day = el("input", { id: "purchaseDay", type: "date", max: kigaliToday(), value: kigaliToday() });
+        var linesBox = el("div", { className: "line-rows" });
+        var totalLine = el("p", { className: "purchase-total" });
+        var budgetBox = el("div", { className: "budget-check", "aria-live": "polite" });
+        var count = 0;
+
+        function readLines() {
+            var lines = [];
+            linesBox.querySelectorAll(".line-row").forEach(function (row) {
+                var select = row.querySelector("select");
+                var inputs = row.querySelectorAll("input");
+                var item = itemById(select.value);
+                var quantity = Number(inputs[0].value);
+                var cost = Number(inputs[1].value);
+                lines.push({ row: row, item: item, select: select, qtyInput: inputs[0], costInput: inputs[1], quantity: quantity, unitCost: cost });
+            });
+            return lines;
+        }
+
+        function update() {
+            var total = 0;
+            var byCategory = {};
+
+            readLines().forEach(function (line) {
+                var sum = line.item && line.quantity > 0 && line.unitCost >= 0 ? Math.round(line.quantity * line.unitCost) : 0;
+                line.row.querySelector(".line-sum").textContent = sum ? formatRwf(sum) : "";
+                total += sum;
+                if (line.item && sum) byCategory[line.item.category] = (byCategory[line.item.category] || 0) + sum;
+            });
+
+            totalLine.textContent = "Total " + formatRwf(total);
+            budgetBox.textContent = "";
+
+            if (!budget) return;
+            Object.keys(byCategory).forEach(function (category) {
+                var row = budget.rows.filter(function (r) { return r.category === category; })[0];
+                if (!row || row.budget === null) return;
+                var after = row.spent + byCategory[category];
+                var over = after - row.budget;
+                budgetBox.appendChild(el("p", {
+                    className: over > 0 ? "is-over" : null,
+                    text: category + ": " + formatRwf(after) + " of the " + formatRwf(row.budget) + " " + monthName(budget.month) + " budget" +
+                        (over > 0 ? " · over by " + formatRwf(over) : " · " + formatRwf(-over) + " left")
+                }));
+            });
+        }
+
+        async function checkBudget() {
+            var month = (day.value || kigaliToday()).slice(0, 7);
+            if (month === budgetMonth) return;
+            budgetMonth = month;
+            try {
+                budget = await api("GET", "/admin/stock/budget?month=" + month);
+            } catch (error) {
+                budget = null;
+            }
+            update();
+        }
+
+        function addLine() {
+            count += 1;
+            var id = "purchaseItem-" + count;
+            var select = itemSelect(id, items, "", false);
+            var amount = el("input", { id: id + "-qty", type: "number", inputmode: "decimal", min: "0.01", step: "0.01" });
+            var cost = el("input", { id: id + "-cost", type: "number", inputmode: "numeric", min: "0", step: "1" });
+            var unit = el("span", { className: "line-unit", text: "" });
+
+            select.addEventListener("change", function () {
+                var item = itemById(select.value);
+                unit.textContent = item ? item.unit : "";
+                if (item && cost.value === "" && item.unitCost) cost.value = String(item.unitCost);
+                update();
+            });
+
+            var row = el("div", { className: "line-row purchase-line" }, [
+                el("div", { className: "room-field line-item" }, [el("label", { for: id, text: "Item" }), select]),
+                el("div", { className: "room-field line-qty" }, [el("label", { for: id + "-qty", text: "How many" }), el("div", { className: "qty-with-unit" }, [amount, unit])]),
+                el("div", { className: "room-field line-cost" }, [el("label", { for: id + "-cost", text: "Price for one (RWF)" }), cost]),
+                el("p", { className: "line-sum", "aria-live": "off" }),
+                el("button", {
+                    type: "button",
+                    className: "line-remove",
+                    "aria-label": "Remove this item",
+                    text: "×",
+                    onclick: function () {
+                        if (linesBox.children.length > 1) {
+                            row.remove();
+                            update();
+                        }
+                    }
+                })
+            ]);
+
+            linesBox.appendChild(row);
+            return select;
+        }
+
+        addLine();
+
+        var note = el("input", { id: "purchaseNote", type: "text", maxlength: "300", autocomplete: "off", placeholder: "For example: paid with mobile money" });
+        var message = el("p", { className: "room-form-message", role: "status" });
+        var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Save purchase" });
+
+        var form = el("form", { className: "form-card doc-form", novalidate: true }, [
+            el("h2", { text: "Record a purchase" }),
+            el("div", { className: "room-fields" }, [
+                el("div", { className: "room-field" }, [el("label", { for: "purchaseSupplier", text: "Where was it bought?" }), supplier]),
+                el("div", { className: "room-field" }, [el("label", { for: "purchaseDay", text: "Day bought" }), day])
+            ]),
+            linesBox,
+            el("button", { type: "button", className: "link-btn add-line", text: "+ Add another item", onclick: function () { addLine().focus(); } }),
+            totalLine,
+            budgetBox,
+            el("div", { className: "room-field" }, [el("label", { for: "purchaseNote", text: "Note (optional)" }), note]),
+            el("p", { className: "help", text: "The stock goes up when the manager checks it in." }),
+            el("div", { className: "room-form-foot" }, [
+                save,
+                button("Cancel", "btn-ghost", function () { slot.textContent = ""; }),
+                message
+            ])
+        ]);
+
+        form.addEventListener("input", update);
+        day.addEventListener("change", checkBudget);
+
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            if (!supplier.value.trim()) {
+                message.textContent = "Enter where it was bought.";
+                supplier.focus();
+                return;
+            }
+
+            var body = { supplier: supplier.value.trim(), day: day.value, note: note.value.trim(), lines: [] };
+            var lines = readLines();
+
+            for (var i = 0; i < lines.length; i += 1) {
+                var line = lines[i];
+                if (!line.select.value && !line.qtyInput.value && !line.costInput.value) continue;
+                if (!line.item) {
+                    message.textContent = "Choose the item.";
+                    line.select.focus();
+                    return;
+                }
+                if (!line.qtyInput.value || !(line.quantity > 0)) {
+                    message.textContent = "Enter how many " + line.item.unit + " of " + line.item.name + ".";
+                    line.qtyInput.focus();
+                    return;
+                }
+                if (line.costInput.value === "" || !(line.unitCost >= 0) || !Number.isInteger(line.unitCost)) {
+                    message.textContent = "Enter the price for one " + line.item.name + " (whole RWF).";
+                    line.costInput.focus();
+                    return;
+                }
+                body.lines.push({ itemId: line.item._id, quantity: line.quantity, unitCost: line.unitCost });
+            }
+
+            if (!body.lines.length) {
+                message.textContent = "Add at least one item.";
+                return;
+            }
+
+            save.disabled = true;
+            message.textContent = "Saving…";
+
+            try {
+                var data = await api("POST", "/admin/purchases", body);
+                slot.textContent = "";
+                var warn = data.warnings.map(function (w) {
+                    return " Over the " + w.category + " budget by " + formatRwf(w.over) + ".";
+                }).join("");
+                toast(data.purchase.ref + " saved (" + formatRwf(data.purchase.total) + "). The manager checks it in when it arrives." + warn, Boolean(warn));
+                load("stock", true);
+            } catch (error) {
+                message.textContent = error.status === 401 ? "" : error.message;
+                save.disabled = false;
+            }
+        });
+
+        slot.appendChild(form);
+        update();
+        checkBudget();
+        supplier.focus();
+    }
+
+    $("newPurchaseButton").addEventListener("click", openPurchaseForm);
+
+    /* ----- Budget (owner) ----- */
+
+    async function loadBudget() {
+        if (!stock.budgetMonth) stock.budgetMonth = kigaliToday().slice(0, 7);
+        $("budgetMonth").value = stock.budgetMonth;
+        $("budgetMessage").textContent = "";
+
+        var data = await api("GET", "/admin/stock/budget?month=" + stock.budgetMonth);
+        renderBudget(data);
+    }
+
+    function renderBudget(data, copiedFrom) {
+        var table = $("budgetTable");
+        table.textContent = "";
+        table.appendChild(el("caption", { className: "visually-hidden", text: "Budget and spending for " + monthName(data.month) }));
+        table.appendChild(el("thead", {}, [el("tr", {}, ["Category", "Budget (RWF)", "Spent", "Left"].map(function (h, i) {
+            return el("th", { scope: "col", className: i === 0 ? "room-col" : null, text: h });
+        }))]));
+
+        var body = el("tbody");
+
+        data.rows.forEach(function (row) {
+            var id = "budget-" + row.category.replace(/[^a-z]/gi, "");
+            var value = copiedFrom ? copiedFrom[row.category] : row.budget;
+            var input = el("input", {
+                id: id,
+                type: "number",
+                inputmode: "numeric",
+                min: "0",
+                step: "1000",
+                "data-category": row.category,
+                "aria-label": "Budget for " + row.category,
+                placeholder: "No budget"
+            });
+            if (value !== null && value !== undefined) input.value = String(value);
+
+            var over = row.budget !== null && row.spent > row.budget;
+            var used = row.budget ? Math.min(100, Math.round((row.spent / row.budget) * 100)) : 0;
+
+            body.appendChild(el("tr", { className: over ? "is-over" : null }, [
+                el("th", { scope: "row", className: "room-col", text: row.category }),
+                el("td", {}, [input]),
+                el("td", {}, [
+                    el("span", { text: formatRwf(row.spent) }),
+                    row.budget ? el("span", { className: "budget-bar", "aria-hidden": "true" }, [el("span", { style: "width:" + used + "%" })]) : null
+                ]),
+                el("td", {
+                    className: over ? "is-low" : null,
+                    text: row.budget === null ? "–" : over ? "Over by " + formatRwf(row.spent - row.budget) : formatRwf(row.budget - row.spent)
+                })
+            ]));
+        });
+
+        table.appendChild(body);
+
+        var totalOver = data.hasBudget && data.totalSpent > data.totalBudget;
+        table.appendChild(el("tfoot", {}, [el("tr", { className: "total-row" }, [
+            el("th", { scope: "row", className: "room-col", text: "Total" }),
+            el("td", { text: data.hasBudget ? formatRwf(data.totalBudget) : "–" }),
+            el("td", { text: formatRwf(data.totalSpent) }),
+            el("td", {
+                className: totalOver ? "is-low" : null,
+                text: !data.hasBudget ? "–" : totalOver ? "Over by " + formatRwf(data.totalSpent - data.totalBudget) : formatRwf(data.totalBudget - data.totalSpent)
+            })
+        ])]));
+
+        $("budgetSummary").textContent = monthName(data.month) + ": " + formatRwf(data.totalSpent) + " spent" +
+            (data.hasBudget ? " of " + formatRwf(data.totalBudget) + " budget." : ". No budget set yet.");
+    }
+
+    $("budgetMonth").addEventListener("change", function () {
+        if (!this.value) return;
+        stock.budgetMonth = this.value;
+        loadBudget().catch(showLoadError);
+    });
+
+    $("budgetCopy").addEventListener("click", async function () {
+        var month = stock.budgetMonth;
+        var date = new Date(month + "-01T00:00:00Z");
+        date.setUTCMonth(date.getUTCMonth() - 1);
+        var previous = date.toISOString().slice(0, 7);
+
+        try {
+            var last = await api("GET", "/admin/stock/budget?month=" + previous);
+            var current = await api("GET", "/admin/stock/budget?month=" + month);
+            var copied = {};
+            last.rows.forEach(function (row) {
+                copied[row.category] = row.budget;
+            });
+            renderBudget(current, copied);
+            $("budgetMessage").textContent = last.hasBudget
+                ? "Copied from " + monthName(previous) + ". Press Save budget to keep it."
+                : monthName(previous) + " had no budget to copy.";
+        } catch (error) {
+            if (error.status !== 401) toast(error.message, true);
+        }
+    });
+
+    $("budgetForm").addEventListener("submit", async function (event) {
+        event.preventDefault();
+        var amounts = {};
+        var message = $("budgetMessage");
+
+        var inputs = $("budgetTable").querySelectorAll("input[data-category]");
+        for (var i = 0; i < inputs.length; i += 1) {
+            var value = inputs[i].value.trim();
+            if (value !== "" && (!/^\d+$/.test(value))) {
+                message.textContent = "Budgets are whole numbers of RWF.";
+                inputs[i].focus();
+                return;
+            }
+            amounts[inputs[i].getAttribute("data-category")] = value === "" ? null : Number(value);
+        }
+
+        message.textContent = "Saving…";
+
+        try {
+            var data = await api("PUT", "/admin/stock/budget", { month: stock.budgetMonth, amounts: amounts });
+            renderBudget(data);
+            message.textContent = "";
+            toast("Budget for " + monthName(data.month) + " saved.");
+        } catch (error) {
+            message.textContent = error.status === 401 ? "" : error.message;
+        }
+    });
+
+    /* ----- Changes: what was received, issued or counted, newest first ----- */
 
     function changeRow(move) {
-        var what = move.type === "count"
-            ? "Counted: " + qty(move.quantity) + " (" + signed(move.change) + ")"
-            : MOVE_WORDS[move.type] + " " + qty(move.quantity);
+        var what;
+        if (move.type === "count") what = "Counted: " + qty(move.quantity) + " (" + signed(move.change) + ")";
+        else if (move.type === "out") what = "Issued " + qty(move.quantity) + (move.department ? " to " + move.department : "");
+        else what = "Received " + qty(move.quantity);
 
         var meta = [formatDay(move.day, { weekday: "short", day: "numeric", month: "short" }), move.userName ? "by " + move.userName : ""];
-        if (move.unitCost) meta.push(formatRwf(move.unitCost) + " each");
+        if (move.ref) meta.push(move.ref);
+        if (move.unitCost && move.type === "in") meta.push(formatRwf(move.unitCost) + " each");
 
         return el("article", { className: "change-row is-" + move.type }, [
             el("div", {}, [
@@ -2214,7 +3160,7 @@
         if (!more) list.textContent = "";
 
         if (!data.movements.length && !more) {
-            list.appendChild(el("p", { className: "empty", text: "Nothing has been used, received or counted yet." }));
+            list.appendChild(el("p", { className: "empty", text: "Nothing has been received, issued or counted yet." }));
         }
 
         data.movements.forEach(function (move) {
@@ -2230,7 +3176,8 @@
         loadChanges(true).catch(showLoadError);
     });
 
-    /* Report: what was used and what is left, for a period */
+    /* ----- Report: what came in, was used and remains, for a period ----- */
+
     function setPeriod(kind) {
         var today = kigaliToday();
         var first = today.slice(0, 8) + "01";
@@ -2270,6 +3217,34 @@
         });
     });
 
+    function staticStat(number, label, note) {
+        return el("div", { className: "stat is-static" }, [
+            el("span", { className: "stat-number", text: String(number) }),
+            el("span", { className: "stat-label", text: label }),
+            el("span", { className: "stat-note", text: note })
+        ]);
+    }
+
+    function moneyTable(caption, heads, rows, total) {
+        var table = el("table", { className: "report-table money-table" }, [
+            el("caption", { text: caption }),
+            el("thead", {}, [el("tr", {}, heads.map(function (h, i) {
+                return el("th", { scope: "col", className: i === 0 ? "room-col" : null, text: h });
+            }))])
+        ]);
+        table.appendChild(el("tbody", {}, rows.map(function (cells) {
+            return el("tr", {}, cells.map(function (cell, i) {
+                return i === 0 ? el("th", { scope: "row", className: "room-col", text: cell }) : el("td", { text: cell });
+            }));
+        })));
+        if (total) {
+            table.appendChild(el("tfoot", {}, [el("tr", { className: "total-row" }, total.map(function (cell, i) {
+                return i === 0 ? el("th", { scope: "row", className: "room-col", text: cell }) : el("td", { text: cell });
+            }))]));
+        }
+        return el("div", { className: "grid-wrap report-wrap", tabindex: "0", role: "region", "aria-label": caption }, [table]);
+    }
+
     async function loadReport() {
         if (!stock.reportFrom) setPeriod("month");
 
@@ -2286,7 +3261,7 @@
             formatDay(data.to, { day: "numeric", month: "short", year: "numeric" }) + " · " + plural(data.rows.length, "item", "items");
 
         table.textContent = "";
-        table.appendChild(el("caption", { className: "visually-hidden", text: "Stock used and left for the period" }));
+        table.appendChild(el("caption", { className: "visually-hidden", text: "Stock used and remaining for the period" }));
 
         var heads = ["Item", "At start", "Received", "Used", "Corrections", "Remaining"];
         if (prices) heads.push("Value used", "Value remaining");
@@ -2299,6 +3274,7 @@
         var lastCategory = "";
         var totalUsed = 0;
         var totalLeft = 0;
+        var totalCorrections = 0;
 
         if (!data.rows.length) {
             body.appendChild(el("tr", {}, [el("td", { colspan: String(heads.length), className: "empty-cell", text: "No items yet." })]));
@@ -2329,6 +3305,7 @@
                 cells.push(el("td", { text: formatRwf(row.usedValue) }), el("td", { text: formatRwf(row.remainingValue) }));
                 totalUsed += row.usedValue;
                 totalLeft += row.remainingValue;
+                totalCorrections += row.correctionsValue || 0;
             }
 
             body.appendChild(el("tr", {}, cells));
@@ -2343,6 +3320,31 @@
             foot.appendChild(el("td", { text: formatRwf(totalLeft) }));
             table.appendChild(el("tfoot", {}, [foot]));
         }
+
+        // Money (owner): spending, issues by department, count differences
+        var money = $("moneyReport");
+        money.textContent = "";
+
+        if (data.departments) {
+            var spentTotal = data.spent.reduce(function (sum, row) { return sum + row.spent; }, 0);
+            var deptTotal = data.departments.reduce(function (sum, row) { return sum + row.value; }, 0);
+
+            money.appendChild(el("h2", { className: "section-title", text: "Money for this period" }));
+            money.appendChild(el("div", { className: "stats money-stats" }, [
+                staticStat(formatRwf(spentTotal), "Bought", "Purchases recorded"),
+                staticStat(formatRwf(deptTotal), "Issued", "Value given to departments"),
+                staticStat(signedRwf(totalCorrections), "Count differences", totalCorrections < 0 ? "Missing at counts" : "Found at counts"),
+                staticStat(formatRwf(totalLeft), "Remaining", "Value in store at the end")
+            ]));
+
+            money.appendChild(moneyTable("Bought, by category", ["Category", "Spent"],
+                data.spent.filter(function (r) { return r.spent; }).map(function (r) { return [r.category, formatRwf(r.spent)]; }),
+                ["Total", formatRwf(spentTotal)]));
+
+            money.appendChild(moneyTable("Issued to departments", ["Department", "Times issued", "Value"],
+                data.departments.filter(function (d) { return d.issues; }).map(function (d) { return [d.department, String(d.issues), formatRwf(d.value)]; }),
+                ["Total", "", formatRwf(deptTotal)]));
+        }
     }
 
     /* A file Excel opens: comma separated, with the BOM so letters like é show correctly. */
@@ -2351,6 +3353,23 @@
         var textValue = String(value === undefined || value === null ? "" : value);
         if (/^[=+\-@\t\r]/.test(textValue)) textValue = "'" + textValue; // never run as a formula
         return /[",\r\n]/.test(textValue) ? "\"" + textValue.replace(/"/g, "\"\"") + "\"" : textValue;
+    }
+
+    function downloadCsv(lines, fileName) {
+        var csv = "﻿" + lines.map(function (line) {
+            return line.map(csvCell).join(",");
+        }).join("\r\n");
+
+        var link = el("a", {
+            href: URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })),
+            download: fileName
+        });
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(function () {
+            URL.revokeObjectURL(link.href);
+            link.remove();
+        }, 1000);
     }
 
     $("reportDownload").addEventListener("click", function () {
@@ -2367,41 +3386,133 @@
             return line;
         }));
 
-        var csv = "﻿" + lines.map(function (line) {
-            return line.map(csvCell).join(",");
-        }).join("\r\n");
-
-        var link = el("a", {
-            href: URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })),
-            download: "zebra-dormus-stock-" + data.from + "-to-" + data.to + ".csv"
-        });
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(function () {
-            URL.revokeObjectURL(link.href);
-            link.remove();
-        }, 1000);
-    });
-
-    async function loadStock(quiet) {
-        if (!quiet) {
-            $("stockStats").textContent = "";
-            if (stock.tab === "items") placeholder($("stockList"), "Loading stock…");
+        if (data.departments) {
+            lines.push([], ["Bought, by category", "Spent (RWF)"]);
+            data.spent.forEach(function (r) { lines.push([r.category, r.spent]); });
+            lines.push([], ["Issued to departments", "Times issued", "Value (RWF)"]);
+            data.departments.forEach(function (d) { lines.push([d.department, d.issues, d.value]); });
         }
 
-        var data = await api("GET", "/admin/stock/items" + (stock.archived ? "?archived=1" : ""));
-        stock.items = data.items;
-        stock.categories = data.categories;
-        stock.summary = data.summary;
+        downloadCsv(lines, "zebra-dormus-stock-" + data.from + "-to-" + data.to + ".csv");
+    });
 
-        fillCategorySelect();
-        renderStockStats();
-        renderStockAlert();
+    /* ----- Audit log (owner) ----- */
+
+    var AUDIT_AREA_NAMES = {
+        "sign-in": "Sign-in",
+        bookings: "Bookings",
+        rooms: "Rooms",
+        users: "Users",
+        stock: "Stock",
+        purchases: "Purchases",
+        requests: "Requests",
+        budget: "Budget"
+    };
+
+    function auditRow(entry) {
+        return el("article", { className: "audit-row" }, [
+            el("p", { className: "audit-when", text: bookedAt(entry.createdAt) }),
+            el("div", {}, [
+                el("p", { className: "audit-what", text: entry.action }),
+                el("p", {
+                    className: "stock-meta",
+                    text: (entry.userName || "Someone") + (entry.role ? " (" + (ROLE_NAMES[entry.role] || entry.role) + ")" : "") + " · " + (AUDIT_AREA_NAMES[entry.area] || entry.area)
+                })
+            ])
+        ]);
+    }
+
+    async function loadAudit(more) {
+        var list = $("auditList");
+        var params = [];
+
+        if (stock.auditArea) params.push("area=" + encodeURIComponent(stock.auditArea));
+        if (stock.auditQ) params.push("q=" + encodeURIComponent(stock.auditQ));
+        if (more && stock.auditBefore) params.push("before=" + encodeURIComponent(stock.auditBefore));
+
+        if (!more) {
+            stock.auditEntries = [];
+            placeholder(list, "Loading the audit log…");
+        }
+
+        var data = await api("GET", "/admin/audit" + (params.length ? "?" + params.join("&") : ""));
+
+        if (!more) list.textContent = "";
+        if (!data.entries.length && !more) list.appendChild(el("p", { className: "empty", text: "Nothing found." }));
+
+        data.entries.forEach(function (entry) {
+            stock.auditEntries.push(entry);
+            list.appendChild(auditRow(entry));
+        });
+
+        var last = data.entries[data.entries.length - 1];
+        stock.auditBefore = last ? last.createdAt : "";
+        $("moreAudit").hidden = data.entries.length < 100;
+    }
+
+    var auditTimer = null;
+
+    $("auditArea").addEventListener("change", function () {
+        stock.auditArea = this.value;
+        loadAudit(false).catch(showLoadError);
+    });
+
+    $("auditSearch").addEventListener("input", function () {
+        var box = this;
+        clearTimeout(auditTimer);
+        auditTimer = setTimeout(function () {
+            stock.auditQ = box.value.trim();
+            loadAudit(false).catch(showLoadError);
+        }, 350);
+    });
+
+    $("moreAudit").addEventListener("click", function () {
+        loadAudit(true).catch(showLoadError);
+    });
+
+    $("auditDownload").addEventListener("click", function () {
+        var lines = [["When", "Who", "Role", "Area", "What"]].concat(stock.auditEntries.map(function (entry) {
+            return [bookedAt(entry.createdAt), entry.userName, ROLE_NAMES[entry.role] || entry.role, AUDIT_AREA_NAMES[entry.area] || entry.area, entry.action];
+        }));
+        downloadCsv(lines, "zebra-dormus-audit-" + kigaliToday() + ".csv");
+    });
+
+    /* ----- Loading the Stock section ----- */
+
+    async function loadStock(quiet) {
+        var staffOnly = !can("stock.view");
+
+        $("stockHeading").textContent = staffOnly ? "Supplies" : "Stock";
+        $("stockIntro").textContent = staffOnly
+            ? "Ask for what your department needs. The manager issues it; then confirm you received it."
+            : "What came into the store, what was used and what remains.";
+
+        if (!stock.tab || !stockTabAllowed(stock.tab)) stock.tab = defaultStockTab();
+
+        if (!staffOnly) {
+            if (!quiet) {
+                $("stockStats").textContent = "";
+                if (stock.tab === "items") placeholder($("stockList"), "Loading stock…");
+            }
+
+            var data = await api("GET", "/admin/stock/items" + (stock.archived ? "?archived=1" : ""));
+            stock.items = data.items;
+            stock.categories = data.categories;
+            stock.departments = data.departments;
+            stock.summary = data.summary;
+            stock.counts = can("stock.approve") && data.summary.countsWaiting
+                ? (await api("GET", "/admin/stock/counts")).counts
+                : [];
+
+            fillCategorySelect();
+            renderStockStats();
+            renderStockAlert();
+        } else {
+            $("stockAlert").hidden = true;
+        }
+
         showStockTab(stock.tab);
-
-        if (stock.tab === "items") renderStockList();
-        else if (stock.tab === "changes") await loadChanges(false);
-        else await loadReport();
+        await loadStockTab(stock.tab, quiet);
     }
 
     /* ---------- Start ---------- */

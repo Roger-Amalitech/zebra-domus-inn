@@ -53,19 +53,19 @@
         </a>
 
         <nav class="tabs" aria-label="Admin sections">
-            <a href="#today" class="tab" data-view="today" data-perm="bookings.view">
+            <a href="#today" class="tab" data-view="today" data-perm="bookings.view" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 15h3v3H8z"/></svg>
                 <span>Today</span>
             </a>
-            <a href="#bookings" class="tab" data-view="bookings" data-perm="bookings.view">
+            <a href="#bookings" class="tab" data-view="bookings" data-perm="bookings.view" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M8 12h8M8 16h5"/></svg>
                 <span>Bookings</span>
             </a>
-            <a href="#availability" class="tab" data-view="availability" data-perm="bookings.view">
+            <a href="#availability" class="tab" data-view="availability" data-perm="bookings.view" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 <span>Availability</span>
             </a>
-            <a href="#stock" class="tab" data-view="stock" data-perm="stock.view">
+            <a href="#stock" class="tab" data-view="stock" data-perm="stock.view|requests.make">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>
                 <span>Stock</span>
             </a>
@@ -73,7 +73,7 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18V7"/><path d="M3 14h18v4"/><path d="M21 18v-4a3 3 0 0 0-3-3h-7v3"/><circle cx="7" cy="11" r="2"/></svg>
                 <span>Rooms</span>
             </a>
-            <a href="#users" class="tab" data-view="users" data-perm="users" hidden>
+            <a href="#users" class="tab" data-view="users" data-perm="users.manage" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.5a5 5 0 0 1 4.5 5"/></svg>
                 <span>Users</span>
             </a>
@@ -186,23 +186,29 @@
             <div class="night-detail" id="nightDetail" aria-live="polite"></div>
         </section>
 
-        <!-- STOCK -->
+        <!-- STOCK (staff see it as Supplies) -->
         <section class="view" id="view-stock" aria-labelledby="stockHeading" hidden>
             <div class="view-head">
                 <h1 id="stockHeading">Stock</h1>
-                <p class="muted">What came into the store, what was used and what remains.</p>
+                <p class="muted" id="stockIntro">What came into the store, what was used and what remains.</p>
             </div>
 
-            <div class="stats" id="stockStats"></div>
+            <div class="stats" id="stockStats" data-perm="stock.view"></div>
             <p class="stock-alert" id="stockAlert" hidden></p>
 
-            <div class="segmented stock-tabs" role="group" aria-label="Stock sections">
-                <button type="button" data-stock-tab="items" aria-pressed="true">Items</button>
-                <button type="button" data-stock-tab="changes" aria-pressed="false">Changes</button>
-                <button type="button" data-stock-tab="report" aria-pressed="false">Report</button>
+            <div class="segmented stock-tabs" role="group" aria-label="Stock sections" data-perm="stock.view">
+                <button type="button" data-stock-tab="items" data-perm="stock.view" aria-pressed="true">Items <span class="seg-count" hidden></span></button>
+                <button type="button" data-stock-tab="requests" data-perm="requests.manage" aria-pressed="false">Requests <span class="seg-count" hidden></span></button>
+                <button type="button" data-stock-tab="purchases" data-perm="purchases.view" aria-pressed="false">Purchases <span class="seg-count" hidden></span></button>
+                <button type="button" data-stock-tab="budget" data-perm="budget.manage" aria-pressed="false">Budget</button>
+                <button type="button" data-stock-tab="changes" data-perm="stock.view" aria-pressed="false">Changes</button>
+                <button type="button" data-stock-tab="report" data-perm="stock.view" aria-pressed="false">Report</button>
+                <button type="button" data-stock-tab="audit" data-perm="audit.view" aria-pressed="false">Audit</button>
             </div>
 
-            <div class="stock-panel" id="stockItemsPanel">
+            <!-- Items -->
+            <div class="stock-panel" id="stock-items">
+                <div class="approvals" id="approvalsBox" hidden></div>
                 <div class="filters stock-filters">
                     <div class="field-search">
                         <label for="stockSearch" class="visually-hidden">Search items</label>
@@ -216,7 +222,7 @@
                     </div>
                     <button type="button" class="btn btn-primary btn-small" id="addItemButton" data-perm="stock.items" hidden>Add item</button>
                 </div>
-                <p class="stock-key" id="stockKey"><strong>In stock</strong> everything received since the item was added · <strong>Used</strong> everything used · <strong>Remaining</strong> what is in the store now</p>
+                <p class="stock-key" id="stockKey"><strong>In stock</strong> everything received since the item was added · <strong>Used</strong> everything issued · <strong>Remaining</strong> what is in the store now</p>
                 <p class="count" id="stockCount" aria-live="polite"></p>
                 <div id="itemFormSlot"></div>
                 <div class="list" id="stockList"></div>
@@ -227,12 +233,54 @@
                 </label>
             </div>
 
-            <div class="stock-panel" id="stockChangesPanel" hidden>
+            <!-- Requests -->
+            <div class="stock-panel" id="stock-requests" hidden>
+                <div class="panel-actions" data-perm="requests.make" hidden>
+                    <button type="button" class="btn btn-primary btn-small" id="newRequestButton">Ask for supplies</button>
+                </div>
+                <div id="requestFormSlot"></div>
+                <div class="list" id="requestList"></div>
+            </div>
+
+            <!-- Purchases -->
+            <div class="stock-panel" id="stock-purchases" hidden>
+                <div class="panel-actions" data-perm="purchases.record" hidden>
+                    <button type="button" class="btn btn-primary btn-small" id="newPurchaseButton">Record a purchase</button>
+                </div>
+                <div id="purchaseFormSlot"></div>
+                <div class="list" id="purchaseList"></div>
+            </div>
+
+            <!-- Budget -->
+            <div class="stock-panel" id="stock-budget" hidden>
+                <div class="report-controls">
+                    <div class="report-dates">
+                        <label for="budgetMonth">Month</label>
+                        <input type="month" id="budgetMonth">
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-small" id="budgetCopy">Copy last month</button>
+                </div>
+                <p class="count" id="budgetSummary" aria-live="polite"></p>
+                <form id="budgetForm" novalidate>
+                    <div class="grid-wrap report-wrap" role="region" aria-label="Budget per category">
+                        <table class="report-table budget-table" id="budgetTable"></table>
+                    </div>
+                    <p class="help budget-help">Spent = purchases recorded in that month (cancelled ones don't count). Leave a box empty for no budget.</p>
+                    <div class="room-form-foot">
+                        <button type="submit" class="btn btn-primary btn-small">Save budget</button>
+                        <p class="room-form-message" id="budgetMessage" role="status"></p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Changes -->
+            <div class="stock-panel" id="stock-changes" hidden>
                 <div class="list" id="stockChanges"></div>
                 <button type="button" class="btn btn-ghost btn-small more-btn" id="moreChanges" hidden>Show older changes</button>
             </div>
 
-            <div class="stock-panel" id="stockReportPanel" hidden>
+            <!-- Report -->
+            <div class="stock-panel" id="stock-report" hidden>
                 <div class="report-controls">
                     <div class="report-quick" role="group" aria-label="Period">
                         <button type="button" class="btn btn-ghost btn-small" data-period="month">This month</button>
@@ -249,9 +297,38 @@
                     <button type="button" class="btn btn-primary btn-small" id="reportDownload">Download for Excel</button>
                 </div>
                 <p class="count" id="reportRange" aria-live="polite"></p>
-                <div class="grid-wrap report-wrap">
+                <div class="grid-wrap report-wrap" tabindex="0" role="region" aria-label="Stock report">
                     <table class="report-table" id="reportTable"></table>
                 </div>
+                <div id="moneyReport"></div>
+            </div>
+
+            <!-- Audit (owner) -->
+            <div class="stock-panel" id="stock-audit" hidden>
+                <p class="stock-key">Every change anyone makes, with who and when. Nobody can edit or delete it.</p>
+                <div class="filters audit-filters">
+                    <div class="field-select">
+                        <label for="auditArea" class="visually-hidden">Show</label>
+                        <select id="auditArea">
+                            <option value="">Everything</option>
+                            <option value="purchases">Purchases</option>
+                            <option value="requests">Requests</option>
+                            <option value="stock">Stock</option>
+                            <option value="budget">Budget</option>
+                            <option value="bookings">Bookings</option>
+                            <option value="rooms">Rooms</option>
+                            <option value="users">Users</option>
+                            <option value="sign-in">Sign-ins</option>
+                        </select>
+                    </div>
+                    <div class="field-search">
+                        <label for="auditSearch" class="visually-hidden">Search the audit log</label>
+                        <input type="search" id="auditSearch" placeholder="Search, e.g. a name or P-0001" autocomplete="off" maxlength="60">
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-small" id="auditDownload">Download for Excel</button>
+                </div>
+                <div class="list audit-list" id="auditList"></div>
+                <button type="button" class="btn btn-ghost btn-small more-btn" id="moreAudit" hidden>Show older</button>
             </div>
         </section>
 
@@ -270,6 +347,12 @@
                 <h1 id="usersHeading">Users</h1>
                 <p class="muted" id="usersIntro">People who can sign in to this dashboard, and what each one may do.</p>
             </div>
+
+            <ul class="role-guide" aria-label="What each role can do">
+                <li><strong>Owner</strong> Records purchases, sets budgets, approves count differences, sees money reports and the audit log, changes rooms and prices.</li>
+                <li><strong>Manager</strong> Checks purchases into the store, issues supplies, counts stock, handles staff requests and bookings, adds staff.</li>
+                <li><strong>Staff</strong> Asks for supplies for their department and confirms receiving them. Can't change stock numbers.</li>
+            </ul>
 
             <form class="form-card" id="addStaffForm" novalidate>
                 <h2>Add a person</h2>
@@ -293,10 +376,15 @@
                             <option value="staff">Staff</option>
                             <option value="manager">Manager</option>
                         </select>
-                        <p class="help">Managers add staff and choose what they may do.</p>
+                    </div>
+                    <div class="room-field">
+                        <label for="staffDept">Department</label>
+                        <select id="staffDept">
+                            <option value="">No department</option>
+                        </select>
+                        <p class="help">Their supply requests start with it.</p>
                     </div>
                 </div>
-                <div id="staffPerms"></div>
                 <div class="room-form-foot">
                     <button type="submit" class="btn btn-primary btn-small" id="addStaffButton">Add person</button>
                     <p class="room-form-message" id="addStaffMessage" role="status"></p>
@@ -322,8 +410,6 @@
                     <ul class="perm-list" id="myPerms"></ul>
                 </div>
             </div>
-
-            <p class="room-note no-access" id="noAccessNote" hidden>You can't open any part of the dashboard yet. Ask the manager to tick what you may do, then press Refresh.</p>
 
             <p class="room-note" id="envOwnerNote" hidden>Your password is set in the backend/.env file on the server (ADMIN_PASSWORD). To change it, edit that line and restart the server.</p>
 
