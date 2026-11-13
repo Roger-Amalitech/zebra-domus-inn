@@ -22,6 +22,7 @@ const {
   isEmail,
   publicUser,
   ownerEmailFromEnv,
+  clearFailuresFor,
 } = require("../utils/adminAuth");
 const { canManage } = require("../utils/permissions");
 const { DEPARTMENTS } = require("../utils/departments");
@@ -174,6 +175,7 @@ router.patch("/:id", async (req, res) => {
       const weak = passwordProblem(body.password);
       if (weak) return bad(res, weak);
       user.passwordHash = await hashPassword(body.password);
+      clearFailuresFor(user.email); // locked out by wrong passwords? the new one works at once
       said.push("password reset");
       signOut = true;
     }

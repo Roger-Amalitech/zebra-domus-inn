@@ -439,6 +439,13 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <!-- Shown one minute before a screen nobody is using signs itself out -->
+    <div class="idle-warning" id="idleWarning" role="alertdialog" aria-labelledby="idleTitle" aria-describedby="idleText" hidden>
+        <p class="idle-title" id="idleTitle">Still there?</p>
+        <p class="idle-text" id="idleText">You'll be signed out soon because nobody has used this screen.</p>
+        <button type="button" class="btn btn-primary btn-small" id="stayButton">Stay signed in</button>
+    </div>
 </div>
 
 <script src="api-config.js"></script>

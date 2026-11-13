@@ -197,10 +197,13 @@
 
     /* ---------- Talking to the booking server ---------- */
 
-    function AdminError(message, status) {
+    function AdminError(message, status, waking) {
         this.message = message;
         this.status = status;
+        this.waking = Boolean(waking); // the server is starting up; trying again soon will work
     }
+
+    var WAKING_MESSAGE = "The server is starting up after a quiet time. Please wait a moment and try again.";
 
     async function api(method, path, body) {
         var options = { method: method, headers: {}, cache: "no-store" };
@@ -218,7 +221,7 @@
         try {
             response = await fetch(API + path, options);
         } catch (error) {
-            throw new AdminError("Can't reach the booking server. Check that it is running, then press Refresh.", 0);
+            throw new AdminError("Can't reach the booking server. Check the internet connection, then press Refresh.", 0, true);
         }
 
         var data = null;
@@ -229,14 +232,23 @@
             data = null;
         }
 
+        // Signed out: the session ended, or the account was removed or turned off.
         if (response.status === 401 && path !== "/admin/login") {
-            signOut("You were signed out. Please sign in again.");
+            var why = data && data.message && data.message !== "Please sign in again."
+                ? data.message
+                : "You were signed out. Please sign in again.";
+            signOut(why);
             throw new AdminError("", 401);
         }
 
         // Not allowed: what this person may do has probably just changed.
         if (response.status === 403 && path !== "/admin/me") {
             setTimeout(syncMe, 0);
+        }
+
+        // Render answers 502/503/504 (a web page, not our JSON) while the server wakes up
+        if (!data && [502, 503, 504].indexOf(response.status) >= 0) {
+            throw new AdminError(WAKING_MESSAGE, response.status, true);
         }
 
         if (!response.ok || !data || data.success === false) {
@@ -413,14 +425,67 @@
     function showApp(nextUser) {
         applyUser(nextUser);
         signedIn = true;
+        signingOut = false;
         $("signin").hidden = true;
         $("app").hidden = false;
         show(viewFromHash(), true);
     }
 
+    /* Signing out starts the page again from clean, so nothing from the
+       account stays loaded behind the sign-in screen. The message is kept
+       for a moment so the sign-in page can say why. */
+    var SIGNOUT_NOTE = "zd-admin-signout-note";
+    var signingOut = false;
+
     function signOut(message) {
+        // several requests can fail at the same moment: the first one says why
+        if (signingOut) return;
+        signingOut = true;
         setToken("");
+        signedIn = false;
+        forgetActive();
+
+        try {
+            window.sessionStorage.setItem(SIGNOUT_NOTE, message || "");
+            window.history.replaceState(null, "", window.location.pathname);
+            window.location.reload();
+        } catch (error) {
+            /* storage blocked: at least show the sign-in screen */
+        }
+
         showSignin(message);
+    }
+
+    function takeSignoutNote() {
+        try {
+            var note = window.sessionStorage.getItem(SIGNOUT_NOTE) || "";
+            window.sessionStorage.removeItem(SIGNOUT_NOTE);
+            return note;
+        } catch (error) {
+            return "";
+        }
+    }
+
+    function pause(ms) {
+        return new Promise(function (resolve) {
+            setTimeout(resolve, ms);
+        });
+    }
+
+    /* If the server is asleep, keep trying for up to 90 seconds while it wakes,
+       instead of failing the first time. */
+    async function signInWaiting(email, password, message) {
+        var giveUpAt = Date.now() + 90 * 1000;
+
+        for (;;) {
+            try {
+                return await api("POST", "/admin/login", { email: email, password: password });
+            } catch (error) {
+                if (!error.waking || Date.now() > giveUpAt) throw error;
+                message.textContent = "The server is starting up after a quiet time. This can take up to a minute. Please wait…";
+                await pause(4000);
+            }
+        }
     }
 
     $("signinForm").addEventListener("submit", async function (event) {
@@ -448,9 +513,10 @@
         message.textContent = "";
 
         try {
-            var data = await api("POST", "/admin/login", { email: email.value.trim(), password: password.value });
+            var data = await signInWaiting(email.value.trim(), password.value, message);
             setToken(data.token);
             password.value = "";
+            markActive(true);
             showApp(data.user);
         } catch (error) {
             message.textContent = error.message;
@@ -464,6 +530,85 @@
     $("signoutButton").addEventListener("click", function () {
         signOut("You have signed out.");
     });
+
+    /* ---------- Signing out a screen nobody is using ---------- */
+
+    // A screen left open (reception, a phone on the desk) signs itself out
+    // after 15 minutes without anyone touching it, with a one-minute warning.
+    var IDLE_MINUTES = 15;
+    var IDLE_LIMIT_MS = IDLE_MINUTES * 60 * 1000;
+    var IDLE_WARN_MS = 60 * 1000;
+    var ACTIVE_KEY = "zd-admin-last-active";
+    var lastActive = Date.now();
+    var lastSaved = 0;
+
+    function savedActive() {
+        try {
+            return Number(window.sessionStorage.getItem(ACTIVE_KEY)) || 0;
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    function markActive(force) {
+        lastActive = Date.now();
+
+        // remembered, so reloading the page doesn't restart the 15 minutes
+        if (force === true || lastActive - lastSaved > 5000) {
+            lastSaved = lastActive;
+            try {
+                window.sessionStorage.setItem(ACTIVE_KEY, String(lastActive));
+            } catch (error) {
+                /* private mode: kept in memory only */
+            }
+        }
+
+        // The warning closes on the next check (within a second), not here:
+        // closing it under a finger would let the tap land on what's behind it.
+    }
+
+    function forgetActive() {
+        try {
+            window.sessionStorage.removeItem(ACTIVE_KEY);
+        } catch (error) {
+            /* nothing to forget */
+        }
+    }
+
+    function idleCheck() {
+        if (!signedIn) return;
+
+        var left = IDLE_LIMIT_MS - (Date.now() - lastActive);
+        var box = $("idleWarning");
+
+        if (left <= 0) {
+            signOut("You were signed out because this screen wasn't used for " + IDLE_MINUTES + " minutes. Please sign in again.");
+            return;
+        }
+
+        if (left <= IDLE_WARN_MS) {
+            $("idleText").textContent = "You'll be signed out in " + Math.ceil(left / 1000) +
+                " seconds because nobody has used this screen.";
+            box.hidden = false;
+        } else if (!box.hidden) {
+            box.hidden = true;
+        }
+    }
+
+    // Any touch, click, key or scroll counts as using the screen.
+    // (The dashboard refreshing itself doesn't.)
+    ["pointerdown", "keydown", "wheel", "touchstart", "scroll", "mousemove"].forEach(function (name) {
+        document.addEventListener(name, function () {
+            if (signedIn) markActive();
+        }, { passive: true, capture: true });
+    });
+
+    $("stayButton").addEventListener("click", function () {
+        markActive(true);
+        $("idleWarning").hidden = true;
+    });
+
+    setInterval(idleCheck, 1000);
 
     /* ---------- Switching sections ---------- */
 
@@ -564,6 +709,9 @@
     // Coming back to the page (another app, another tab): show the latest at once.
     document.addEventListener("visibilitychange", function () {
         if (!signedIn || document.visibilityState !== "visible") return;
+        idleCheck(); // a phone that slept longer than 15 minutes signs out now
+        if (!signedIn) return;
+        syncMe(); // also signs out at once an account that was removed meanwhile
         if (current === "stock" && stockCanRefresh()) load("stock", true);
     });
 
@@ -1301,7 +1449,7 @@
                 text: "Remove " + account.name + "? They will not be able to sign in any more."
             }));
             actions.appendChild(button("Yes, remove", "btn-primary", function () {
-                change("DELETE", null, account.name + " has been removed.");
+                change("DELETE", null, account.name + " has been removed and signed out.");
             }));
             actions.appendChild(keep);
             keep.focus();
@@ -1326,7 +1474,7 @@
                 change(
                     "PATCH",
                     { active: !account.active },
-                    account.active ? account.name + " can no longer sign in." : account.name + " can sign in again."
+                    account.active ? account.name + " has been turned off and signed out." : account.name + " can sign in again."
                 );
             }));
             actions.appendChild(button("Remove", "btn-ghost btn-danger", askToRemove));
@@ -3559,9 +3707,16 @@
 
     async function start() {
         if (!getToken()) {
-            showSignin("");
+            showSignin(takeSignoutNote());
             return;
         }
+
+        var last = savedActive();
+        if (last && Date.now() - last >= IDLE_LIMIT_MS) {
+            signOut("You were signed out because this screen wasn't used for " + IDLE_MINUTES + " minutes. Please sign in again.");
+            return;
+        }
+        lastActive = last || Date.now();
 
         try {
             var data = await api("GET", "/admin/me");

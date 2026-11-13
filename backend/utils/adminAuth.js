@@ -32,9 +32,9 @@ const MIN_PASSWORD = 8;
 const MAX_PASSWORD = 200;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/* The secret that signs tokens. Set ADMIN_TOKEN_SECRET in .env to keep
-   people signed in when the server restarts; otherwise a new random
-   secret is made at start-up (everyone signs in again after a restart). */
+/* The secret that signs tokens. A new one is made each time the server
+   starts, so a restart (Render waking up, or a deploy) signs everyone out.
+   ADMIN_TOKEN_SECRET in .env can be set to keep people signed in instead. */
 const tokenSecret =
   process.env.ADMIN_TOKEN_SECRET || crypto.randomBytes(32).toString("hex");
 
@@ -110,64 +110,81 @@ function makeToken(user) {
   return `${payload}.${sign(payload)}`;
 }
 
+/* Returns { data } for a good token, or { why } saying why it can't be used. */
 function readToken(token) {
   if (typeof token !== "string" || !token.includes(".")) {
-    return null;
+    return { why: "Please sign in again." };
   }
 
   const [payload, signature] = token.split(".");
 
   if (!payload || !signature) {
-    return null;
+    return { why: "Please sign in again." };
   }
 
   const expected = Buffer.from(sign(payload));
   const given = Buffer.from(signature);
 
+  // signed with an earlier secret: the server has restarted since
   if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) {
-    return null;
+    return { why: "You were signed out because the server restarted. Please sign in again." };
   }
 
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    return Number(data.exp) > Date.now() && mongoose.isValidObjectId(data.uid) ? data : null;
+    if (!mongoose.isValidObjectId(data.uid)) return { why: "Please sign in again." };
+    if (!(Number(data.exp) > Date.now())) {
+      return { why: `Your sign-in ended after ${TOKEN_HOURS} hours. Please sign in again.` };
+    }
+    return { data };
   } catch (error) {
-    return null;
+    return { why: "Please sign in again." };
   }
 }
 
 /* ---------- Too many wrong tries ---------- */
 
-/* After 5 wrong tries from the same address, that address waits 15 minutes. */
-const failedTries = new Map();
+/* After 5 wrong passwords for the same email from the same place, that
+   email waits 15 minutes there. Colleagues on the same Wi-Fi can still
+   sign in. A place that gets many emails wrong (someone guessing) waits
+   too. A manager or the owner resetting the password ends the wait. */
+const MAX_FAILED_PER_PLACE = 25;
+const failedTries = new Map(); // key -> { count, first, lockedUntil }
 
-function isLocked(ip) {
-  const entry = failedTries.get(ip);
+function personKey(ip, email) {
+  return `person|${ip}|${email}`;
+}
 
-  if (!entry) {
-    return false;
-  }
+function placeKey(ip) {
+  return `place|${ip}`;
+}
 
-  if (entry.lockedUntil && entry.lockedUntil > Date.now()) {
-    return true;
-  }
+function isLocked(key) {
+  const entry = failedTries.get(key);
+  if (!entry) return false;
 
-  if (entry.lockedUntil && entry.lockedUntil <= Date.now()) {
-    failedTries.delete(ip);
-  }
+  const now = Date.now();
+  if (entry.lockedUntil > now) return true;
 
+  // the wait is over, or the wrong tries were long ago: start again
+  if (entry.lockedUntil || now - entry.first > LOCK_MINUTES * 60 * 1000) failedTries.delete(key);
   return false;
 }
 
-function recordFailure(ip) {
-  const entry = failedTries.get(ip) || { count: 0, lockedUntil: 0 };
+function recordFailure(key, max) {
+  isLocked(key); // clears an old entry first
+  const entry = failedTries.get(key) || { count: 0, first: Date.now(), lockedUntil: 0 };
   entry.count += 1;
+  if (entry.count >= max) entry.lockedUntil = Date.now() + LOCK_MINUTES * 60 * 1000;
+  failedTries.set(key, entry);
+}
 
-  if (entry.count >= MAX_FAILED_TRIES) {
-    entry.lockedUntil = Date.now() + LOCK_MINUTES * 60 * 1000;
+/* A new password was set for this email: they may try again at once. */
+function clearFailuresFor(email) {
+  const ending = `|${String(email).toLowerCase()}`;
+  for (const key of failedTries.keys()) {
+    if (key.startsWith("person|") && key.endsWith(ending)) failedTries.delete(key);
   }
-
-  failedTries.set(ip, entry);
 }
 
 /* ---------- What the dashboard may see about an account ---------- */
@@ -249,14 +266,6 @@ async function ensureOwnerFromEnv() {
 async function login(req, res) {
   try {
     const ip = req.ip || "unknown";
-
-    if (isLocked(ip)) {
-      return res.status(429).json({
-        success: false,
-        message: `Too many wrong tries. Please wait ${LOCK_MINUTES} minutes and try again.`,
-      });
-    }
-
     const body = req.body || {};
     const email = text(body.email).toLowerCase();
     const password = typeof body.password === "string" ? body.password : "";
@@ -265,6 +274,20 @@ async function login(req, res) {
       return res.status(400).json({
         success: false,
         message: "Please enter your email and password.",
+      });
+    }
+
+    if (isLocked(personKey(ip, email))) {
+      return res.status(429).json({
+        success: false,
+        message: `Too many wrong passwords for this email. Please wait ${LOCK_MINUTES} minutes, or ask the manager to reset your password.`,
+      });
+    }
+
+    if (isLocked(placeKey(ip))) {
+      return res.status(429).json({
+        success: false,
+        message: `Too many wrong tries from this place. Please wait ${LOCK_MINUTES} minutes and try again.`,
       });
     }
 
@@ -282,14 +305,15 @@ async function login(req, res) {
       : (await takeSameTime(password), false);
 
     if (!rightPassword) {
-      recordFailure(ip);
+      recordFailure(personKey(ip, email), MAX_FAILED_TRIES);
+      recordFailure(placeKey(ip), MAX_FAILED_PER_PLACE);
       return res.status(401).json({
         success: false,
         message: "That email or password isn't right.",
       });
     }
 
-    failedTries.delete(ip);
+    failedTries.delete(personKey(ip, email));
 
     if (!user.active) {
       return res.status(403).json({
@@ -316,17 +340,29 @@ async function login(req, res) {
 
 /* ---------- Guards for admin routes ---------- */
 
+/* Sends the person back to the sign-in page, saying why. */
+function signedOut(res, message) {
+  return res.status(401).json({ success: false, message });
+}
+
 async function requireAdmin(req, res, next) {
   try {
     const header = req.get("authorization") || "";
-    const data = readToken(header.startsWith("Bearer ") ? header.slice(7) : "");
-    const user = data ? await AdminUser.findById(data.uid) : null;
+    const { data, why } = readToken(header.startsWith("Bearer ") ? header.slice(7) : "");
 
-    if (!user || !user.active || (user.tokenVersion || 0) !== data.v) {
-      return res.status(401).json({
-        success: false,
-        message: "Please sign in again.",
-      });
+    if (!data) return signedOut(res, why);
+
+    const user = await AdminUser.findById(data.uid);
+
+    // removed, turned off or changed by the manager or the owner: out at once
+    if (!user) {
+      return signedOut(res, "Your account has been removed. Ask the manager or the owner if this is a mistake.");
+    }
+    if (!user.active) {
+      return signedOut(res, "Your account has been turned off. Ask the manager or the owner.");
+    }
+    if ((user.tokenVersion || 0) !== data.v) {
+      return signedOut(res, "Your account was changed by the manager or the owner (for example a new password). Please sign in again.");
     }
 
     req.admin = user;
@@ -350,6 +386,7 @@ function requireOwner(req, res, next) {
 
 module.exports = {
   login,
+  clearFailuresFor,
   requireAdmin,
   requireOwner,
   ensureOwnerFromEnv,

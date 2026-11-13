@@ -2271,3 +2271,44 @@ a {
         outline-offset: 2px;
     }
 }
+
+/* "Still there?" before signing out a screen nobody is using */
+.idle-warning {
+    position: fixed;
+    left: 50%;
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    z-index: 60;
+    display: grid;
+    gap: 6px;
+    width: min(92vw, 380px);
+    padding: 16px 18px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-card);
+    background: var(--white);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    transform: translateX(-50%);
+}
+
+.idle-warning[hidden] {
+    display: none;
+}
+
+.idle-title {
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.idle-text {
+    font-size: 14px;
+}
+
+.idle-warning .btn {
+    justify-self: start;
+    margin-top: 6px;
+}
+
+@media (min-width: 960px) {
+    .idle-warning {
+        bottom: 28px;
+    }
+}
