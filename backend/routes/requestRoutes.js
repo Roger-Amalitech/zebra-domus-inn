@@ -23,6 +23,7 @@ const { parseDay, innToday } = require("../utils/availability");
 const { DEPARTMENTS } = require("../utils/departments");
 const { audit } = require("../utils/audit");
 const { MAX_AMOUNT, amount, text, qtyText, nextRef, changeStock } = require("../utils/stockOps");
+const { wholeNumberProblem } = require("../utils/units");
 
 const MAX_LINES = 20;
 
@@ -120,6 +121,8 @@ router.post("/", requirePermission("requests.make"), async (req, res) => {
 
       const quantity = amount(line.quantity, 0.01, MAX_AMOUNT);
       if (quantity === null) return bad(res, `Enter how many ${item.unit} of ${item.name} you need.`);
+      const whole = wholeNumberProblem(item.name, item.unit, quantity);
+      if (whole) return bad(res, whole);
 
       lines.push({ item: item._id, itemName: item.name, unit: item.unit, quantity });
     }
@@ -183,6 +186,8 @@ router.post("/:id/issue", requirePermission("requests.manage"), async (req, res)
       const value = given.has(String(line.item)) ? given.get(String(line.item)) : line.quantity;
       const number = amount(value, 0, line.quantity);
       if (number === null) return bad(res, `For ${line.itemName}, give 0 to ${qtyText(line.quantity)} ${line.unit}.`);
+      const whole = wholeNumberProblem(line.itemName, line.unit, number);
+      if (whole) return bad(res, whole);
 
       if (number > 0) {
         const item = await StockItem.findById(line.item).lean();

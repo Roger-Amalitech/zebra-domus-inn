@@ -9,8 +9,9 @@
    PATCH /items/:id              change name, unit, warning level, archive   (stock.items)
    DELETE /items/:id             delete an item and its history              (stock.delete)
    POST  /items/remove-unused    delete items never counted, used or received (stock.delete)
-   POST  /items/:id/movements    { type: out|count, quantity, department?, note?, day? }
+   POST  /items/:id/movements    { type: out|count|loss, quantity, department?, reason?, note?, day? }
                                  out = issue to a department (stock.issue)
+                                 loss = write off: expired, damaged, spoiled, lost, other (stock.writeoff)
                                  count (stock.count): the owner's count changes the stock at
                                  once; a manager's difference waits for the owner's approval
    GET   /counts                 counts waiting for approval (?status=all for every count)
@@ -42,6 +43,16 @@ const { DEPARTMENTS } = require("../utils/departments");
 const { audit } = require("../utils/audit");
 const { validMonth, monthOverview } = require("../utils/budget");
 const { MAX_AMOUNT, round, amount, money, text, kigaliDay, qtyText, changeStock } = require("../utils/stockOps");
+const { UNIT_GROUPS, knownUnit, wholeNumberProblem } = require("../utils/units");
+
+// why something is written off
+const LOSS_REASONS = {
+  expired: "Expired",
+  damaged: "Damaged or broken",
+  spoiled: "Spoiled or gone bad",
+  lost: "Lost or missing",
+  other: "Other",
+};
 
 const { STOCK_CATEGORIES } = StockItem;
 const DAYS_BACK = 60;
@@ -70,9 +81,9 @@ function statusOf(item) {
   return "ok";
 }
 
-/* In stock, used and corrections since each item was added.
+/* In stock, used, written off and corrections since each item was added.
    Starting stock and purchases count as "in stock", so for every item:
-   remaining now = in stock - used + corrections. */
+   remaining now = in stock - used - written off + corrections. */
 async function totalsFor(itemIds) {
   const match = itemIds ? [{ $match: { item: { $in: itemIds } } }] : [];
   const rows = await StockMovement.aggregate([
@@ -84,6 +95,7 @@ async function totalsFor(itemIds) {
         received: { $sum: { $cond: [{ $eq: ["$type", "in"] }, "$change", 0] } },
         used: { $sum: { $cond: [{ $eq: ["$type", "out"] }, { $multiply: ["$change", -1] }, 0] } },
         corrections: { $sum: { $cond: [{ $eq: ["$type", "count"] }, "$change", 0] } },
+        lost: { $sum: { $cond: [{ $eq: ["$type", "loss"] }, { $multiply: ["$change", -1] }, 0] } },
       },
     },
   ]);
@@ -91,7 +103,7 @@ async function totalsFor(itemIds) {
   return new Map(rows.map((row) => [String(row._id), row]));
 }
 
-const NO_TOTALS = { changes: 0, received: 0, used: 0, corrections: 0 };
+const NO_TOTALS = { changes: 0, received: 0, used: 0, corrections: 0, lost: 0 };
 
 async function totalsOf(itemId) {
   return (await totalsFor([itemId])).get(String(itemId)) || NO_TOTALS;
@@ -138,6 +150,7 @@ function itemForAdmin(item, prices, totals, waitingCount) {
     shown.received = round(totals.received);
     shown.used = round(totals.used);
     shown.corrections = round(totals.corrections);
+    shown.lost = round(totals.lost || 0);
   }
 
   // a count that waits for the owner's approval
@@ -162,6 +175,7 @@ function movementForAdmin(move, prices) {
     balanceAfter: move.balanceAfter,
     note: move.note || "",
     department: move.department || "",
+    reason: move.reason || "",
     ref: move.ref || "",
     day: toDay(move.day),
     userName: move.userName || "",
@@ -186,6 +200,8 @@ function readDay(body) {
   return { day, dayText };
 }
 
+const UNIT_FROM_LIST = "Please choose how the item is counted from the list (kg, litres, pieces…).";
+
 /* Reads the item fields sent by someone who manages items. */
 function readItem(body, partial) {
   const values = {};
@@ -204,6 +220,9 @@ function readItem(body, partial) {
   if (!partial || has("unit")) {
     values.unit = text(body.unit) || "pieces";
     if (values.unit.length > 20) return { error: "The unit can be up to 20 characters, for example \"rolls\"." };
+    // chosen from the list; an older item may keep its own unit (checked when changing it)
+    if (knownUnit(values.unit)) values.unit = knownUnit(values.unit);
+    else if (!partial) return { error: UNIT_FROM_LIST };
   }
 
   if (has("lowStockAt") || !partial) {
@@ -258,6 +277,8 @@ router.get("/items", requirePermission("stock.view"), async (req, res) => {
       success: true,
       categories: STOCK_CATEGORIES,
       departments: DEPARTMENTS,
+      units: UNIT_GROUPS,
+      lossReasons: LOSS_REASONS,
       summary,
       items: items.map((item) =>
         itemForAdmin(item, prices, totals.get(String(item._id)) || NO_TOTALS, waitingOf.get(String(item._id)))
@@ -334,7 +355,7 @@ router.post("/items", requirePermission("stock.items"), async (req, res) => {
     const item = await createItem(values, quantity, req);
     await audit(req.admin, "stock", `Added item ${item.name}` + (quantity > 0 ? ` with ${qtyText(quantity)} ${item.unit} starting stock` : ""));
 
-    const totals = quantity > 0 ? { changes: 1, received: quantity, used: 0, corrections: 0 } : NO_TOTALS;
+    const totals = quantity > 0 ? { changes: 1, received: quantity, used: 0, corrections: 0, lost: 0 } : NO_TOTALS;
     return res.status(201).json({ success: true, item: itemForAdmin(item.toObject(), seesPrices(req), totals) });
   } catch (error) {
     if (error.code === 11000) return bad(res, "There is already an item with this name.", 409);
@@ -394,6 +415,16 @@ router.patch("/items/:id", requirePermission("stock.items"), async (req, res) =>
     const before = await StockItem.findById(req.params.id).lean();
     if (!before) return bad(res, "Item not found.", 404);
 
+    if (values.unit && values.unit !== before.unit) {
+      if (!knownUnit(values.unit)) return bad(res, UNIT_FROM_LIST);
+      if (wholeNumberProblem(before.name, values.unit, before.quantity)) {
+        return bad(
+          res,
+          `${before.name} has ${qtyText(before.quantity)} ${before.unit} now, which isn't a whole number of ${values.unit}. Count it first, or keep ${before.unit}.`
+        );
+      }
+    }
+
     if (values.name) {
       values.nameKey = values.name.toLowerCase();
       const clash = await StockItem.exists({ nameKey: values.nameKey, _id: { $ne: req.params.id } });
@@ -411,6 +442,7 @@ router.patch("/items/:id", requirePermission("stock.items"), async (req, res) =>
 
     const said = [];
     if (values.name && values.name !== before.name) said.push(`renamed from ${before.name}`);
+    if (values.unit && values.unit !== before.unit) said.push(`counted in ${values.unit} (was ${before.unit})`);
     if (values.active === false && before.active !== false) said.push("archived");
     if (values.active === true && before.active === false) said.push("brought back");
     if (values.unitCost !== undefined && values.unitCost !== (before.unitCost || 0)) {
@@ -486,10 +518,15 @@ router.post("/items/:id/movements", requirePermission("stock.view"), async (req,
     if (type === "in") {
       return bad(res, "New stock comes in through a purchase: the owner records it, then it is checked in under Purchases.");
     }
-    if (!["out", "count"].includes(type)) return bad(res, "Choose issue or count.");
+    if (!["out", "count", "loss"].includes(type)) return bad(res, "Choose issue, count or write off.");
 
     if (type === "out" && !can(req.admin, "stock.issue")) return denied(res, "Your role can't issue stock. Ask the manager.");
     if (type === "count" && !can(req.admin, "stock.count")) return denied(res, "Your role can't count stock. Ask the manager.");
+    if (type === "loss" && !can(req.admin, "stock.writeoff")) return denied(res, "Your role can't write off stock. Ask the manager.");
+
+    const reason = text(body.reason);
+    if (type === "loss" && !LOSS_REASONS[reason]) return bad(res, "Choose why: expired, damaged, spoiled, lost or other.");
+    if (type === "loss" && reason === "other" && !text(body.note)) return bad(res, "Please say what happened in the note.");
 
     const quantity = amount(body.quantity, type === "count" ? 0 : 0.01, MAX_AMOUNT);
     if (quantity === null) {
@@ -511,6 +548,9 @@ router.post("/items/:id/movements", requirePermission("stock.view"), async (req,
 
     const addedOn = kigaliDay(item.createdAt);
     if (when.dayText < addedOn) return bad(res, `${item.name} was added on ${addedOn}. Choose that day or later.`);
+
+    const whole = wholeNumberProblem(item.name, item.unit, quantity);
+    if (whole) return bad(res, whole);
 
     const prices = seesPrices(req);
 
@@ -549,15 +589,16 @@ router.post("/items/:id/movements", requirePermission("stock.view"), async (req,
       itemId: item._id,
       type,
       quantity,
-      change: type === "out" ? -quantity : (current) => round(quantity - current.quantity),
+      change: type === "count" ? (current) => round(quantity - current.quantity) : -quantity,
       person: req.admin,
       day: when.day,
       note,
       department: type === "out" ? department : "",
+      reason: type === "loss" ? reason : "",
     });
 
     if (result.error) {
-      const extra = result.status === 409 && type === "out" ? " If the number is wrong, count it." : "";
+      const extra = result.status === 409 && type !== "count" ? " If the number is wrong, count it." : "";
       return bad(res, result.error + extra, result.status);
     }
 
@@ -575,7 +616,9 @@ router.post("/items/:id/movements", requirePermission("stock.view"), async (req,
       "stock",
       type === "out"
         ? `Issued ${qtyText(quantity)} ${item.unit} of ${item.name} to ${department}`
-        : `Counted ${item.name}: ${qtyText(quantity)} ${item.unit} (change ${move.change > 0 ? "+" : ""}${qtyText(move.change)})`
+        : type === "loss"
+          ? `Wrote off ${qtyText(quantity)} ${item.unit} of ${item.name}: ${LOSS_REASONS[reason].toLowerCase()}` + (note ? ` (${note})` : "")
+          : `Counted ${item.name}: ${qtyText(quantity)} ${item.unit} (change ${move.change > 0 ? "+" : ""}${qtyText(move.change)})`
     );
 
     return res.status(201).json({
@@ -722,7 +765,7 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
 
     const [items, moves] = await Promise.all([
       StockItem.find().sort({ category: 1, name: 1 }).lean(),
-      StockMovement.find({ day: { $gte: from } }).select("item type change day unitCost department").lean(),
+      StockMovement.find({ day: { $gte: from } }).select("item itemName type quantity change day unitCost department reason note userName").lean(),
     ]);
 
     const costOf = new Map(items.map((item) => [String(item._id), item.unitCost || 0]));
@@ -738,8 +781,9 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
         const received = sum(inPeriod.filter((move) => move.type === "in"));
         const used = -sum(inPeriod.filter((move) => move.type === "out"));
         const corrections = sum(inPeriod.filter((move) => move.type === "count"));
+        const writtenOff = -sum(inPeriod.filter((move) => move.type === "loss"));
         const remaining = round(item.quantity - sum(afterPeriod));
-        const atStart = round(remaining - received + used - corrections);
+        const atStart = round(remaining - received + used + writtenOff - corrections);
 
         const row = {
           _id: item._id,
@@ -750,6 +794,7 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
           atStart,
           received,
           used,
+          writtenOff,
           corrections,
           remaining,
           lowStockAt: item.lowStockAt,
@@ -759,15 +804,47 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
           row.unitCost = item.unitCost || 0;
           row.usedValue = round(used * (item.unitCost || 0));
           row.correctionsValue = round(corrections * (item.unitCost || 0));
+          row.writtenOffValue = round(writtenOff * (item.unitCost || 0));
           row.remainingValue = round(remaining * (item.unitCost || 0));
         }
 
         return row;
       })
       // archived items only matter if something happened in the period
-      .filter((row) => row.active || row.received || row.used || row.corrections);
+      .filter((row) => row.active || row.received || row.used || row.writtenOff || row.corrections);
 
     const report = { success: true, from: fromText, to: toText, rows };
+
+    // Expired, damaged, spoiled or lost in the period: every one, and by reason
+    const unitOf = new Map(items.map((item) => [String(item._id), item.unit]));
+    const losses = moves
+      .filter((move) => move.type === "loss" && move.day <= to)
+      .sort((a, b) => b.day - a.day)
+      .map((move) => {
+        const loss = {
+          day: toDay(move.day),
+          itemName: move.itemName,
+          unit: unitOf.get(String(move.item)) || "",
+          quantity: move.quantity,
+          reason: move.reason || "other",
+          reasonText: LOSS_REASONS[move.reason] || "Other",
+          note: move.note || "",
+          userName: move.userName || "",
+        };
+        if (prices) {
+          const cost = move.unitCost !== undefined && move.unitCost !== null ? move.unitCost : costOf.get(String(move.item)) || 0;
+          loss.value = Math.round(move.quantity * cost);
+        }
+        return loss;
+      });
+
+    report.losses = losses;
+    report.lossesByReason = Object.keys(LOSS_REASONS).map((key) => {
+      const mine = losses.filter((loss) => loss.reason === key);
+      const row = { reason: key, reasonText: LOSS_REASONS[key], times: mine.length };
+      if (prices) row.value = mine.reduce((total, loss) => total + loss.value, 0);
+      return row;
+    });
 
     // Money (owner): what went to each department, and what was bought
     if (prices) {

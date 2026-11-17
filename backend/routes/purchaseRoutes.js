@@ -23,6 +23,7 @@ const { parseDay, toDay, addDays, innToday } = require("../utils/availability");
 const { audit } = require("../utils/audit");
 const { overBudget } = require("../utils/budget");
 const { MAX_AMOUNT, amount, money, text, qtyText, nextRef, changeStock } = require("../utils/stockOps");
+const { wholeNumberProblem } = require("../utils/units");
 
 const DAYS_BACK = 60;
 const MAX_LINES = 30;
@@ -128,6 +129,8 @@ router.post("/", requirePermission("purchases.record"), async (req, res) => {
 
       const quantity = amount(line.quantity, 0.01, MAX_AMOUNT);
       if (quantity === null) return bad(res, `Enter how many ${item.unit} of ${item.name} were bought.`);
+      const whole = wholeNumberProblem(item.name, item.unit, quantity);
+      if (whole) return bad(res, whole);
 
       const unitCost = money(line.unitCost);
       if (unitCost === null) return bad(res, `Enter the price for one ${item.name} as a whole number of RWF.`);
@@ -191,6 +194,8 @@ router.post("/:id/receive", requirePermission("purchases.receive"), async (req, 
       if (number === null) {
         return bad(res, `For ${line.itemName}, enter how many came in: 0 to ${qtyText(line.quantity)} ${line.unit}.`);
       }
+      const whole = wholeNumberProblem(line.itemName, line.unit, number);
+      if (whole) return bad(res, whole);
       received.push(number);
     }
 

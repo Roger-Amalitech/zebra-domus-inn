@@ -60,7 +60,7 @@ async function nextRef(prefix) {
 /* Changes an item's quantity by `change` (can be negative), but only if
    nobody else changed it at the same moment, and never below zero.
    Saves a movement too. Returns { item, movement } or { error, status }. */
-async function changeStock({ itemId, type, quantity, change, person, day, note, department, ref, unitCost, setCost }) {
+async function changeStock({ itemId, type, quantity, change, person, day, note, department, ref, unitCost, setCost, reason }) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const item = await StockItem.findById(itemId).lean();
     if (!item) return { error: "Item not found.", status: 404 };
@@ -99,6 +99,7 @@ async function changeStock({ itemId, type, quantity, change, person, day, note, 
       day,
       department: department || "",
       ref: ref || "",
+      reason: reason || "",
       userId: person._id,
       userName: person.name,
     });

@@ -224,7 +224,6 @@
                 </div>
                 <p class="stock-key" id="stockKey"><strong>In stock</strong> everything received since the item was added · <strong>Used</strong> everything issued · <strong>Remaining</strong> what is in the store now</p>
                 <p class="count" id="stockCount" aria-live="polite"></p>
-                <div id="itemFormSlot"></div>
                 <div class="list" id="stockList"></div>
                 <label class="switch archived-toggle" data-perm="stock.items" hidden>
                     <input type="checkbox" id="showArchived">
@@ -238,7 +237,6 @@
                 <div class="panel-actions" data-perm="requests.make" hidden>
                     <button type="button" class="btn btn-primary btn-small" id="newRequestButton">Ask for supplies</button>
                 </div>
-                <div id="requestFormSlot"></div>
                 <div class="list" id="requestList"></div>
             </div>
 
@@ -247,7 +245,6 @@
                 <div class="panel-actions" data-perm="purchases.record" hidden>
                     <button type="button" class="btn btn-primary btn-small" id="newPurchaseButton">Record a purchase</button>
                 </div>
-                <div id="purchaseFormSlot"></div>
                 <div class="list" id="purchaseList"></div>
             </div>
 
@@ -300,6 +297,7 @@
                 <div class="grid-wrap report-wrap" tabindex="0" role="region" aria-label="Stock report">
                     <table class="report-table" id="reportTable"></table>
                 </div>
+                <div id="lossReport"></div>
                 <div id="moneyReport"></div>
             </div>
 
@@ -437,15 +435,15 @@
             </form>
         </section>
     </main>
+</div>
 
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <!-- Shown one minute before a screen nobody is using signs itself out -->
-    <div class="idle-warning" id="idleWarning" role="alertdialog" aria-labelledby="idleTitle" aria-describedby="idleText" hidden>
-        <p class="idle-title" id="idleTitle">Still there?</p>
-        <p class="idle-text" id="idleText">You'll be signed out soon because nobody has used this screen.</p>
-        <button type="button" class="btn btn-primary btn-small" id="stayButton">Stay signed in</button>
-    </div>
+<!-- Shown one minute before a screen nobody is using signs itself out -->
+<div class="idle-warning" id="idleWarning" role="alertdialog" aria-labelledby="idleTitle" aria-describedby="idleText" hidden>
+    <p class="idle-title" id="idleTitle">Still there?</p>
+    <p class="idle-text" id="idleText">You'll be signed out soon because nobody has used this screen.</p>
+    <button type="button" class="btn btn-primary btn-small" id="stayButton">Stay signed in</button>
 </div>
 
 <script src="api-config.js"></script>

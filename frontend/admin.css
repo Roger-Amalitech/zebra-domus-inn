@@ -1497,33 +1497,6 @@ a {
     margin-top: 6px;
 }
 
-.stock-move {
-    display: grid;
-    gap: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #EEEEEE;
-}
-
-.stock-move input,
-.item-form input,
-.item-form select {
-    width: 100%;
-    min-height: 44px;
-    padding: 0 12px;
-    border: 1.5px solid var(--line-strong);
-    border-radius: var(--radius);
-    background: var(--white);
-    font-size: 16px;
-}
-
-.stock-move input:focus,
-.item-form input:focus,
-.item-form select:focus {
-    border-color: var(--ink);
-    outline: none;
-    box-shadow: var(--ring);
-}
-
 .stock-unused,
 .stock-delete-confirm {
     display: flex;
@@ -1687,7 +1660,7 @@ a {
     position: fixed;
     left: 50%;
     bottom: calc(var(--bottombar) + 16px + env(safe-area-inset-bottom));
-    z-index: 50;
+    z-index: 90; /* above the big forms */
     max-width: min(92vw, 460px);
     padding: 12px 18px;
     border-radius: 12px;
@@ -1963,16 +1936,12 @@ a {
     font-size: 13px;
 }
 
-.doc-form,
 .staff-edit {
     display: grid;
     gap: 12px;
     flex-basis: 100%;
 }
 
-.doc-form input,
-.doc-form select,
-.stock-move select,
 .staff-edit select,
 .budget-table input {
     width: 100%;
@@ -1984,8 +1953,6 @@ a {
     font-size: 16px;
 }
 
-.doc-form select,
-.stock-move select,
 .staff-edit select {
     padding-right: 36px;
     background: var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right 12px center / 14px no-repeat;
@@ -1993,75 +1960,11 @@ a {
     cursor: pointer;
 }
 
-.doc-form input:focus,
-.doc-form select:focus,
-.stock-move select:focus,
 .staff-edit select:focus,
 .budget-table input:focus {
     border-color: var(--ink);
     outline: none;
     box-shadow: var(--ring);
-}
-
-.line-rows {
-    display: grid;
-    gap: 10px;
-}
-
-.line-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 44px;
-    gap: 8px 10px;
-    align-items: end;
-    padding: 12px;
-    border-radius: var(--radius);
-    background: var(--soft);
-}
-
-.line-row .line-item {
-    grid-column: 1 / -1;
-}
-
-.line-row .line-cost {
-    grid-column: 1;
-}
-
-.line-sum {
-    grid-column: 1;
-    margin: 0;
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 600;
-}
-
-.line-remove {
-    grid-column: 2;
-    grid-row: 2;
-    width: 44px;
-    height: 44px;
-    border: 1.5px solid var(--line-strong);
-    border-radius: var(--radius);
-    background: var(--white);
-    font-size: 20px;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.qty-with-unit {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.line-unit {
-    min-width: 40px;
-    color: var(--muted);
-    font-size: 13.5px;
-}
-
-.add-line {
-    justify-self: start;
-    font-size: 14px;
 }
 
 .purchase-total {
@@ -2195,44 +2098,6 @@ a {
 }
 
 @media (min-width: 720px) {
-    .line-row {
-        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 44px;
-    }
-
-    .line-row .line-item {
-        grid-column: 1;
-    }
-
-    .line-row .line-qty {
-        grid-column: 2;
-    }
-
-    .line-remove {
-        grid-column: 3;
-        grid-row: 1;
-    }
-
-    .purchase-line {
-        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 110px 44px;
-    }
-
-    .purchase-line .line-cost {
-        grid-column: 3;
-        grid-row: 1;
-    }
-
-    .purchase-line .line-sum {
-        grid-column: 4;
-        grid-row: 1;
-        align-self: center;
-        padding-top: 22px;
-        text-align: right;
-    }
-
-    .purchase-line .line-remove {
-        grid-column: 5;
-    }
-
     .audit-filters {
         grid-template-columns: 200px minmax(0, 1fr) auto;
         align-items: center;
@@ -2277,7 +2142,7 @@ a {
     position: fixed;
     left: 50%;
     bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-    z-index: 60;
+    z-index: 95; /* above the big forms */
     display: grid;
     gap: 6px;
     width: min(92vw, 380px);
@@ -2310,5 +2175,570 @@ a {
 @media (min-width: 960px) {
     .idle-warning {
         bottom: 28px;
+    }
+}
+
+/* =========================================
+   Big forms (Issue, Count, Expired / damaged, Check in…)
+   Full screen on phones, a large window on computers.
+========================================= */
+
+html.sheet-open,
+html.sheet-open body {
+    overflow: hidden;
+}
+
+.sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    background: rgba(17, 17, 17, 0.55);
+}
+
+.sheet {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    background: var(--white);
+    animation: sheet-in 0.2s ease-out;
+}
+
+.sheet-form {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+@keyframes sheet-in {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+}
+
+.sheet-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 20px 18px;
+    border-bottom: 1px solid var(--line);
+}
+
+.sheet-heading {
+    min-width: 0;
+}
+
+.sheet-kicker {
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.sheet-title {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+}
+
+.sheet-sub {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 15.5px;
+}
+
+.sheet-close {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: 50%;
+    background: var(--white);
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.sheet-close:hover {
+    background: var(--soft);
+}
+
+.sheet-body {
+    flex: 1 1 auto;
+    display: grid;
+    align-content: start;
+    gap: 24px;
+    padding: 22px 20px 28px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.sheet-foot {
+    display: grid;
+    gap: 10px;
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: var(--white);
+}
+
+.sheet-message:empty {
+    display: none;
+}
+
+.sheet-message {
+    padding: 10px 14px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius);
+    background: var(--soft);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.sheet-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.sheet-buttons .btn {
+    min-height: 56px;
+    font-size: 16px;
+}
+
+.sheet-submit {
+    flex: 1 1 auto;
+    font-size: 17px !important;
+}
+
+/* fields */
+
+.sheet-field {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.sheet-field > label,
+.sheet-field > legend,
+.sheet-label {
+    padding: 0;
+    font-size: 15.5px;
+    font-weight: 700;
+}
+
+.sheet-field > legend {
+    margin-bottom: 8px;
+}
+
+.sheet-field .help,
+.sheet-body > .help {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.sheet-field input[type="text"],
+.sheet-field input[type="date"],
+.sheet-field select {
+    width: 100%;
+    min-height: 54px;
+    padding: 0 16px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: var(--radius);
+    background-color: var(--white);
+    font-size: 17px;
+}
+
+.sheet-field select {
+    padding-right: 44px;
+    background: var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right 16px center / 16px no-repeat;
+    appearance: none;
+    cursor: pointer;
+}
+
+.sheet-field input:focus,
+.sheet-field select:focus {
+    border-color: var(--ink);
+    outline: none;
+    box-shadow: var(--ring);
+}
+
+.sheet-pair {
+    display: grid;
+    gap: 24px;
+}
+
+/* a number with its unit: "2.5 | kg" */
+.input-with-unit {
+    display: flex;
+    align-items: stretch;
+    border: 1.5px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--white);
+    overflow: hidden;
+}
+
+.input-with-unit:focus-within {
+    border-color: var(--ink);
+    box-shadow: var(--ring);
+}
+
+.sheet-field .input-with-unit input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.input-unit {
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    border-left: 1px solid var(--line);
+    background: var(--soft);
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.input-unit:empty {
+    display: none;
+}
+
+/* the big − 4 rolls + */
+.big-number {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) 64px;
+    gap: 10px;
+}
+
+.big-step {
+    min-height: 76px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-card);
+    background: var(--white);
+    font-size: 34px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.big-step:hover {
+    background: var(--soft);
+}
+
+.big-step:active {
+    background: var(--ink);
+    color: var(--white);
+}
+
+.big-number-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 76px;
+    padding: 0 16px;
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-card);
+    background: var(--white);
+}
+
+.big-number-box:focus-within {
+    box-shadow: var(--ring);
+}
+
+/* (no box of its own: the box around it is the field) */
+.big-number-box input.big-number-input {
+    flex: 1 1 0;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: 38px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.big-number-box input.big-number-input:focus,
+.sheet-field .input-with-unit input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.big-number-unit {
+    flex: 1 1 0;
+    min-width: 0;
+    color: var(--muted);
+    font-size: 20px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.big-number-unit:empty::before {
+    content: "—";
+}
+
+/* big choices: departments, reasons */
+.chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.chip-choice {
+    position: relative;
+    display: inline-flex;
+    cursor: pointer;
+}
+
+.chip-choice input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.chip-choice span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 54px;
+    padding: 0 22px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--white);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.chip-choice:hover span {
+    border-color: var(--ink);
+}
+
+.chip-choice input:checked + span {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--white);
+}
+
+.chip-choice input:checked + span::before {
+    content: "✓";
+    margin-right: 8px;
+}
+
+.chip-choice input:focus-visible + span {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+}
+
+.sheet-preview {
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    background: var(--soft);
+    font-size: 16.5px;
+    font-weight: 600;
+}
+
+.sheet-preview:empty {
+    display: none;
+}
+
+/* several items in one form (requests, purchases) */
+.request-lines,
+.purchase-lines {
+    display: grid;
+    gap: 14px;
+}
+
+.request-line,
+.purchase-line {
+    display: grid;
+    gap: 18px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: #FAFAFA;
+}
+
+.purchase-line-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 24px;
+}
+
+.line-sum {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.line-remove-link {
+    justify-self: start;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.request-line:only-child .line-remove-link,
+.purchase-line:only-child .line-remove-link {
+    display: none;
+}
+
+.add-line-big {
+    justify-self: start;
+    min-height: 52px;
+    border-style: dashed;
+    font-size: 15px;
+}
+
+.sheet .purchase-total {
+    font-size: 24px;
+    font-weight: 800;
+    text-align: right;
+}
+
+.sheet .budget-check:empty {
+    display: none;
+}
+
+/* archive / delete at the bottom of "Change item" */
+.sheet-more {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-top: 20px;
+    border-top: 1px dashed var(--line-strong);
+}
+
+.sheet .stock-delete-confirm {
+    gap: 10px;
+    padding: 16px;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius);
+}
+
+.sheet .stock-delete-confirm .confirm-text {
+    flex-basis: 100%;
+}
+
+/* expired or damaged, on the stock cards and in the changes list */
+.stock-lost {
+    justify-self: start;
+    padding: 5px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--soft);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.change-row.is-loss {
+    border-left-style: dotted;
+    border-left-color: var(--ink);
+}
+
+.loss-list td,
+.loss-list thead th {
+    text-align: left;
+}
+
+.loss-list.has-value td:last-child,
+.loss-list.has-value thead th:last-child {
+    text-align: right;
+}
+
+.report-table td.is-lost {
+    font-weight: 700;
+}
+
+@media (min-width: 560px) {
+    .sheet-pair {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 18px;
+    }
+}
+
+@media (min-width: 720px) {
+    .sheet-backdrop {
+        align-items: center;
+        padding: 24px;
+    }
+
+    .sheet {
+        width: min(640px, 100%);
+        height: auto;
+        max-height: min(90vh, 900px);
+        border-radius: 22px;
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+        overflow: hidden;
+    }
+
+    .sheet.is-wide {
+        width: min(860px, 100%);
+    }
+
+    .sheet-head {
+        padding: 26px 28px 20px;
+    }
+
+    .sheet-title {
+        font-size: 32px;
+    }
+
+    .sheet-body {
+        padding: 26px 28px 30px;
+    }
+
+    .sheet-foot {
+        padding: 16px 28px;
+    }
+
+    .sheet-buttons {
+        justify-content: flex-end;
+    }
+
+    .sheet-submit {
+        flex: 0 0 auto;
+        min-width: 240px;
+    }
+
+    .big-number {
+        grid-template-columns: 76px minmax(0, 1fr) 76px;
+    }
+
+    .big-number-box input.big-number-input {
+        font-size: 44px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sheet {
+        animation: none;
     }
 }

@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
    in    - checked in from a purchase (or the starting stock)
    out   - issued to a department or used
    count - the shelf was counted and the number corrected
+   loss  - written off: expired, damaged, spoiled, lost or other
            (a manager's difference only counts once the owner approves it) */
 const stockMovementSchema = new mongoose.Schema(
   {
@@ -18,7 +19,7 @@ const stockMovementSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["in", "out", "count"],
+      enum: ["in", "out", "count", "loss"],
       required: true,
     },
     // the number typed in: how many came in / were used / were counted
@@ -51,6 +52,11 @@ const stockMovementSchema = new mongoose.Schema(
     day: {
       type: Date,
       required: true,
+    },
+    // why it was written off (for "loss"): expired, damaged, spoiled, lost, other
+    reason: {
+      type: String,
+      default: "",
     },
     // who it went to (for "out")
     department: {

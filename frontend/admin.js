@@ -650,6 +650,7 @@
     }
 
     window.addEventListener("hashchange", function () {
+        closeSheet(); // going to another section (or Back) closes a big form
         if (signedIn) show(viewFromHash(), false);
     });
 
@@ -687,6 +688,7 @@
     /* Stock is only refreshed on its own when nobody is in the middle of
        something there: a form open, a question asked, or typing. */
     function stockCanRefresh() {
+        if (sheetIsOpen()) return false;
         if (["items", "requests", "purchases"].indexOf(stock.tab) < 0) return false;
         if (document.querySelector("#view-stock form:not(#budgetForm), #view-stock .confirm-text")) return false;
         var active = document.activeElement;
@@ -700,6 +702,7 @@
         if (!signedIn || document.visibilityState !== "visible") return;
         syncMe();
         if (["rooms", "users", "account"].indexOf(current) >= 0) return;
+        if (sheetIsOpen()) return;
         if (current === "stock" && !stockCanRefresh()) return;
         if (document.querySelector(".confirm-text, .doc-form")) return;
         if (document.activeElement === $("searchBox")) return;
@@ -1667,8 +1670,6 @@
         auditEntries: []
     };
 
-    var STOCK_UNITS = ["pieces", "rolls", "bottles", "bars", "packs", "boxes", "kits", "kg", "litres", "sets", "cans"];
-
     // the sections inside Stock, and what each needs
     var STOCK_TABS = ["items", "requests", "purchases", "budget", "changes", "report", "audit"];
     var STOCK_TAB_NEEDS = {
@@ -2098,43 +2099,355 @@
         }
     }
 
-    /* In stock (everything received since the item was added), used, and remaining now */
     function clock(date) {
         return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Kigali" });
+    }
+
+    /* ---------- Units ---------- */
+
+    var UNIT_GROUPS_DEFAULT = [
+        { group: "Weight", units: ["kg", "g"] },
+        { group: "Volume", units: ["litres", "ml"] },
+        { group: "Counted", units: ["pieces", "bottles", "cans", "rolls", "bars", "packs", "boxes", "bags", "sachets", "trays", "kits", "sets", "pairs", "bundles"] }
+    ];
+
+    var LOSS_REASONS_DEFAULT = {
+        expired: "Expired",
+        damaged: "Damaged or broken",
+        spoiled: "Spoiled or gone bad",
+        lost: "Lost or missing",
+        other: "Other"
+    };
+
+    function unitGroups() {
+        return stock.units && stock.units.length ? stock.units : UNIT_GROUPS_DEFAULT;
+    }
+
+    function lossReasons() {
+        return stock.lossReasons || LOSS_REASONS_DEFAULT;
+    }
+
+    // counted things (bottles, rolls…) are whole numbers; kg and litres can have decimals
+    function isWholeUnit(unit) {
+        var counted = unitGroups().filter(function (g) { return g.group === "Counted"; })[0];
+        return Boolean(counted && counted.units.indexOf(String(unit || "").trim().toLowerCase()) >= 0);
+    }
+
+    // "2,5" and "2.5" both mean two and a half
+    function readNumber(value) {
+        var textValue = String(value === undefined || value === null ? "" : value).trim().replace(",", ".");
+        if (!/^\d*\.?\d+$/.test(textValue)) return NaN;
+        return Number(textValue);
+    }
+
+    // "2.5 kg", "4 rolls", "1 roll"
+    function amountText(value, unit) {
+        return qty(value) + " " + (Number(value) === 1 ? oneUnit(unit) : unit);
+    }
+
+    // "for one box", "for one litre", "for one kg"
+    function oneUnit(unit) {
+        var u = String(unit || "");
+        if (/(x|ch|sh)es$/.test(u)) return u.slice(0, -2);
+        return u.replace(/s$/, "");
+    }
+
+    /* ---------- Big forms: a full screen on phones, a large window on computers ---------- */
+
+    var sheet = null;
+
+    /* options: { kicker, title, sub, fields: [nodes], submitText, wide, onSubmit(ctx) }
+       onSubmit returns true to stay open (e.g. something to fix), or throws an error to show. */
+    function openSheet(options) {
+        closeSheet();
+
+        var opener = document.activeElement;
+        var message = el("p", { className: "sheet-message", role: "status", "aria-live": "polite" });
+        var submit = el("button", { type: "submit", className: "btn btn-primary sheet-submit", text: options.submitText || "Save" });
+        var cancel = el("button", { type: "button", className: "btn btn-ghost sheet-cancel", text: "Cancel" });
+        var close = el("button", { type: "button", className: "sheet-close", "aria-label": "Close" }, [el("span", { "aria-hidden": "true", text: "×" })]);
+
+        var form = el("form", { className: "sheet-form", novalidate: true }, [
+            el("header", { className: "sheet-head" }, [
+                el("div", { className: "sheet-heading" }, [
+                    options.kicker ? el("p", { className: "sheet-kicker", text: options.kicker }) : null,
+                    el("h2", { className: "sheet-title", id: "sheetTitle", text: options.title }),
+                    options.sub ? el("p", { className: "sheet-sub", text: options.sub }) : null
+                ]),
+                close
+            ]),
+            el("div", { className: "sheet-body" }, options.fields),
+            el("footer", { className: "sheet-foot" }, [
+                message,
+                el("div", { className: "sheet-buttons" }, [cancel, submit])
+            ])
+        ]);
+
+        var dialog = el("div", {
+            className: "sheet" + (options.wide ? " is-wide" : ""),
+            role: "dialog",
+            "aria-modal": "true",
+            "aria-labelledby": "sheetTitle"
+        }, [form]);
+        var backdrop = el("div", { className: "sheet-backdrop" }, [dialog]);
+        var current = { backdrop: backdrop, form: form, opener: opener, submit: submit, message: message, label: submit.textContent };
+
+        var ctx = {
+            message: message,
+            setSubmitText: function (textValue) {
+                current.label = textValue;
+                if (!submit.disabled) submit.textContent = textValue;
+            },
+            // show what to fix, put the cursor there, and stay open
+            problem: function (textValue, field) {
+                message.textContent = textValue;
+                if (field && field.focus) field.focus();
+                return true;
+            }
+        };
+
+        close.addEventListener("click", closeSheet);
+        cancel.addEventListener("click", closeSheet);
+
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            if (submit.disabled) return;
+
+            message.textContent = "";
+            submit.disabled = true;
+            submit.textContent = "Saving…";
+
+            try {
+                var stay = await options.onSubmit(ctx);
+                if (stay !== true) closeSheet();
+            } catch (error) {
+                message.textContent = error && error.status === 401 ? "" : (error && error.message) || "Something went wrong. Please try again.";
+            } finally {
+                if (sheet === current) {
+                    submit.disabled = false;
+                    submit.textContent = current.label;
+                }
+            }
+        });
+
+        // Escape closes; Tab stays inside the form
+        backdrop.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeSheet();
+                return;
+            }
+            if (event.key !== "Tab") return;
+
+            var focusable = Array.prototype.filter.call(
+                form.querySelectorAll("button, input, select, textarea, a[href]"),
+                function (node) {
+                    return !node.disabled && node.offsetParent !== null && !(node.type === "radio" && !node.checked && form.querySelector('input[name="' + node.name + '"]:checked'));
+                }
+            );
+            if (!focusable.length) return;
+
+            var first = focusable[0];
+            var last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
+
+        $("toast").classList.remove("is-visible"); // an old message would cover the buttons
+        document.body.appendChild(backdrop);
+        document.documentElement.classList.add("sheet-open");
+        $("app").inert = true;
+        sheet = current;
+
+        var start = form.querySelector("[data-autofocus]") || form.querySelector(".sheet-body input, .sheet-body select, .sheet-body textarea");
+        if (start) {
+            start.focus({ preventScroll: true });
+            if (start.select && start.getAttribute("data-autofocus") === "select") start.select();
+        }
+
+        return current;
+    }
+
+    function closeSheet() {
+        if (!sheet) return;
+
+        var closing = sheet;
+        sheet = null;
+        closing.backdrop.remove();
+        document.documentElement.classList.remove("sheet-open");
+        $("app").inert = false;
+
+        var back = closing.opener && document.contains(closing.opener) ? closing.opener : sameOnNewCard(closing.opener);
+        if (back && back.focus) back.focus({ preventScroll: true });
+    }
+
+    // The list behind may have been drawn again after saving:
+    // find the same button on the same card, or else the card itself.
+    function sameOnNewCard(opener) {
+        var old = opener && opener.closest ? opener.closest("[data-key]") : null;
+        if (!old) return null;
+
+        var fresh = document.querySelector('[data-key="' + old.getAttribute("data-key") + '"]');
+        if (!fresh) return null;
+
+        var label = opener.textContent;
+        var match = Array.prototype.filter.call(fresh.querySelectorAll("button"), function (b) {
+            return b.textContent === label && !b.disabled;
+        })[0];
+        if (match) return match;
+
+        fresh.setAttribute("tabindex", "-1");
+        return fresh;
+    }
+
+    function sheetIsOpen() {
+        return Boolean(sheet);
+    }
+
+    /* A labelled block in a big form */
+    function sheetField(labelFor, labelText, children, help) {
+        var node = el("div", { className: "sheet-field" }, [
+            labelFor ? el("label", { for: labelFor, text: labelText }) : el("p", { className: "sheet-label", text: labelText })
+        ].concat(children, help ? [el("p", { className: "help", id: labelFor ? labelFor + "-help" : null, text: help })] : []));
+
+        // the help is read out with the field
+        var target = help && labelFor ? node.querySelector("#" + labelFor) : null;
+        if (target) {
+            var described = target.getAttribute("aria-describedby");
+            target.setAttribute("aria-describedby", (described ? described + " " : "") + labelFor + "-help");
+        }
+        return node;
+    }
+
+    /* A big number box with − and + and the unit beside it */
+    function bigNumber(id, options) {
+        var unitName = options.unit || "";
+        var whole = isWholeUnit(unitName);
+        var min = options.min === undefined ? 0 : options.min;
+        var input = el("input", {
+            id: id,
+            type: "text",
+            inputmode: whole ? "numeric" : "decimal",
+            autocomplete: "off",
+            className: "big-number-input",
+            "aria-describedby": id + "-unit"
+        });
+        if (options.value !== undefined && options.value !== null) input.value = qty(options.value).replace(/,/g, "");
+        if (options.autofocus) input.setAttribute("data-autofocus", "select");
+
+        function step(by) {
+            var current = readNumber(input.value);
+            var next = (isNaN(current) ? 0 : current) + by;
+            if (next < min) next = min;
+            if (options.max !== undefined && next > options.max) next = options.max;
+            input.value = String(Math.round(next * 100) / 100);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
+        var node = el("div", { className: "big-number" }, [
+            el("button", { type: "button", className: "big-step", "aria-label": "One less", text: "−", onclick: function () { step(-1); } }),
+            el("div", { className: "big-number-box" }, [
+                input,
+                el("span", { className: "big-number-unit", id: id + "-unit" })
+            ]),
+            el("button", { type: "button", className: "big-step", "aria-label": "One more", text: "+", onclick: function () { step(1); } })
+        ]);
+
+        // "1 roll", "2 rolls"
+        function showUnit() {
+            node.querySelector(".big-number-unit").textContent = readNumber(input.value) === 1 ? oneUnit(unitName) : unitName;
+        }
+
+        input.addEventListener("input", showUnit);
+        showUnit();
+
+        var control = {
+            node: node,
+            input: input,
+            whole: whole,
+            value: function () {
+                return readNumber(input.value);
+            },
+            setUnit: function (unit) {
+                unitName = unit || "";
+                control.whole = isWholeUnit(unitName);
+                input.setAttribute("inputmode", control.whole ? "numeric" : "decimal");
+                showUnit();
+            }
+        };
+        return control;
+    }
+
+    /* Big tappable choices (one of them), e.g. the department or the reason */
+    var chipCount = 0;
+
+    function choiceChips(legend, choices, chosen) {
+        chipCount += 1;
+        var name = "choice-" + chipCount;
+        var row = el("div", { className: "chips-row" });
+
+        choices.forEach(function (choice, index) {
+            var id = name + "-" + index;
+            var input = el("input", { type: "radio", name: name, id: id, value: choice.value });
+            if (choice.value === chosen) input.checked = true;
+            row.appendChild(el("label", { className: "chip-choice", for: id }, [input, el("span", { text: choice.label })]));
+        });
+
+        var node = el("fieldset", { className: "sheet-field chip-field" }, [el("legend", { text: legend }), row]);
+
+        return {
+            node: node,
+            value: function () {
+                var picked = node.querySelector("input:checked");
+                return picked ? picked.value : "";
+            },
+            focus: function () {
+                var first = node.querySelector("input:checked") || node.querySelector("input");
+                if (first) first.focus();
+            },
+            onChange: function (fn) {
+                node.addEventListener("change", fn);
+            }
+        };
+    }
+
+    /* ---------- Item figures and cards ---------- */
+
+    /* In stock (everything received since the item was added), used, and remaining now */
+    function figureUnit(value, unit) {
+        return " " + (Number(value) === 1 ? oneUnit(unit) : unit);
     }
 
     function stockFigures(item) {
         return el("dl", { className: "stock-figures" }, [
             el("div", {}, [
                 el("dt", { text: "In stock" }),
-                el("dd", { text: qty(item.received) })
+                el("dd", {}, [el("span", { className: "figure", text: qty(item.received) }), el("span", { className: "unit", text: figureUnit(item.received, item.unit) })])
             ]),
             el("div", {}, [
                 el("dt", { text: "Used" }),
-                el("dd", { text: qty(item.used) })
+                el("dd", {}, [el("span", { className: "figure", text: qty(item.used) }), el("span", { className: "unit", text: figureUnit(item.used, item.unit) })])
             ]),
             el("div", { className: "is-remaining" + (stock.changed[item._id] ? " is-updated" : "") }, [
                 el("dt", { text: "Remaining" }),
-                el("dd", {}, [el("span", { className: "figure", text: qty(item.quantity) }), el("span", { className: "unit", text: " " + item.unit })])
+                el("dd", {}, [el("span", { className: "figure", text: qty(item.quantity) }), el("span", { className: "unit", text: figureUnit(item.quantity, item.unit) })])
             ])
         ]);
     }
 
-    function departmentSelect(id, chosen) {
-        var select = el("select", { id: id, required: true });
-        fillSelect(select, stock.departments, "Choose…", chosen);
-        return select;
-    }
-
     function stockCard(item) {
         var info = STOCK_STATUS[item.status] || STOCK_STATUS.ok;
-        var formBox = el("div", { className: "stock-form-box" });
         var actions = el("div", { className: "booking-actions" });
         var waiting = item.waitingCount;
 
-        var meta = item.category + (item.lowStockAt > 0 ? " · warn at " + qty(item.lowStockAt) + " " + item.unit : "");
+        var meta = item.category + (item.lowStockAt > 0 ? " · warn at " + amountText(item.lowStockAt, item.unit) : "");
 
-        var card = el("article", { className: "stock-card is-" + item.status + (item.active ? "" : " is-archived") }, [
+        var card = el("article", { className: "stock-card is-" + item.status + (item.active ? "" : " is-archived"), "data-key": "item-" + item._id }, [
             el("div", { className: "stock-top" }, [
                 el("div", { className: "stock-title" }, [
                     el("h3", { className: "stock-name", text: item.name }),
@@ -2145,143 +2458,191 @@
                     : el("span", { className: "pill pill-closed", text: "Archived" })
             ]),
             stockFigures(item),
+            item.lost
+                ? el("p", { className: "stock-lost", text: "Expired or damaged: " + amountText(item.lost, item.unit) })
+                : null,
             item.corrections
-                ? el("p", { className: "stock-meta", text: "Corrections after counting: " + signed(item.corrections) + " " + item.unit })
+                ? el("p", { className: "stock-meta", text: "Corrections after counting: " + signed(item.corrections) + figureUnit(Math.abs(item.corrections), item.unit) })
                 : null,
             waiting
                 ? el("p", {
                     className: "count-waiting",
-                    text: "Count waiting for the owner: " + qty(waiting.counted) + " " + item.unit + " (" + signed(waiting.change) + "), by " + waiting.countedByName
+                    text: "Count waiting for the owner: " + amountText(waiting.counted, item.unit) + " (" + signed(waiting.change) + "), by " + waiting.countedByName
                 })
                 : null,
             item.unitCost !== undefined && item.unitCost > 0
-                ? el("p", { className: "stock-meta", text: formatRwf(item.unitCost) + " each · " + formatRwf(item.value) + " in store" })
+                ? el("p", { className: "stock-meta", text: formatRwf(item.unitCost) + " for one " + oneUnit(item.unit) + " · " + formatRwf(item.value) + " in store" })
                 : null,
             item.notes ? el("p", { className: "stock-notes", text: item.notes }) : null,
-            actions,
-            formBox
+            actions
         ]);
 
-        function renderActions() {
-            actions.textContent = "";
-            formBox.textContent = "";
-
-            if (item.active) {
-                if (can("stock.issue")) actions.appendChild(button("− Issue", "btn-ghost", function () { openMove("out"); }));
-                if (can("stock.count")) actions.appendChild(button("Count", "btn-ghost", function () { openMove("count"); }));
-            }
-
-            if (can("stock.items")) {
-                actions.appendChild(button("Edit", "btn-ghost", function () { openItemForm(item); }));
-            }
-
-            actions.hidden = !actions.children.length;
+        if (item.active) {
+            if (can("stock.issue")) actions.appendChild(button("− Issue", "btn-ghost", function () { openMove(item, "out"); }));
+            if (can("stock.count")) actions.appendChild(button("Count", "btn-ghost", function () { openMove(item, "count"); }));
+            if (can("stock.writeoff")) actions.appendChild(button("Expired / damaged", "btn-ghost", function () { openMove(item, "loss"); }));
         }
 
-        function openMove(type) {
-            actions.textContent = "";
-            actions.hidden = false;
-            formBox.textContent = "";
-
-            var id = "move-" + item._id;
-            var question = type === "out" ? "How many " + item.unit + " to issue?" : "How many " + item.unit + " are there now?";
-            var hint = type === "out" ? "What for? For example: rooms 1–3" : "For example: monthly count";
-
-            var amount = el("input", { id: id + "-qty", type: "number", inputmode: "decimal", min: "0", step: "0.01", required: true });
-            if (type === "count") amount.value = String(item.quantity);
-            var note = el("input", { id: id + "-note", type: "text", maxlength: "200", placeholder: hint, autocomplete: "off" });
-            var day = el("input", { id: id + "-day", type: "date", max: kigaliToday(), value: kigaliToday() });
-            var dept = type === "out" ? departmentSelect(id + "-dept", "") : null;
-
-            var fields = [el("div", { className: "room-field" }, [el("label", { for: id + "-qty", text: question }), amount])];
-            if (dept) fields.push(el("div", { className: "room-field" }, [el("label", { for: id + "-dept", text: "Which department?" }), dept]));
-            fields.push(
-                el("div", { className: "room-field" }, [el("label", { for: id + "-note", text: "Note (optional)" }), note]),
-                el("div", { className: "room-field" }, [el("label", { for: id + "-day", text: "Day" }), day])
-            );
-
-            var message = el("p", { className: "room-form-message", role: "status" });
-            var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: type === "out" ? "Issue" : "Save count" });
-
-            var form = el("form", { className: "stock-move", novalidate: true }, [
-                el("div", { className: "room-fields" }, fields),
-                type === "count" && !can("stock.approve")
-                    ? el("p", { className: "help", text: "If the number is different from the record, the owner approves it before the stock changes." })
-                    : null,
-                el("div", { className: "room-form-foot" }, [
-                    save,
-                    button("Cancel", "btn-ghost", renderActions),
-                    message
-                ])
-            ]);
-
-            form.addEventListener("submit", async function (event) {
-                event.preventDefault();
-
-                var number = Number(amount.value);
-                if (amount.value === "" || !isFinite(number) || number < 0 || (type !== "count" && number <= 0)) {
-                    message.textContent = type === "count" ? "Enter how many there are now." : "Enter how many.";
-                    amount.focus();
-                    return;
-                }
-
-                if (type === "out" && number > item.quantity) {
-                    message.textContent = "Only " + qty(item.quantity) + " " + item.unit + " are in stock. If that's wrong, count it.";
-                    amount.focus();
-                    return;
-                }
-
-                if (dept && !dept.value) {
-                    message.textContent = "Choose the department.";
-                    dept.focus();
-                    return;
-                }
-
-                var body = { type: type, quantity: number, note: note.value.trim(), day: day.value };
-                if (dept) body.department = dept.value;
-
-                save.disabled = true;
-                message.textContent = "Saving…";
-
-                try {
-                    var data = await api("POST", "/admin/stock/items/" + item._id + "/movements", body);
-                    var updated = data.item;
-                    var done;
-
-                    if (data.waiting) {
-                        done = "Count saved: " + qty(number) + " " + item.unit + ". It waits for the owner's approval.";
-                    } else if (type === "out") {
-                        done = "Issued " + qty(number) + " " + item.unit + " of " + item.name + " to " + body.department + ". " + qty(updated.quantity) + " left.";
-                    } else {
-                        var diff = data.movement.change;
-                        done = item.name + " counted: " + qty(updated.quantity) + " " + item.unit +
-                            (diff === 0 ? ", same as recorded." : " (" + signed(diff) + " compared with the record).");
-                    }
-
-                    replaceItem(updated);
-                    card.replaceWith(stockCard(updated));
-                    toast(done);
-                    refreshStockSummary();
-                } catch (error) {
-                    message.textContent = error.status === 401 ? "" : error.message;
-                    save.disabled = false;
-                }
-            });
-
-            formBox.appendChild(form);
-            amount.focus();
-            if (type === "count") amount.select();
+        if (can("stock.items")) {
+            actions.appendChild(button("Edit", "btn-ghost", function () { openItemForm(item); }));
         }
 
-        renderActions();
+        actions.hidden = !actions.children.length;
         return card;
     }
 
-    /* Add or change an item */
+    /* Issue, count, or write off (expired, damaged…) one item, in a big form */
+    function openMove(item, type) {
+        var id = "move-" + item._id;
+        var number = bigNumber(id + "-qty", {
+            unit: item.unit,
+            value: type === "count" ? item.quantity : null,
+            max: type === "count" ? undefined : item.quantity,
+            autofocus: true
+        });
+
+        var fields = [];
+        var dept = null;
+        var reason = null;
+        var preview = el("p", { className: "sheet-preview", "aria-live": "polite" });
+
+        if (type === "out") {
+            fields.push(sheetField(id + "-qty", "How many " + item.unit + " to issue?", [number.node]));
+            dept = choiceChips("Which department?", stock.departments.map(function (d) {
+                return { value: d, label: d };
+            }), "");
+            fields.push(dept.node);
+        } else if (type === "loss") {
+            fields.push(sheetField(id + "-qty", "How many " + item.unit + "?", [number.node]));
+            var reasons = lossReasons();
+            reason = choiceChips("Why?", Object.keys(reasons).map(function (key) {
+                return { value: key, label: reasons[key] };
+            }), "");
+            fields.push(reason.node);
+        } else {
+            fields.push(sheetField(id + "-qty", "How many " + item.unit + " are there now?", [number.node],
+                can("stock.approve") ? "" : "If it differs from the record, the owner approves it before the stock changes."));
+        }
+
+        fields.push(preview);
+
+        var hint = type === "out" ? "What for? For example: rooms 1–3" : type === "loss" ? "What happened? For example: past its date" : "For example: monthly count";
+        var note = el("input", { id: id + "-note", type: "text", maxlength: "200", placeholder: hint, autocomplete: "off" });
+        var day = el("input", { id: id + "-day", type: "date", max: kigaliToday(), value: kigaliToday() });
+
+        fields.push(el("div", { className: "sheet-pair" }, [
+            sheetField(id + "-note", type === "loss" ? "Note" : "Note (optional)", [note]),
+            sheetField(id + "-day", "Day", [day])
+        ]));
+
+        var verb = type === "out" ? "Issue" : type === "loss" ? "Write off" : "Save count";
+        var ctxRef = null;
+
+        function update() {
+            var n = number.value();
+            if (type === "count") {
+                if (isNaN(n)) preview.textContent = "The record says " + amountText(item.quantity, item.unit) + ".";
+                else if (n === item.quantity) preview.textContent = "Same as the record.";
+                else preview.textContent = "Difference: " + signed(n - item.quantity) + " " + item.unit + " compared with the record (" + qty(item.quantity) + ").";
+                return;
+            }
+            if (isNaN(n) || n <= 0) {
+                preview.textContent = amountText(item.quantity, item.unit) + " in stock now.";
+                if (ctxRef) ctxRef.setSubmitText(verb);
+                return;
+            }
+            preview.textContent = n > item.quantity
+                ? "Only " + amountText(item.quantity, item.unit) + " in stock."
+                : "After this: " + amountText(Math.round((item.quantity - n) * 100) / 100, item.unit) + " left.";
+            if (ctxRef) ctxRef.setSubmitText(verb + " " + amountText(n, item.unit));
+        }
+
+        number.input.addEventListener("input", update);
+
+        var opened = openSheet({
+            kicker: type === "out" ? "Issue" : type === "loss" ? "Expired or damaged" : "Count",
+            title: item.name,
+            sub: amountText(item.quantity, item.unit) + " in stock",
+            fields: fields,
+            submitText: verb,
+            onSubmit: async function (ctx) {
+                var n = number.value();
+
+                if (isNaN(n) || n < 0 || (type !== "count" && n === 0)) {
+                    return ctx.problem(type === "count" ? "Enter how many there are now." : "Enter how many.", number.input);
+                }
+                if (number.whole && !Number.isInteger(n)) {
+                    return ctx.problem(item.name + " is counted in " + item.unit + ": please use a whole number.", number.input);
+                }
+                if (type !== "count" && n > item.quantity) {
+                    return ctx.problem("Only " + amountText(item.quantity, item.unit) + " in stock. If that's wrong, count it.", number.input);
+                }
+                if (dept && !dept.value()) return ctx.problem("Choose the department.", { focus: dept.focus });
+                if (reason && !reason.value()) return ctx.problem("Choose why.", { focus: reason.focus });
+                if (reason && reason.value() === "other" && !note.value.trim()) {
+                    return ctx.problem("Please say what happened in the note.", note);
+                }
+
+                var body = { type: type, quantity: n, note: note.value.trim(), day: day.value };
+                if (dept) body.department = dept.value();
+                if (reason) body.reason = reason.value();
+
+                var data = await api("POST", "/admin/stock/items/" + item._id + "/movements", body);
+                var updated = data.item;
+                var done;
+
+                if (data.waiting) {
+                    done = "Count saved: " + amountText(n, item.unit) + ". It waits for the owner's approval.";
+                } else if (type === "out") {
+                    done = "Issued " + amountText(n, item.unit) + " of " + item.name + " to " + body.department + ". " + amountText(updated.quantity, item.unit) + " left.";
+                } else if (type === "loss") {
+                    done = "Written off " + amountText(n, item.unit) + " of " + item.name + " (" + lossReasons()[body.reason].toLowerCase() + "). " +
+                        amountText(updated.quantity, item.unit) + " left.";
+                } else {
+                    var diff = data.movement.change;
+                    done = item.name + " counted: " + amountText(updated.quantity, item.unit) +
+                        (diff === 0 ? ", same as the record." : " (" + signed(diff) + " compared with the record).");
+                }
+
+                replaceItem(updated);
+                renderStockList();
+                toast(done);
+                refreshStockSummary();
+            }
+        });
+
+        ctxRef = {
+            setSubmitText: function (textValue) {
+                opened.label = textValue;
+                if (!opened.submit.disabled) opened.submit.textContent = textValue;
+            }
+        };
+        update();
+    }
+
+    /* A select of units, grouped: weight, volume, counted */
+    function unitSelect(id, chosen) {
+        var select = el("select", { id: id });
+        var known = false;
+
+        unitGroups().forEach(function (group) {
+            var optgroup = el("optgroup", { label: group.group });
+            group.units.forEach(function (unit) {
+                if (unit === chosen) known = true;
+                optgroup.appendChild(el("option", { value: unit, text: unit }));
+            });
+            select.appendChild(optgroup);
+        });
+
+        // an item made before the list existed keeps its own unit
+        if (chosen && !known) select.insertBefore(el("option", { value: chosen, text: chosen }), select.firstChild);
+        select.value = chosen || "pieces";
+        return select;
+    }
+
+    /* Add or change an item, in a big form */
     function openItemForm(item) {
-        var slot = $("itemFormSlot");
         var editing = Boolean(item);
-        slot.textContent = "";
 
         var name = el("input", { id: "itemName", type: "text", maxlength: "80", required: true, autocomplete: "off" });
         var category = el("select", { id: "itemCategory" });
@@ -2289,155 +2650,154 @@
             category.appendChild(el("option", { value: c, text: c }));
         });
 
-        var unitList = el("datalist", { id: "unitOptions" });
-        STOCK_UNITS.forEach(function (u) {
-            unitList.appendChild(el("option", { value: u }));
-        });
-
-        var unit = el("input", { id: "itemUnit", type: "text", maxlength: "20", list: "unitOptions", placeholder: "rolls, bottles, kg…", autocomplete: "off" });
-        var start = el("input", { id: "itemStart", type: "number", inputmode: "decimal", min: "0", step: "0.01", value: "0" });
-        var low = el("input", { id: "itemLow", type: "number", inputmode: "decimal", min: "0", step: "0.01", value: "0", "aria-describedby": "itemLowHelp" });
-        var cost = el("input", { id: "itemCost", type: "number", inputmode: "numeric", min: "0", step: "1", value: "0" });
+        var unit = unitSelect("itemUnit", editing ? item.unit : "pieces");
+        var start = el("input", { id: "itemStart", type: "text", inputmode: "decimal", value: "0", autocomplete: "off" });
+        var low = el("input", { id: "itemLow", type: "text", inputmode: "decimal", value: "0", autocomplete: "off" });
+        var cost = el("input", { id: "itemCost", type: "text", inputmode: "numeric", value: "0", autocomplete: "off" });
         var notes = el("input", { id: "itemNotes", type: "text", maxlength: "300", autocomplete: "off" });
+
+        var startUnit = el("span", { className: "input-unit" });
+        var lowUnit = el("span", { className: "input-unit" });
+        var costUnit = el("span", { className: "input-unit" });
+
+        function showUnits() {
+            startUnit.textContent = unit.value;
+            lowUnit.textContent = unit.value;
+            costUnit.textContent = "RWF for one " + oneUnit(unit.value);
+        }
 
         if (editing) {
             name.value = item.name;
             category.value = item.category;
-            unit.value = item.unit;
-            low.value = String(item.lowStockAt);
+            low.value = qty(item.lowStockAt).replace(/,/g, "");
             cost.value = String(item.unitCost || 0);
             notes.value = item.notes || "";
         } else {
             category.value = stock.category || "Toiletries";
-            unit.value = "pieces";
         }
 
-        var message = el("p", { className: "room-form-message", role: "status" });
-        var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: editing ? "Save changes" : "Add item" });
+        unit.addEventListener("change", showUnits);
+        showUnits();
+        name.setAttribute("data-autofocus", "true");
+
         var showPrice = can("stock.prices");
         var showStart = !editing && can("stock.approve"); // stock without a purchase is the owner's call
 
         var fields = [
-            el("div", { className: "room-field" }, [el("label", { for: "itemName", text: "Name" }), name]),
-            el("div", { className: "room-field" }, [el("label", { for: "itemCategory", text: "Category" }), category]),
-            el("div", { className: "room-field" }, [el("label", { for: "itemUnit", text: "Counted in" }), unit, unitList])
+            sheetField("itemName", "Name", [name]),
+            el("div", { className: "sheet-pair" }, [
+                sheetField("itemCategory", "Category", [category]),
+                sheetField("itemUnit", "Counted in", [unit], "Weight and volume can have decimals (2.5 kg). Counted things are whole numbers.")
+            ])
         ];
 
         if (showStart) {
-            fields.push(el("div", { className: "room-field" }, [el("label", { for: "itemStart", text: "How many you have now" }), start]));
+            fields.push(sheetField("itemStart", "How many you have now", [el("div", { className: "input-with-unit" }, [start, startUnit])]));
         }
 
-        fields.push(
-            el("div", { className: "room-field" }, [
-                el("label", { for: "itemLow", text: "Warn me when there are" }),
-                low,
-                el("p", { className: "help", id: "itemLowHelp", text: "…or fewer left. 0 = never warn." })
-            ]),
-            showPrice ? el("div", { className: "room-field" }, [el("label", { for: "itemCost", text: "Price for one (RWF)" }), cost]) : null,
-            el("div", { className: "room-field room-field-wide" }, [el("label", { for: "itemNotes", text: "Notes (optional)" }), notes])
-        );
+        fields.push(sheetField("itemLow", "Warn me when there are", [el("div", { className: "input-with-unit" }, [low, lowUnit])], "…or fewer left. 0 = never warn."));
+        if (showPrice) fields.push(sheetField("itemCost", "Price", [el("div", { className: "input-with-unit" }, [cost, costUnit])]));
+        fields.push(sheetField("itemNotes", "Notes (optional)", [notes]));
 
-        var foot = el("div", { className: "room-form-foot" }, [
-            save,
-            button("Cancel", "btn-ghost", function () {
-                slot.textContent = "";
-            })
-        ]);
+        if (!editing && !showStart) {
+            fields.push(el("p", { className: "help", text: "New items start at 0. Stock comes in when the owner's purchase is checked in, or count it and the owner approves the number." }));
+        }
 
+        // archive / bring back / delete, for an item that already exists
         if (editing) {
-            foot.appendChild(button(item.active ? "Archive item" : "Bring back", "btn-ghost", function () {
-                submit({ active: !item.active }, item.active
-                    ? item.name + " archived. It stays in old reports."
-                    : item.name + " is back in the stock list.");
-            }));
-            if (can("stock.delete")) foot.appendChild(button("Delete item", "btn-ghost btn-danger", askDelete));
-        }
+            var more = el("div", { className: "sheet-more" });
 
-        foot.appendChild(message);
-
-        function askDelete() {
-            var history = item.changes
-                ? " Its history (" + plural(item.changes, "change", "changes") + ") is deleted too, and it disappears from reports. To keep the history, archive it instead."
-                : "";
-            var box = el("div", { className: "stock-delete-confirm" }, [
-                el("p", { className: "confirm-text", text: "Delete " + item.name + " for good?" + history })
-            ]);
-            var keep = button("Keep it", "btn-ghost", function () {
-                box.remove();
-                foot.hidden = false;
-            });
-
-            box.appendChild(button("Yes, delete", "btn-primary", async function () {
-                this.disabled = true;
+            var archive = button(item.active ? "Archive item" : "Bring back", "btn-ghost", async function () {
+                archive.disabled = true;
                 try {
-                    await api("DELETE", "/admin/stock/items/" + item._id);
-                    slot.textContent = "";
-                    toast(item.name + " deleted.");
+                    await api("PATCH", "/admin/stock/items/" + item._id, { active: !item.active });
+                    closeSheet();
+                    toast(item.active ? item.name + " archived. It stays in old reports." : item.name + " is back in the stock list.");
                     load("stock", true);
                 } catch (error) {
+                    archive.disabled = false;
                     if (error.status !== 401) toast(error.message, true);
-                    box.remove();
-                    foot.hidden = false;
                 }
-            }));
-            box.appendChild(keep);
+            });
+            more.appendChild(archive);
 
-            foot.hidden = true;
-            form.appendChild(box);
-            keep.focus();
+            if (can("stock.delete")) {
+                var del = button("Delete item", "btn-ghost btn-danger", function () {
+                    var history = item.changes
+                        ? " Its history (" + plural(item.changes, "change", "changes") + ") is deleted too, and it disappears from reports. To keep the history, archive it instead."
+                        : "";
+                    var box = el("div", { className: "stock-delete-confirm" }, [
+                        el("p", { className: "confirm-text", text: "Delete " + item.name + " for good?" + history })
+                    ]);
+                    var keep = button("Keep it", "btn-ghost", function () {
+                        box.remove();
+                        more.hidden = false;
+                    });
+                    box.appendChild(button("Yes, delete", "btn-primary", async function () {
+                        this.disabled = true;
+                        try {
+                            await api("DELETE", "/admin/stock/items/" + item._id);
+                            closeSheet();
+                            toast(item.name + " deleted.");
+                            load("stock", true);
+                        } catch (error) {
+                            if (error.status !== 401) toast(error.message, true);
+                            box.remove();
+                            more.hidden = false;
+                        }
+                    }));
+                    box.appendChild(keep);
+                    more.hidden = true;
+                    more.parentNode.appendChild(box);
+                    keep.focus();
+                });
+                more.appendChild(del);
+            }
+
+            fields.push(more);
         }
 
-        var form = el("form", { className: "form-card item-form", novalidate: true }, [
-            el("h2", { text: editing ? "Change " + item.name : "Add an item" }),
-            el("div", { className: "room-fields" }, fields),
-            !editing && !showStart
-                ? el("p", { className: "help", text: "New items start at 0. Stock comes in when the owner's purchase is checked in, or count it and the owner approves the number." })
-                : null,
-            foot
-        ]);
+        openSheet({
+            kicker: editing ? "Change item" : "Add an item",
+            title: editing ? item.name : "New stock item",
+            fields: fields,
+            submitText: editing ? "Save changes" : "Add item",
+            onSubmit: async function (ctx) {
+                if (!name.value.trim()) return ctx.problem("Please enter the item's name.", name);
 
-        async function submit(body, doneMessage) {
-            save.disabled = true;
-            message.textContent = "Saving…";
+                var lowNumber = low.value.trim() === "" ? 0 : readNumber(low.value);
+                if (isNaN(lowNumber)) return ctx.problem("\"Warn me when there are\" must be a number.", low);
 
-            try {
+                var body = {
+                    name: name.value.trim(),
+                    category: category.value,
+                    unit: unit.value,
+                    lowStockAt: lowNumber,
+                    notes: notes.value.trim()
+                };
+
+                if (showPrice) {
+                    var price = cost.value.trim() === "" ? 0 : readNumber(cost.value);
+                    if (isNaN(price) || !Number.isInteger(price)) return ctx.problem("The price is a whole number of RWF.", cost);
+                    body.unitCost = price;
+                }
+
+                if (showStart) {
+                    var startNumber = start.value.trim() === "" ? 0 : readNumber(start.value);
+                    if (isNaN(startNumber)) return ctx.problem("\"How many you have now\" must be a number.", start);
+                    if (isWholeUnit(unit.value) && !Number.isInteger(startNumber)) {
+                        return ctx.problem("Things counted in " + unit.value + " are whole numbers.", start);
+                    }
+                    body.quantity = startNumber;
+                }
+
                 if (editing) await api("PATCH", "/admin/stock/items/" + item._id, body);
                 else await api("POST", "/admin/stock/items", body);
-                slot.textContent = "";
-                toast(doneMessage);
-                load("stock", true);
-            } catch (error) {
-                message.textContent = error.status === 401 ? "" : error.message;
-                save.disabled = false;
+
+                toast(editing ? body.name + " saved." : body.name + " added.");
+                await load("stock", true);
             }
-        }
-
-        form.addEventListener("submit", function (event) {
-            event.preventDefault();
-
-            if (!name.value.trim()) {
-                message.textContent = "Please enter the item's name.";
-                name.focus();
-                return;
-            }
-
-            var body = {
-                name: name.value.trim(),
-                category: category.value,
-                unit: unit.value.trim() || "pieces",
-                lowStockAt: low.value === "" ? 0 : Number(low.value),
-                notes: notes.value.trim()
-            };
-
-            if (showPrice) body.unitCost = cost.value === "" ? 0 : Number(cost.value);
-            if (showStart) body.quantity = start.value === "" ? 0 : Number(start.value);
-
-            submit(body, editing ? body.name + " saved." : body.name + " added.");
         });
-
-        slot.appendChild(form);
-        slot.scrollIntoView({ behavior: "smooth", block: "start" });
-        name.focus();
     }
 
     $("addItemButton").addEventListener("click", function () {
@@ -2549,7 +2909,7 @@
             info.push("Turned down by " + request.issuedByName + (request.rejectReason ? ": " + request.rejectReason : ""));
         }
 
-        var card = el("article", { className: "doc-card is-" + request.status }, [
+        var card = el("article", { className: "doc-card is-" + request.status, "data-key": "request-" + request._id }, [
             el("div", { className: "staff-top" }, [
                 el("h3", { className: "staff-name", text: request.ref + " · " + request.department }),
                 el("div", { className: "badges" }, [el("span", { className: badge.className, text: badge.text })])
@@ -2584,57 +2944,53 @@
         }
 
         function openIssue() {
-            actions.textContent = "";
-            var inputs = [];
-            var fields = el("div", { className: "room-fields" });
+            var numbers = [];
+            var fields = [];
 
             request.lines.forEach(function (line, index) {
                 var item = itemById(String(line.itemId));
                 var inStock = item ? item.quantity : 0;
                 var id = "issue-" + request._id + "-" + index;
-                var input = el("input", { id: id, type: "number", inputmode: "decimal", min: "0", max: String(line.quantity), step: "0.01" });
-                input.value = String(Math.min(line.quantity, inStock));
-                inputs.push(input);
-                fields.appendChild(el("div", { className: "room-field" }, [
-                    el("label", { for: id, text: line.itemName + " (" + qty(inStock) + " " + line.unit + " in stock)" }),
-                    input,
-                    el("p", { className: "help", text: "Asked for " + qty(line.quantity) + " " + line.unit })
-                ]));
+                var number = bigNumber(id, { unit: line.unit, value: Math.min(line.quantity, inStock), max: line.quantity, autofocus: index === 0 });
+                numbers.push(number);
+                fields.push(sheetField(id, line.itemName, [number.node],
+                    "Asked for " + amountText(line.quantity, line.unit) + " · " + amountText(inStock, line.unit) + " in stock"));
             });
 
             var noteId = "issue-note-" + request._id;
             var note = el("input", { id: noteId, type: "text", maxlength: "200", autocomplete: "off", placeholder: "For example: only 1 soap left" });
-            fields.appendChild(el("div", { className: "room-field room-field-wide" }, [el("label", { for: noteId, text: "Note (optional)" }), note]));
+            fields.push(sheetField(noteId, "Note (optional)", [note]));
 
-            var message = el("p", { className: "room-form-message", role: "status" });
-            var form = el("form", { className: "doc-form", novalidate: true }, [
-                fields,
-                el("div", { className: "room-form-foot" }, [
-                    el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Give these" }),
-                    button("Cancel", "btn-ghost", renderActions),
-                    message
-                ])
-            ]);
+            openSheet({
+                kicker: "Issue a request",
+                title: request.ref + " · " + request.department,
+                sub: "Asked by " + request.requestedByName + " · " + bookedAt(request.createdAt) + (request.note ? " · " + request.note : ""),
+                fields: fields,
+                submitText: "Give these",
+                onSubmit: async function (ctx) {
+                    var body = { note: note.value.trim(), lines: [] };
 
-            form.addEventListener("submit", function (event) {
-                event.preventDefault();
-                var body = { note: note.value.trim(), lines: [] };
-
-                for (var i = 0; i < request.lines.length; i += 1) {
-                    var number = Number(inputs[i].value);
-                    if (inputs[i].value === "" || !isFinite(number) || number < 0 || number > request.lines[i].quantity) {
-                        message.textContent = "For " + request.lines[i].itemName + ", give 0 to " + qty(request.lines[i].quantity) + ".";
-                        inputs[i].focus();
-                        return;
+                    for (var i = 0; i < request.lines.length; i += 1) {
+                        var line = request.lines[i];
+                        var n = numbers[i].value();
+                        if (isNaN(n) || n < 0 || n > line.quantity) {
+                            return ctx.problem("For " + line.itemName + ", give 0 to " + amountText(line.quantity, line.unit) + ".", numbers[i].input);
+                        }
+                        if (numbers[i].whole && !Number.isInteger(n)) {
+                            return ctx.problem(line.itemName + " is counted in " + line.unit + ": please use a whole number.", numbers[i].input);
+                        }
+                        body.lines.push({ itemId: line.itemId, issued: n });
                     }
-                    body.lines.push({ itemId: request.lines[i].itemId, issued: number });
+
+                    if (body.lines.every(function (l) { return l.issued === 0; })) {
+                        return ctx.problem("Nothing to give? Close this and press Turn down instead, saying why.", numbers[0].input);
+                    }
+
+                    await api("POST", "/admin/requests/" + request._id + "/issue", body);
+                    toast(request.ref + " given to " + request.requestedByName + ". The stock has gone down.");
+                    await load("stock", true);
                 }
-
-                send("issue", body, request.ref + " given to " + request.requestedByName + ". The stock has gone down.");
             });
-
-            actions.appendChild(form);
-            if (inputs[0]) inputs[0].focus();
         }
 
         function askReject() {
@@ -2686,47 +3042,49 @@
         return card;
     }
 
-    /* Staff: ask for supplies */
+    /* Staff: ask for supplies, in a big form */
     function openRequestForm() {
-        var slot = $("requestFormSlot");
-        slot.textContent = "";
-
         if (!stock.catalog.length) {
-            slot.appendChild(el("p", { className: "room-note", text: "There are no items to ask for yet. Ask the manager to add them." }));
+            toast("There are no items to ask for yet. Ask the manager to add them.", true);
             return;
         }
 
-        var dept = el("select", { id: "requestDept" });
-        fillSelect(dept, stock.departments, "Choose…", user.department || "");
+        var dept = choiceChips("For which department?", stock.departments.map(function (d) {
+            return { value: d, label: d };
+        }), user.department || "");
 
-        var linesBox = el("div", { className: "line-rows" });
+        var linesBox = el("div", { className: "request-lines" });
         var count = 0;
+
+        function catalogItem(id) {
+            return stock.catalog.filter(function (i) { return i._id === id; })[0] || null;
+        }
 
         function addLine() {
             count += 1;
             var id = "requestItem-" + count;
             var select = itemSelect(id, stock.catalog, "", true);
-            var amount = el("input", { id: id + "-qty", type: "number", inputmode: "decimal", min: "0.01", step: "0.01", placeholder: "How many" });
-            var unit = el("span", { className: "line-unit", text: "" });
+            var number = bigNumber(id + "-qty", { unit: "", min: 0 });
 
             select.addEventListener("change", function () {
-                var item = stock.catalog.filter(function (i) { return i._id === select.value; })[0];
-                unit.textContent = item ? item.unit : "";
+                var item = catalogItem(select.value);
+                if (item && !number.input.value) number.input.value = "1";
+                number.setUnit(item ? item.unit : "");
             });
 
-            var row = el("div", { className: "line-row" }, [
-                el("div", { className: "room-field line-item" }, [el("label", { for: id, text: "Item" }), select]),
-                el("div", { className: "room-field line-qty" }, [el("label", { for: id + "-qty", text: "How many" }), el("div", { className: "qty-with-unit" }, [amount, unit])]),
+            var row = el("div", { className: "request-line" }, [
+                sheetField(id, "Item", [select]),
+                sheetField(id + "-qty", "How many?", [number.node]),
                 el("button", {
                     type: "button",
-                    className: "line-remove",
-                    "aria-label": "Remove this item",
-                    text: "×",
+                    className: "link-btn line-remove-link",
+                    text: "Remove this item",
                     onclick: function () {
                         if (linesBox.children.length > 1) row.remove();
                     }
                 })
             ]);
+
             linesBox.appendChild(row);
             return select;
         }
@@ -2734,74 +3092,48 @@
         addLine();
 
         var note = el("input", { id: "requestNote", type: "text", maxlength: "200", autocomplete: "off", placeholder: "For example: for rooms 1–6" });
-        var message = el("p", { className: "room-form-message", role: "status" });
-        var send = el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Send request" });
 
-        var form = el("form", { className: "form-card doc-form", novalidate: true }, [
-            el("h2", { text: "Ask for supplies" }),
-            el("div", { className: "room-field" }, [el("label", { for: "requestDept", text: "For which department?" }), dept]),
-            linesBox,
-            el("button", { type: "button", className: "link-btn add-line", text: "+ Add another item", onclick: function () { addLine().focus(); } }),
-            el("div", { className: "room-field" }, [el("label", { for: "requestNote", text: "Note (optional)" }), note]),
-            el("div", { className: "room-form-foot" }, [
-                send,
-                button("Cancel", "btn-ghost", function () { slot.textContent = ""; }),
-                message
-            ])
-        ]);
+        openSheet({
+            kicker: "Ask for supplies",
+            title: "What do you need?",
+            sub: "The manager issues it; then you confirm you received it.",
+            fields: [
+                dept.node,
+                linesBox,
+                el("button", { type: "button", className: "btn btn-ghost add-line-big", text: "+ Add another item", onclick: function () { addLine().focus(); } }),
+                sheetField("requestNote", "Note (optional)", [note])
+            ],
+            submitText: "Send request",
+            onSubmit: async function (ctx) {
+                if (!dept.value()) return ctx.problem("Choose the department.", { focus: dept.focus });
 
-        form.addEventListener("submit", async function (event) {
-            event.preventDefault();
+                var lines = [];
+                var rows = linesBox.querySelectorAll(".request-line");
 
-            if (!dept.value) {
-                message.textContent = "Choose the department.";
-                dept.focus();
-                return;
-            }
+                for (var i = 0; i < rows.length; i += 1) {
+                    var select = rows[i].querySelector("select");
+                    var input = rows[i].querySelector(".big-number-input");
+                    if (!select.value && !input.value) continue;
+                    if (!select.value) return ctx.problem("Choose the item.", select);
 
-            var lines = [];
-            var rows = linesBox.querySelectorAll(".line-row");
-
-            for (var i = 0; i < rows.length; i += 1) {
-                var select = rows[i].querySelector("select");
-                var amount = rows[i].querySelector("input");
-                if (!select.value && !amount.value) continue;
-                if (!select.value) {
-                    message.textContent = "Choose the item.";
-                    select.focus();
-                    return;
+                    var item = catalogItem(select.value);
+                    var n = readNumber(input.value);
+                    if (isNaN(n) || n <= 0) return ctx.problem("Enter how many you need.", input);
+                    if (item && isWholeUnit(item.unit) && !Number.isInteger(n)) {
+                        return ctx.problem(item.name + " is counted in " + item.unit + ": please use a whole number.", input);
+                    }
+                    lines.push({ itemId: select.value, quantity: n });
                 }
-                var number = Number(amount.value);
-                if (!amount.value || !isFinite(number) || number <= 0) {
-                    message.textContent = "Enter how many you need.";
-                    amount.focus();
-                    return;
-                }
-                lines.push({ itemId: select.value, quantity: number });
-            }
 
-            if (!lines.length) {
-                message.textContent = "Choose at least one item.";
-                rows[0].querySelector("select").focus();
-                return;
-            }
+                if (!lines.length) return ctx.problem("Choose at least one item.", rows[0].querySelector("select"));
 
-            send.disabled = true;
-            message.textContent = "Sending…";
-
-            try {
-                var data = await api("POST", "/admin/requests", { department: dept.value, note: note.value.trim(), lines: lines });
-                slot.textContent = "";
+                var data = await api("POST", "/admin/requests", { department: dept.value(), note: note.value.trim(), lines: lines });
                 toast(data.request.ref + " sent. The manager will issue it.");
                 loadRequests(true).catch(showLoadError);
-            } catch (error) {
-                message.textContent = error.status === 401 ? "" : error.message;
-                send.disabled = false;
             }
         });
 
-        slot.appendChild(form);
-        (dept.value ? form.querySelector(".line-row select") : dept).focus();
+        if (dept.value()) linesBox.querySelector("select").focus();
     }
 
     $("newRequestButton").addEventListener("click", openRequestForm);
@@ -2863,7 +3195,7 @@
         }
         if (purchase.status === "cancelled") info.push("Cancelled by " + purchase.cancelledByName + " · " + bookedAt(purchase.cancelledAt));
 
-        var card = el("article", { className: "doc-card is-" + purchase.status }, [
+        var card = el("article", { className: "doc-card is-" + purchase.status, "data-key": "purchase-" + purchase._id }, [
             el("div", { className: "staff-top" }, [
                 el("h3", { className: "staff-name", text: purchase.ref + " · " + purchase.supplier }),
                 el("div", { className: "badges" }, badges)
@@ -2897,54 +3229,46 @@
         }
 
         function openReceive() {
-            actions.textContent = "";
-            var inputs = [];
-            var fields = el("div", { className: "room-fields" });
+            var numbers = [];
+            var fields = [];
 
             purchase.lines.forEach(function (line, index) {
                 var id = "receive-" + purchase._id + "-" + index;
-                var input = el("input", { id: id, type: "number", inputmode: "decimal", min: "0", max: String(line.quantity), step: "0.01", value: String(line.quantity) });
-                inputs.push(input);
-                fields.appendChild(el("div", { className: "room-field" }, [
-                    el("label", { for: id, text: line.itemName + ": how many came in?" }),
-                    input,
-                    el("p", { className: "help", text: "Bought " + qty(line.quantity) + " " + line.unit })
-                ]));
+                var number = bigNumber(id, { unit: line.unit, value: line.quantity, max: line.quantity, autofocus: index === 0 });
+                numbers.push(number);
+                fields.push(sheetField(id, line.itemName + ": how many came in?", [number.node], "Bought " + amountText(line.quantity, line.unit)));
             });
 
             var noteId = "receive-note-" + purchase._id;
             var note = el("input", { id: noteId, type: "text", maxlength: "300", autocomplete: "off", placeholder: "Anything missing or damaged?" });
-            fields.appendChild(el("div", { className: "room-field room-field-wide" }, [el("label", { for: noteId, text: "Note (optional)" }), note]));
+            fields.push(sheetField(noteId, "Note (optional)", [note]));
 
-            var message = el("p", { className: "room-form-message", role: "status" });
-            var form = el("form", { className: "doc-form", novalidate: true }, [
-                fields,
-                el("div", { className: "room-form-foot" }, [
-                    el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Add to stock" }),
-                    button("Cancel", "btn-ghost", renderActions),
-                    message
-                ])
-            ]);
+            openSheet({
+                kicker: "Check in a purchase",
+                title: purchase.ref + " · " + purchase.supplier,
+                sub: "Bought " + shortDay(purchase.day) + " · recorded by " + purchase.createdByName,
+                fields: fields,
+                submitText: "Add to stock",
+                onSubmit: async function (ctx) {
+                    var body = { note: note.value.trim(), lines: [] };
 
-            form.addEventListener("submit", function (event) {
-                event.preventDefault();
-                var body = { note: note.value.trim(), lines: [] };
-
-                for (var i = 0; i < purchase.lines.length; i += 1) {
-                    var number = Number(inputs[i].value);
-                    if (inputs[i].value === "" || !isFinite(number) || number < 0 || number > purchase.lines[i].quantity) {
-                        message.textContent = "For " + purchase.lines[i].itemName + ", enter 0 to " + qty(purchase.lines[i].quantity) + ".";
-                        inputs[i].focus();
-                        return;
+                    for (var i = 0; i < purchase.lines.length; i += 1) {
+                        var line = purchase.lines[i];
+                        var n = numbers[i].value();
+                        if (isNaN(n) || n < 0 || n > line.quantity) {
+                            return ctx.problem("For " + line.itemName + ", enter 0 to " + amountText(line.quantity, line.unit) + ".", numbers[i].input);
+                        }
+                        if (numbers[i].whole && !Number.isInteger(n)) {
+                            return ctx.problem(line.itemName + " is counted in " + line.unit + ": please use a whole number.", numbers[i].input);
+                        }
+                        body.lines.push({ itemId: line.itemId, received: n });
                     }
-                    body.lines.push({ itemId: purchase.lines[i].itemId, received: number });
+
+                    await api("POST", "/admin/purchases/" + purchase._id + "/receive", body);
+                    toast(purchase.ref + " checked in. The stock has gone up.");
+                    await load("stock", true);
                 }
-
-                send("receive", body, purchase.ref + " checked in. The stock has gone up.");
             });
-
-            actions.appendChild(form);
-            if (inputs[0]) inputs[0].focus();
         }
 
         function askCancel() {
@@ -2969,37 +3293,39 @@
         return card;
     }
 
-    /* Owner: record what was bought */
+    /* Owner: record what was bought, in a big form */
     function openPurchaseForm() {
-        var slot = $("purchaseFormSlot");
         var items = stock.items.filter(function (i) { return i.active; });
         var budget = null;
         var budgetMonth = "";
-        slot.textContent = "";
 
         if (!items.length) {
-            slot.appendChild(el("p", { className: "room-note", text: "Add the items to the stock list first (Items, then Add item)." }));
+            toast("Add the items to the stock list first (Items, then Add item).", true);
             return;
         }
 
-        var supplier = el("input", { id: "purchaseSupplier", type: "text", maxlength: "80", autocomplete: "off", placeholder: "For example: Simba Supermarket" });
+        var supplier = el("input", { id: "purchaseSupplier", type: "text", maxlength: "80", autocomplete: "off", placeholder: "For example: Simba Supermarket", "data-autofocus": "true" });
         var day = el("input", { id: "purchaseDay", type: "date", max: kigaliToday(), value: kigaliToday() });
-        var linesBox = el("div", { className: "line-rows" });
+        var linesBox = el("div", { className: "purchase-lines" });
         var totalLine = el("p", { className: "purchase-total" });
         var budgetBox = el("div", { className: "budget-check", "aria-live": "polite" });
         var count = 0;
 
         function readLines() {
-            var lines = [];
-            linesBox.querySelectorAll(".line-row").forEach(function (row) {
+            return Array.prototype.map.call(linesBox.querySelectorAll(".purchase-line"), function (row) {
                 var select = row.querySelector("select");
-                var inputs = row.querySelectorAll("input");
-                var item = itemById(select.value);
-                var quantity = Number(inputs[0].value);
-                var cost = Number(inputs[1].value);
-                lines.push({ row: row, item: item, select: select, qtyInput: inputs[0], costInput: inputs[1], quantity: quantity, unitCost: cost });
+                var qtyInput = row.querySelector(".line-qty-input");
+                var costInput = row.querySelector(".line-cost-input");
+                return {
+                    row: row,
+                    item: itemById(select.value),
+                    select: select,
+                    qtyInput: qtyInput,
+                    costInput: costInput,
+                    quantity: readNumber(qtyInput.value),
+                    unitCost: readNumber(costInput.value)
+                };
             });
-            return lines;
         }
 
         function update() {
@@ -3008,7 +3334,7 @@
 
             readLines().forEach(function (line) {
                 var sum = line.item && line.quantity > 0 && line.unitCost >= 0 ? Math.round(line.quantity * line.unitCost) : 0;
-                line.row.querySelector(".line-sum").textContent = sum ? formatRwf(sum) : "";
+                line.row.querySelector(".line-sum").textContent = sum ? "= " + formatRwf(sum) : "";
                 total += sum;
                 if (line.item && sum) byCategory[line.item.category] = (byCategory[line.item.category] || 0) + sum;
             });
@@ -3046,9 +3372,9 @@
             count += 1;
             var id = "purchaseItem-" + count;
             var select = itemSelect(id, items, "", false);
-            var amount = el("input", { id: id + "-qty", type: "number", inputmode: "decimal", min: "0.01", step: "0.01" });
-            var cost = el("input", { id: id + "-cost", type: "number", inputmode: "numeric", min: "0", step: "1" });
-            var unit = el("span", { className: "line-unit", text: "" });
+            var amount = el("input", { id: id + "-qty", type: "text", inputmode: "decimal", autocomplete: "off", className: "line-qty-input" });
+            var cost = el("input", { id: id + "-cost", type: "text", inputmode: "numeric", autocomplete: "off", className: "line-cost-input" });
+            var unit = el("span", { className: "input-unit", text: "" });
 
             select.addEventListener("change", function () {
                 var item = itemById(select.value);
@@ -3057,23 +3383,26 @@
                 update();
             });
 
-            var row = el("div", { className: "line-row purchase-line" }, [
-                el("div", { className: "room-field line-item" }, [el("label", { for: id, text: "Item" }), select]),
-                el("div", { className: "room-field line-qty" }, [el("label", { for: id + "-qty", text: "How many" }), el("div", { className: "qty-with-unit" }, [amount, unit])]),
-                el("div", { className: "room-field line-cost" }, [el("label", { for: id + "-cost", text: "Price for one (RWF)" }), cost]),
-                el("p", { className: "line-sum", "aria-live": "off" }),
-                el("button", {
-                    type: "button",
-                    className: "line-remove",
-                    "aria-label": "Remove this item",
-                    text: "×",
-                    onclick: function () {
-                        if (linesBox.children.length > 1) {
-                            row.remove();
-                            update();
+            var row = el("div", { className: "purchase-line" }, [
+                sheetField(id, "Item", [select]),
+                el("div", { className: "sheet-pair" }, [
+                    sheetField(id + "-qty", "How many", [el("div", { className: "input-with-unit" }, [amount, unit])]),
+                    sheetField(id + "-cost", "Price for one", [el("div", { className: "input-with-unit" }, [cost, el("span", { className: "input-unit", text: "RWF" })])])
+                ]),
+                el("div", { className: "purchase-line-foot" }, [
+                    el("p", { className: "line-sum" }),
+                    el("button", {
+                        type: "button",
+                        className: "link-btn line-remove-link",
+                        text: "Remove this item",
+                        onclick: function () {
+                            if (linesBox.children.length > 1) {
+                                row.remove();
+                                update();
+                            }
                         }
-                    }
-                })
+                    })
+                ])
             ]);
 
             linesBox.appendChild(row);
@@ -3083,90 +3412,61 @@
         addLine();
 
         var note = el("input", { id: "purchaseNote", type: "text", maxlength: "300", autocomplete: "off", placeholder: "For example: paid with mobile money" });
-        var message = el("p", { className: "room-form-message", role: "status" });
-        var save = el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Save purchase" });
 
-        var form = el("form", { className: "form-card doc-form", novalidate: true }, [
-            el("h2", { text: "Record a purchase" }),
-            el("div", { className: "room-fields" }, [
-                el("div", { className: "room-field" }, [el("label", { for: "purchaseSupplier", text: "Where was it bought?" }), supplier]),
-                el("div", { className: "room-field" }, [el("label", { for: "purchaseDay", text: "Day bought" }), day])
-            ]),
-            linesBox,
-            el("button", { type: "button", className: "link-btn add-line", text: "+ Add another item", onclick: function () { addLine().focus(); } }),
-            totalLine,
-            budgetBox,
-            el("div", { className: "room-field" }, [el("label", { for: "purchaseNote", text: "Note (optional)" }), note]),
-            el("p", { className: "help", text: "The stock goes up when the manager checks it in." }),
-            el("div", { className: "room-form-foot" }, [
-                save,
-                button("Cancel", "btn-ghost", function () { slot.textContent = ""; }),
-                message
-            ])
-        ]);
+        var opened = openSheet({
+            kicker: "Record a purchase",
+            title: "What did you buy?",
+            sub: "The stock goes up when the manager checks it in.",
+            wide: true,
+            fields: [
+                el("div", { className: "sheet-pair" }, [
+                    sheetField("purchaseSupplier", "Where was it bought?", [supplier]),
+                    sheetField("purchaseDay", "Day bought", [day])
+                ]),
+                linesBox,
+                el("button", { type: "button", className: "btn btn-ghost add-line-big", text: "+ Add another item", onclick: function () { addLine().focus(); } }),
+                totalLine,
+                budgetBox,
+                sheetField("purchaseNote", "Note (optional)", [note])
+            ],
+            submitText: "Save purchase",
+            onSubmit: async function (ctx) {
+                if (!supplier.value.trim()) return ctx.problem("Enter where it was bought.", supplier);
 
-        form.addEventListener("input", update);
-        day.addEventListener("change", checkBudget);
+                var body = { supplier: supplier.value.trim(), day: day.value, note: note.value.trim(), lines: [] };
+                var lines = readLines();
 
-        form.addEventListener("submit", async function (event) {
-            event.preventDefault();
-
-            if (!supplier.value.trim()) {
-                message.textContent = "Enter where it was bought.";
-                supplier.focus();
-                return;
-            }
-
-            var body = { supplier: supplier.value.trim(), day: day.value, note: note.value.trim(), lines: [] };
-            var lines = readLines();
-
-            for (var i = 0; i < lines.length; i += 1) {
-                var line = lines[i];
-                if (!line.select.value && !line.qtyInput.value && !line.costInput.value) continue;
-                if (!line.item) {
-                    message.textContent = "Choose the item.";
-                    line.select.focus();
-                    return;
+                for (var i = 0; i < lines.length; i += 1) {
+                    var line = lines[i];
+                    if (!line.select.value && !line.qtyInput.value && !line.costInput.value) continue;
+                    if (!line.item) return ctx.problem("Choose the item.", line.select);
+                    if (isNaN(line.quantity) || line.quantity <= 0) {
+                        return ctx.problem("Enter how many " + line.item.unit + " of " + line.item.name + ".", line.qtyInput);
+                    }
+                    if (isWholeUnit(line.item.unit) && !Number.isInteger(line.quantity)) {
+                        return ctx.problem(line.item.name + " is counted in " + line.item.unit + ": please use a whole number.", line.qtyInput);
+                    }
+                    if (isNaN(line.unitCost) || !Number.isInteger(line.unitCost)) {
+                        return ctx.problem("Enter the price for one " + line.item.name + " (whole RWF).", line.costInput);
+                    }
+                    body.lines.push({ itemId: line.item._id, quantity: line.quantity, unitCost: line.unitCost });
                 }
-                if (!line.qtyInput.value || !(line.quantity > 0)) {
-                    message.textContent = "Enter how many " + line.item.unit + " of " + line.item.name + ".";
-                    line.qtyInput.focus();
-                    return;
-                }
-                if (line.costInput.value === "" || !(line.unitCost >= 0) || !Number.isInteger(line.unitCost)) {
-                    message.textContent = "Enter the price for one " + line.item.name + " (whole RWF).";
-                    line.costInput.focus();
-                    return;
-                }
-                body.lines.push({ itemId: line.item._id, quantity: line.quantity, unitCost: line.unitCost });
-            }
 
-            if (!body.lines.length) {
-                message.textContent = "Add at least one item.";
-                return;
-            }
+                if (!body.lines.length) return ctx.problem("Add at least one item.", lines[0].select);
 
-            save.disabled = true;
-            message.textContent = "Saving…";
-
-            try {
                 var data = await api("POST", "/admin/purchases", body);
-                slot.textContent = "";
                 var warn = data.warnings.map(function (w) {
                     return " Over the " + w.category + " budget by " + formatRwf(w.over) + ".";
                 }).join("");
                 toast(data.purchase.ref + " saved (" + formatRwf(data.purchase.total) + "). The manager checks it in when it arrives." + warn, Boolean(warn));
                 load("stock", true);
-            } catch (error) {
-                message.textContent = error.status === 401 ? "" : error.message;
-                save.disabled = false;
             }
         });
 
-        slot.appendChild(form);
+        opened.form.addEventListener("input", update);
+        day.addEventListener("change", checkBudget);
         update();
         checkBudget();
-        supplier.focus();
     }
 
     $("newPurchaseButton").addEventListener("click", openPurchaseForm);
@@ -3297,13 +3597,16 @@
         }
     });
 
-    /* ----- Changes: what was received, issued or counted, newest first ----- */
+    /* ----- Changes: what was received, issued, counted or written off, newest first ----- */
 
     function changeRow(move) {
+        var item = itemById(String(move.itemId));
+        var unit = item ? item.unit : "";
         var what;
-        if (move.type === "count") what = "Counted: " + qty(move.quantity) + " (" + signed(move.change) + ")";
-        else if (move.type === "out") what = "Issued " + qty(move.quantity) + (move.department ? " to " + move.department : "");
-        else what = "Received " + qty(move.quantity);
+        if (move.type === "count") what = "Counted: " + amountText(move.quantity, unit) + " (" + signed(move.change) + ")";
+        else if (move.type === "out") what = "Issued " + amountText(move.quantity, unit) + (move.department ? " to " + move.department : "");
+        else if (move.type === "loss") what = "Written off " + amountText(move.quantity, unit) + " · " + (lossReasons()[move.reason] || "other").toLowerCase();
+        else what = "Received " + amountText(move.quantity, unit);
 
         var meta = [formatDay(move.day, { weekday: "short", day: "numeric", month: "short" }), move.userName ? "by " + move.userName : ""];
         if (move.ref) meta.push(move.ref);
@@ -3315,7 +3618,7 @@
                 el("p", { className: "stock-meta", text: meta.filter(Boolean).join(" · ") }),
                 move.note ? el("p", { className: "stock-notes", text: move.note }) : null
             ]),
-            el("p", { className: "change-left", text: "Left: " + qty(move.balanceAfter) })
+            el("p", { className: "change-left", text: "Left: " + amountText(move.balanceAfter, unit) })
         ]);
     }
 
@@ -3334,7 +3637,7 @@
         if (!more) list.textContent = "";
 
         if (!data.movements.length && !more) {
-            list.appendChild(el("p", { className: "empty", text: "Nothing has been received, issued or counted yet." }));
+            list.appendChild(el("p", { className: "empty", text: "Nothing has been received, issued, counted or written off yet." }));
         }
 
         data.movements.forEach(function (move) {
@@ -3419,6 +3722,51 @@
         return el("div", { className: "grid-wrap report-wrap", tabindex: "0", role: "region", "aria-label": caption }, [table]);
     }
 
+    /* Expired, damaged, spoiled or lost: by reason, then each one */
+    function renderLosses(data, prices) {
+        var box = $("lossReport");
+        box.textContent = "";
+        if (!data.losses) return;
+
+        box.appendChild(el("h2", { className: "section-title", text: "Expired and damaged in this period" }));
+
+        if (!data.losses.length) {
+            box.appendChild(el("p", { className: "empty", text: "Nothing was written off in this period." }));
+            return;
+        }
+
+        var lostTotal = data.lossesByReason.reduce(function (sum, r) { return sum + (r.value || 0); }, 0);
+        var times = data.lossesByReason.reduce(function (sum, r) { return sum + r.times; }, 0);
+
+        box.appendChild(moneyTable("Written off, by reason",
+            prices ? ["Reason", "Times", "Value"] : ["Reason", "Times"],
+            data.lossesByReason.filter(function (r) { return r.times; }).map(function (r) {
+                return prices ? [r.reasonText, String(r.times), formatRwf(r.value)] : [r.reasonText, String(r.times)];
+            }),
+            prices ? ["Total", String(times), formatRwf(lostTotal)] : ["Total", String(times)]));
+
+        var heads = ["Day", "Item", "Amount", "Why", "Note", "By"];
+        if (prices) heads.push("Value");
+
+        var each = moneyTable("Each write-off, newest first", heads,
+            data.losses.map(function (l) {
+                var cells = [
+                    formatDay(l.day, { weekday: "short", day: "numeric", month: "short" }),
+                    l.itemName,
+                    amountText(l.quantity, l.unit),
+                    l.reasonText,
+                    l.note || "",
+                    l.userName || ""
+                ];
+                if (prices) cells.push(formatRwf(l.value));
+                return cells;
+            }),
+            null);
+        each.classList.add("loss-list"); // words, so they line up on the left
+        if (prices) each.classList.add("has-value");
+        box.appendChild(each);
+    }
+
     async function loadReport() {
         if (!stock.reportFrom) setPeriod("month");
 
@@ -3437,8 +3785,8 @@
         table.textContent = "";
         table.appendChild(el("caption", { className: "visually-hidden", text: "Stock used and remaining for the period" }));
 
-        var heads = ["Item", "At start", "Received", "Used", "Corrections", "Remaining"];
-        if (prices) heads.push("Value used", "Value remaining");
+        var heads = ["Item", "At start", "Received", "Used", "Expired / damaged", "Corrections", "Remaining"];
+        if (prices) heads.push("Value used", "Value written off", "Value remaining");
 
         table.appendChild(el("thead", {}, [el("tr", {}, heads.map(function (h, i) {
             return el("th", { scope: "col", className: i === 0 ? "room-col" : null, text: h });
@@ -3447,6 +3795,7 @@
         var body = el("tbody");
         var lastCategory = "";
         var totalUsed = 0;
+        var totalLost = 0;
         var totalLeft = 0;
         var totalCorrections = 0;
 
@@ -3471,13 +3820,19 @@
                 el("td", { text: qty(row.atStart) }),
                 el("td", { text: row.received ? "+" + qty(row.received) : "0" }),
                 el("td", { text: row.used ? "−" + qty(row.used) : "0" }),
+                el("td", { className: row.writtenOff ? "is-lost" : null, text: row.writtenOff ? "−" + qty(row.writtenOff) : "0" }),
                 el("td", { text: row.corrections ? signed(row.corrections) : "0" }),
                 el("td", { className: lowNow ? "is-low" : null, text: qty(row.remaining) + (lowNow ? " ⚠" : "") })
             ];
 
             if (prices) {
-                cells.push(el("td", { text: formatRwf(row.usedValue) }), el("td", { text: formatRwf(row.remainingValue) }));
+                cells.push(
+                    el("td", { text: formatRwf(row.usedValue) }),
+                    el("td", { text: formatRwf(row.writtenOffValue || 0) }),
+                    el("td", { text: formatRwf(row.remainingValue) })
+                );
                 totalUsed += row.usedValue;
+                totalLost += row.writtenOffValue || 0;
                 totalLeft += row.remainingValue;
                 totalCorrections += row.correctionsValue || 0;
             }
@@ -3489,11 +3844,14 @@
 
         if (prices && data.rows.length) {
             var foot = el("tr", { className: "total-row" }, [el("th", { scope: "row", className: "room-col", text: "Total" })]);
-            for (var i = 0; i < 5; i += 1) foot.appendChild(el("td", { text: "" }));
+            for (var i = 0; i < 6; i += 1) foot.appendChild(el("td", { text: "" }));
             foot.appendChild(el("td", { text: formatRwf(totalUsed) }));
+            foot.appendChild(el("td", { text: formatRwf(totalLost) }));
             foot.appendChild(el("td", { text: formatRwf(totalLeft) }));
             table.appendChild(el("tfoot", {}, [foot]));
         }
+
+        renderLosses(data, prices);
 
         // Money (owner): spending, issues by department, count differences
         var money = $("moneyReport");
@@ -3507,6 +3865,7 @@
             money.appendChild(el("div", { className: "stats money-stats" }, [
                 staticStat(formatRwf(spentTotal), "Bought", "Purchases recorded"),
                 staticStat(formatRwf(deptTotal), "Issued", "Value given to departments"),
+                staticStat(formatRwf(totalLost), "Written off", "Expired, damaged or lost"),
                 staticStat(signedRwf(totalCorrections), "Count differences", totalCorrections < 0 ? "Missing at counts" : "Found at counts"),
                 staticStat(formatRwf(totalLeft), "Remaining", "Value in store at the end")
             ]));
@@ -3551,14 +3910,25 @@
         if (!data) return;
 
         var prices = can("stock.prices");
-        var head = ["Item", "Category", "Counted in", "At start", "Received", "Used", "Corrections", "Remaining", "Warn at"];
-        if (prices) head.push("Price for one (RWF)", "Value used (RWF)", "Value remaining (RWF)");
+        var head = ["Item", "Category", "Counted in", "At start", "Received", "Used", "Expired / damaged", "Corrections", "Remaining", "Warn at"];
+        if (prices) head.push("Price for one (RWF)", "Value used (RWF)", "Value written off (RWF)", "Value remaining (RWF)");
 
         var lines = [head].concat(data.rows.map(function (row) {
-            var line = [row.name, row.category, row.unit, row.atStart, row.received, row.used, row.corrections, row.remaining, row.lowStockAt];
-            if (prices) line.push(row.unitCost, row.usedValue, row.remainingValue);
+            var line = [row.name, row.category, row.unit, row.atStart, row.received, row.used, row.writtenOff || 0, row.corrections, row.remaining, row.lowStockAt];
+            if (prices) line.push(row.unitCost, row.usedValue, row.writtenOffValue || 0, row.remainingValue);
             return line;
         }));
+
+        if (data.losses && data.losses.length) {
+            var lossHead = ["Expired or damaged: day", "Item", "Amount", "Counted in", "Why", "Note", "By"];
+            if (prices) lossHead.push("Value (RWF)");
+            lines.push([], lossHead);
+            data.losses.forEach(function (l) {
+                var line = [l.day, l.itemName, l.quantity, l.unit, l.reasonText, l.note || "", l.userName || ""];
+                if (prices) line.push(l.value);
+                lines.push(line);
+            });
+        }
 
         if (data.departments) {
             lines.push([], ["Bought, by category", "Spent (RWF)"]);
@@ -3687,6 +4057,8 @@
             stock.updatedAt = new Date();
             stock.categories = data.categories;
             stock.departments = data.departments;
+            if (data.units) stock.units = data.units;
+            if (data.lossReasons) stock.lossReasons = data.lossReasons;
             stock.summary = data.summary;
             stock.counts = can("stock.approve") && data.summary.countsWaiting
                 ? (await api("GET", "/admin/stock/counts")).counts
