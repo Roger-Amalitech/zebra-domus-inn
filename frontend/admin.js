@@ -77,14 +77,23 @@
     var ICONS = {
         phone: ["M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.8 2z"],
         whatsapp: ["M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.4A8.4 8.4 0 1 1 21 11.5z", "M9 9.5c.3 1.8 2.2 3.9 4.4 4.5l1.1-1.1 1.8.8c-.2 1-1 1.7-2 1.7-3 0-6.4-3.4-6.4-6.4 0-1 .7-1.8 1.7-2l.8 1.8z"],
-        mail: ["M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z", "M3 7l9 6 9-6"]
+        mail: ["M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z", "M3 7l9 6 9-6"],
+        // the stock categories, on the tiles of the item form
+        toiletries: ["M10 3h5", "M12 3v4", "M7 11a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v8a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z", "M7 13h10"],
+        linen: ["M3 6v13", "M3 15h18v4", "M21 15v-3a3 3 0 0 0-3-3h-8v6", "M5 12a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0"],
+        drinks: ["M10 2h4", "M10 2v4l-2 3v11a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V9l-2-3V2", "M8 13h8"],
+        food: ["M5 3v6a2 2 0 0 0 4 0V3", "M7 3v18", "M17 3c-2 1.2-3 3.6-3 6.5V14h3", "M17 3v18"],
+        cleaning: ["M11 3l1.8 4.6L17.5 9.5l-4.7 1.9L11 16l-1.8-4.6L4.5 9.5l4.7-1.9z", "M18.5 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"],
+        maintenance: ["M14.5 4.2a5 5 0 0 0-4.6 6.6L4 16.7a2 2 0 0 0 2.9 2.9l5.9-5.9a5 5 0 0 0 6.6-4.6l-2.9 2.1-2.8-.5-.5-2.8z"],
+        office: ["M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z", "M14 3v4h4", "M9 12h6", "M9 16h6"],
+        other: ["M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z", "M3 7.5l9 4.5 9-4.5", "M12 12v9"]
     };
 
-    function icon(name) {
+    function icon(name, size) {
         var ns = "http://www.w3.org/2000/svg";
         var svg = document.createElementNS(ns, "svg");
-        svg.setAttribute("width", "16");
-        svg.setAttribute("height", "16");
+        svg.setAttribute("width", String(size || 16));
+        svg.setAttribute("height", String(size || 16));
         svg.setAttribute("viewBox", "0 0 24 24");
         svg.setAttribute("fill", "none");
         svg.setAttribute("stroke", "currentColor");
@@ -3126,15 +3135,50 @@
         return select;
     }
 
+    /* The categories as tiles with a picture, two or four in a row */
+    var CATEGORY_ICONS = {
+        "Toiletries": "toiletries",
+        "Bed linen & towels": "linen",
+        "Drinks": "drinks",
+        "Food & kitchen": "food",
+        "Cleaning": "cleaning",
+        "Maintenance": "maintenance",
+        "Office": "office"
+    };
+
+    function categoryTiles(chosen) {
+        var list = stock.categories.slice();
+        if (chosen && list.indexOf(chosen) < 0) list.push(chosen); // an old category stays choosable
+
+        var grid = el("div", { className: "cat-grid" });
+        list.forEach(function (c, index) {
+            var input = el("input", { type: "radio", name: "itemCategory", id: "itemCategory-" + index, value: c });
+            if (c === chosen) input.checked = true;
+            grid.appendChild(el("label", { className: "cat-tile", for: input.id }, [
+                input,
+                el("span", { className: "cat-tile-box" }, [
+                    el("span", { className: "cat-tile-icon" }, [icon(CATEGORY_ICONS[c] || "other", 22)]),
+                    el("span", { className: "cat-tile-name", text: c })
+                ])
+            ]));
+        });
+
+        var node = el("fieldset", { className: "sheet-field cat-field" }, [el("legend", { text: "Category" }), grid]);
+        return {
+            node: node,
+            value: function () {
+                var picked = node.querySelector("input:checked");
+                return picked ? picked.value : "";
+            }
+        };
+    }
+
     /* Add or change an item, in a big form */
     function openItemForm(item) {
         var editing = Boolean(item);
 
-        var name = el("input", { id: "itemName", type: "text", maxlength: "80", required: true, autocomplete: "off" });
-        var category = el("select", { id: "itemCategory" });
-        stock.categories.forEach(function (c) {
-            category.appendChild(el("option", { value: c, text: c }));
-        });
+        var name = el("input", { id: "itemName", type: "text", maxlength: "80", required: true, autocomplete: "off", placeholder: "For example: hand soap" });
+        var category = categoryTiles(editing ? item.category : stock.category || "Toiletries");
 
         var unit = unitSelect("itemUnit", editing ? item.unit : "pieces");
         var start = el("input", { id: "itemStart", type: "text", inputmode: "decimal", value: "0", autocomplete: "off" });
@@ -3146,44 +3190,54 @@
         var lowUnit = el("span", { className: "input-unit" });
         var costUnit = el("span", { className: "input-unit" });
 
+        var showPrice = can("stock.prices");
+        var showStart = !editing && can("stock.approve"); // stock without a purchase is the owner's call
+
+        var unitField = sheetField("itemUnit", "Counted in", [unit], " ");
+        var unitHelp = unitField.querySelector(".help");
+
+        // the units follow "Counted in", and the line under it says what the numbers can be
         function showUnits() {
             startUnit.textContent = unit.value;
             lowUnit.textContent = unit.value;
             costUnit.textContent = "RWF for one " + oneUnit(unit.value);
+            unitHelp.textContent = isWholeUnit(unit.value)
+                ? "Whole numbers only, like 3 " + unit.value + "."
+                : "Can have decimals, like 2.5 " + unit.value + ".";
         }
 
         if (editing) {
             name.value = item.name;
-            category.value = item.category;
             low.value = qty(item.lowStockAt).replace(/,/g, "");
             cost.value = String(item.unitCost || 0);
             notes.value = item.notes || "";
-        } else {
-            category.value = stock.category || "Toiletries";
         }
 
         unit.addEventListener("change", showUnits);
         showUnits();
         name.setAttribute("data-autofocus", "true");
 
-        var showPrice = can("stock.prices");
-        var showStart = !editing && can("stock.approve"); // stock without a purchase is the owner's call
+        // counting and price sit together in one box, two fields in a row on a computer
+        var amounts = [unitField];
+        if (showStart) {
+            amounts.push(sheetField("itemStart", "How many you have now", [el("div", { className: "input-with-unit" }, [start, startUnit])]));
+        }
+        amounts.push(sheetField("itemLow", "Warn me when there are", [el("div", { className: "input-with-unit" }, [low, lowUnit])], "…or fewer left. 0 = never warn."));
+        if (showPrice) amounts.push(sheetField("itemCost", "Price", [el("div", { className: "input-with-unit" }, [cost, costUnit])]));
+
+        var group = el("section", { className: "sheet-group", "aria-labelledby": "itemAmountsTitle" }, [
+            el("h3", { className: "sheet-group-title", id: "itemAmountsTitle", text: showPrice ? "Counting and price" : "Counting" })
+        ]);
+        for (var a = 0; a < amounts.length; a += 2) {
+            group.appendChild(el("div", { className: "sheet-pair" }, amounts.slice(a, a + 2)));
+        }
 
         var fields = [
             sheetField("itemName", "Name", [name]),
-            el("div", { className: "sheet-pair" }, [
-                sheetField("itemCategory", "Category", [category]),
-                sheetField("itemUnit", "Counted in", [unit], "Weight and volume can have decimals (2.5 kg). Counted things are whole numbers.")
-            ])
+            category.node,
+            group,
+            sheetField("itemNotes", "Notes (optional)", [notes])
         ];
-
-        if (showStart) {
-            fields.push(sheetField("itemStart", "How many you have now", [el("div", { className: "input-with-unit" }, [start, startUnit])]));
-        }
-
-        fields.push(sheetField("itemLow", "Warn me when there are", [el("div", { className: "input-with-unit" }, [low, lowUnit])], "…or fewer left. 0 = never warn."));
-        if (showPrice) fields.push(sheetField("itemCost", "Price", [el("div", { className: "input-with-unit" }, [cost, costUnit])]));
-        fields.push(sheetField("itemNotes", "Notes (optional)", [notes]));
 
         if (!editing && !showStart) {
             fields.push(el("p", { className: "help", text: "New items start at 0. Stock comes in when the owner's purchase is checked in, or count it and the owner approves the number." }));
@@ -3256,7 +3310,7 @@
 
                 var body = {
                     name: name.value.trim(),
-                    category: category.value,
+                    category: category.value(),
                     unit: unit.value,
                     lowStockAt: lowNumber,
                     notes: notes.value.trim()

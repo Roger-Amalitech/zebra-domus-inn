@@ -2326,6 +2326,7 @@ html.sheet-open body {
 
 .sheet-field {
     display: grid;
+    align-content: start; /* label and box stay together at the top, even when the field beside it is taller */
     gap: 8px;
     min-width: 0;
     margin: 0;
@@ -2381,6 +2382,128 @@ html.sheet-open body {
 .sheet-pair {
     display: grid;
     gap: 24px;
+}
+
+/* a box that groups fields: "Counting and price" on the item form */
+.sheet-group {
+    display: grid;
+    gap: 22px;
+    min-width: 0;
+    padding: 18px 16px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: #FAFAFA;
+}
+
+.sheet-group-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.sheet-group-title::after {
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--line);
+}
+
+.sheet-group .input-unit {
+    background: #F0F0F0;
+}
+
+/* the categories as tiles with a picture */
+.cat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.cat-tile {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.cat-tile input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.cat-tile-box {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    min-height: 58px;
+    padding: 8px 12px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--white);
+    transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.cat-tile-icon {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--soft);
+    transition: background-color 0.15s;
+}
+
+.cat-tile-name {
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.cat-tile:hover .cat-tile-box {
+    border-color: var(--ink);
+}
+
+.cat-tile input:checked + .cat-tile-box {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--white);
+}
+
+.cat-tile input:checked + .cat-tile-box .cat-tile-icon {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+/* a small tick in the corner of the chosen tile */
+.cat-tile input:checked + .cat-tile-box::after {
+    content: "";
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 12px no-repeat;
+}
+
+.cat-tile input:focus-visible + .cat-tile-box {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
 }
 
 /* a number with its unit: "2.5 | kg" */
@@ -2682,6 +2805,64 @@ html.sheet-open body {
     .sheet-pair {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 18px;
+    }
+
+    /* one field alone in a row takes the whole row */
+    .sheet-pair > :only-child {
+        grid-column: 1 / -1;
+    }
+
+    .sheet-group {
+        padding: 20px 22px 22px;
+    }
+
+    .cat-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .cat-tile-box {
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+        min-height: 96px;
+        padding: 12px 8px;
+        text-align: center;
+    }
+
+    .cat-tile-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+    }
+
+    .cat-tile-name {
+        font-size: 14.5px;
+    }
+}
+
+/* Side by side, a field's label, box and the line under it share rows with the field
+   beside it, so the boxes line up even when one label is longer or one has a line under it.
+   (Each field in a pair has at most three parts: label, box, line under it.) */
+@supports (grid-template-rows: subgrid) {
+    @media (min-width: 560px) {
+        .sheet-pair {
+            row-gap: 0;
+        }
+
+        .sheet-pair > div.sheet-field,
+        .sheet-pair > .sheet-pair {
+            grid-row: span 3;
+            grid-template-rows: subgrid;
+            row-gap: 0;
+        }
+
+        .sheet-pair > div.sheet-field > :first-child {
+            margin-bottom: 8px;
+        }
+
+        .sheet-pair > div.sheet-field > :nth-child(n + 3) {
+            margin-top: 8px;
+        }
     }
 }
 
