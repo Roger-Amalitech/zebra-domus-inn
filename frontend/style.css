@@ -1407,10 +1407,13 @@ h3 {
     position: absolute;
     inset: 0;
     pointer-events: none;
+    /* (like Marriott) only the last strip of the photo melts into the page colour;
+       above it the photo keeps its colours under a light dark tint */
     background:
+        linear-gradient(to bottom, rgba(242, 242, 242, 0) calc(100% - var(--hero-fade, 110px)), var(--page-bg, #F2F2F2) 100%),
         linear-gradient(to bottom, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0) 28%),
-        linear-gradient(to top, rgba(0, 0, 0, 0.46) 0%, rgba(0, 0, 0, 0) 30%),
-        rgba(0, 0, 0, 0.3);
+        linear-gradient(to top, rgba(0, 0, 0, 0.26) var(--hero-fade, 110px), rgba(0, 0, 0, 0) 45%),
+        rgba(0, 0, 0, 0.26);
 }
 /* headline, text and photo controls, centred in the photo */
 .hero-text {
@@ -3523,4 +3526,31 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     .photo-open:hover img,
     .photo-open.has-more:hover img { transform: none; }
     .photo-viewer[open] { animation: none; }
+}
+
+/* =========================================
+   PAGE COLOUR, like Marriott: a soft off-white page instead of plain white,
+   so the white cards, the search box and the top bar stand out and the site
+   doesn't look too light. The photo at the top melts into this colour.
+========================================= */
+:root { --page-bg: #F2F2F2; }
+.page,
+.booking { background: var(--page-bg); }
+
+/* boxes that were grey on the white page are white cards now */
+.perks-box,
+.special-request,
+.amenities li { background: var(--white); }
+.perks-box { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06); }
+.amenities li,
+.policy-card { border-color: transparent; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05); }
+
+/* computers: the photo runs on behind the quick links, and the first white
+   card ("Book directly with the inn") sits over its soft bottom, as on Marriott */
+@media (min-width: 1024px) {
+    :root { --hero-extra: 120px; --hero-fade: 190px; }
+    .hero-image,
+    .has-overlay-header .hero-image { height: calc(var(--hero-h) + var(--hero-extra)); }
+    .hero-links { bottom: calc(var(--hero-extra) + 18px); }
+    .perks { position: relative; z-index: 2; margin-top: calc(-1 * var(--hero-extra) + 28px); }
 }
