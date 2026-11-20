@@ -179,41 +179,58 @@
     <!-- PHOTOS -->
     <section class="section" id="photos" aria-labelledby="photosTitle">
         <h2 id="photosTitle" data-i18n="photos">Photos</h2>
-        <p class="section-sub"><span data-i18n="galleryIntro">Pools, lounges and rooms.</span><span class="swipe-hint" data-i18n="swipeHint"> Swipe to see more.</span></p>
-        <div class="gallery" tabindex="0" role="region" aria-label="Photo gallery, scroll sideways" data-i18n-aria-label="galleryLabel">
-            <figure>
-                <img src="images/sign.jpg" alt="The Zebra Dormus Inn sign above the gate, with two zebra statues" loading="lazy">
-                <figcaption data-i18n="capWelcome">Welcome to Zebra Dormus</figcaption>
-            </figure>
-            <figure>
-                <img src="images/pool.jpg" alt="The large outdoor swimming pool with loungers" loading="lazy">
-                <figcaption data-i18n="capPool">Outdoor pool</figcaption>
-            </figure>
-            <figure>
-                <img src="images/pool-second.jpg" alt="Second swimming pool beside the inn" loading="lazy">
-                <figcaption data-i18n="capPool2">Second pool</figcaption>
-            </figure>
-            <figure>
-                <img src="images/lounge.jpg" alt="Bright lounge with cream sofas" loading="lazy">
-                <figcaption data-i18n="capLounge">Lounge</figcaption>
-            </figure>
-            <figure>
-                <img src="images/sitting-room.jpg" alt="Sitting room with black leather and wood sofas" loading="lazy">
-                <figcaption data-i18n="capSitting">Sitting room</figcaption>
-            </figure>
-            <figure>
-                <img src="images/outdoor-seating.jpg" alt="Covered seating area with green sofas" loading="lazy">
-                <figcaption data-i18n="capGreen">Green lounge</figcaption>
-            </figure>
-            <figure>
-                <img src="images/twin-room.jpg" alt="Room with two beds and fresh towels" loading="lazy">
-                <figcaption data-i18n="capTwin">Twin room</figcaption>
-            </figure>
-            <figure>
-                <img src="images/bathroom.jpg" alt="Private bathroom with a glass shower" loading="lazy">
-                <figcaption data-i18n="capBath">Private bathroom</figcaption>
-            </figure>
-        </div>
+        <p class="section-sub"><span data-i18n="galleryIntro">Pools, lounges and rooms.</span><span data-i18n="swipeHint"> Tap a photo to open it.</span></p>
+        <!-- a collage: one big photo, smaller ones around it (gallery.js opens them full screen) -->
+        <ul class="photo-grid" id="photoGrid" aria-label="Photos of the inn" data-i18n-aria-label="galleryLabel">
+            <li class="photo-tile">
+                <button type="button" class="photo-open">
+                    <img src="images/sign.jpg" alt="The Zebra Dormus Inn sign above the gate, with two zebra statues" loading="eager">
+                    <span class="photo-caption" data-i18n="capWelcome">Welcome to Zebra Dormus</span>
+                </button>
+            </li>
+            <li class="photo-tile">
+                <button type="button" class="photo-open">
+                    <img src="images/pool.jpg" alt="The large outdoor swimming pool with loungers" loading="lazy">
+                    <span class="photo-caption" data-i18n="capPool">Outdoor pool</span>
+                </button>
+            </li>
+            <li class="photo-tile">
+                <button type="button" class="photo-open">
+                    <img src="images/lounge.jpg" alt="Bright lounge with cream sofas" loading="lazy">
+                    <span class="photo-caption" data-i18n="capLounge">Lounge</span>
+                </button>
+            </li>
+            <li class="photo-tile">
+                <button type="button" class="photo-open">
+                    <img src="images/sitting-room.jpg" alt="Sitting room with black leather and wood sofas" loading="lazy">
+                    <span class="photo-caption" data-i18n="capSitting">Sitting room</span>
+                </button>
+            </li>
+            <li class="photo-tile">
+                <button type="button" class="photo-open">
+                    <img src="images/outdoor-seating.jpg" alt="Covered seating area with green sofas" loading="lazy">
+                    <span class="photo-caption" data-i18n="capGreen">Green lounge</span>
+                </button>
+            </li>
+            <li class="photo-tile">
+                <button type="button" class="photo-open">
+                    <img src="images/twin-room.jpg" alt="Room with two beds and fresh towels" loading="lazy">
+                    <span class="photo-caption" data-i18n="capTwin">Twin room</span>
+                </button>
+            </li>
+            <li class="photo-tile">
+                <button type="button" class="photo-open">
+                    <img src="images/pool-second.jpg" alt="Second swimming pool beside the inn" loading="lazy">
+                    <span class="photo-caption" data-i18n="capPool2">Second pool</span>
+                </button>
+            </li>
+            <li class="photo-tile">
+                <button type="button" class="photo-open">
+                    <img src="images/bathroom.jpg" alt="Private bathroom with a glass shower" loading="lazy">
+                    <span class="photo-caption" data-i18n="capBath">Private bathroom</span>
+                </button>
+            </li>
+        </ul>
     </section>
 
     <!-- ABOUT -->

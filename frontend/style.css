@@ -749,12 +749,10 @@ h3 {
     margin-top: 18px;
 }
 
-
 /* Keep the booking confirmation hidden until a booking succeeds */
 #bookingConfirmed[hidden] {
     display: none !important;
 }
-
 
 .form-block h3,
 .payment-options legend {
@@ -1199,45 +1197,6 @@ h3 {
 }
 
 /* PHOTO GALLERY (swipe sideways) */
-.gallery {
-    display: flex;
-    gap: 12px;
-    margin: 14px -20px 0;
-    padding: 0 20px 6px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scroll-padding-left: 20px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-}
-
-.gallery::-webkit-scrollbar {
-    display: none;
-}
-
-.gallery:focus-visible {
-    outline-offset: -3px;
-}
-
-.gallery figure {
-    flex: 0 0 80%;
-    margin: 0;
-    scroll-snap-align: start;
-}
-
-.gallery img {
-    width: 100%;
-    height: 210px;
-    object-fit: cover;
-    border-radius: 14px;
-    background: var(--soft);
-}
-
-.gallery figcaption {
-    margin-top: 8px;
-    font-size: 14px;
-    font-weight: 500;
-}
 
 /* 12. ABOUT */
 .about-card {
@@ -1365,10 +1324,6 @@ h3 {
         justify-content: center;
     }
 }
-
-
-
-
 
 .logo-badge {
     display: inline-flex;
@@ -1617,7 +1572,6 @@ html.rs-lock, html.rs-lock body { overflow: hidden; }
     border-top: 1px solid var(--line-soft);
 }
 .rs-section h3 { font-size: 17px; }
-
 
 .rs-warning {
     margin: 0;
@@ -2102,13 +2056,6 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     }
 
     /* Photos: two and a bit in view, still swipeable, inside the page edges */
-    .gallery {
-        margin: 20px 0 0;
-        padding: 0 0 6px;
-        scroll-padding-left: 0;
-    }
-    .gallery figure { flex-basis: 44%; }
-    .gallery img { height: 240px; }
 
     /* About: photo beside the text */
     .about-card {
@@ -2289,16 +2236,6 @@ html.dr-lock, html.dr-lock body { overflow: hidden; }
     .booking-aside .summary { padding: 20px; }
 
     /* Photos: all eight in a grid, no sideways scrolling with a mouse */
-    .gallery {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 20px;
-        margin: 24px 0 0;
-        padding: 0;
-        overflow: visible;
-    }
-    .gallery img { height: 210px; }
-    .swipe-hint { display: none; }
 
     /* About */
     .about-card img { min-height: 420px; }
@@ -2596,26 +2533,6 @@ h3,
 .search-card .search-field select { font-size: 17px; font-weight: 500; }
 
 /* ----- Photos: Marriott-style cards, the name in white on a dark fade ----- */
-.gallery figure {
-    position: relative;
-    overflow: hidden;
-    border-radius: 16px;
-    background: var(--soft);
-}
-.gallery img { border-radius: 0; }
-.gallery figcaption {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    margin: 0;
-    padding: 14px 16px 40px;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0));
-    color: #FFFFFF;
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-}
 
 /* ----- Quick links and sticky search bar: computers only ----- */
 .hero-links,
@@ -3020,50 +2937,10 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 }
 
 /* ----- Photos: one row on every screen; arrows for a mouse ----- */
-.section-head-text { min-width: 0; }
-.gallery-nav { display: none; }
-.gallery-arrow {
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 1px solid var(--line-strong);
-    border-radius: 50%;
-    background: var(--white);
-    color: var(--ink);
-    cursor: pointer;
-    transition: border-color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
-}
-.gallery-arrow svg { width: 18px; height: 18px; }
-.gallery-arrow:hover:not(:disabled) { border-color: var(--ink); background: var(--soft); }
-.gallery-arrow:disabled { opacity: 0.35; cursor: default; }
-
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
-    .section-head {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 24px;
-    }
-    .gallery-nav { display: flex; flex-shrink: 0; gap: 10px; }
-    .swipe-hint { display: none; }
-}
 
 @media (min-width: 1024px) {
-    .gallery {
-        display: flex;
-        gap: 20px;
-        margin: 24px 0 0;
-        padding: 0 0 4px;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-        scroll-snap-type: x mandatory;
-        scroll-padding-left: 0;
-    }
     /* three photos and part of the fourth, so it's clear there are more */
-    .gallery figure { flex: 0 0 calc((100% - 60px) / 3.3); }
-    .gallery img { height: auto; aspect-ratio: 4 / 3; }
+
 }
 
 /* =========================================
@@ -3209,8 +3086,7 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
    a see-through dark layer fades in over the photo. On phones, a room photo
    darkens for a moment when tapped, so the tap feels answered.
 ========================================= */
-.room-image::after,
-.gallery figure::after {
+.room-image::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -3220,18 +3096,15 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     pointer-events: none;
     transition: opacity 0.3s ease;
 }
-.gallery figcaption { z-index: 2; }
 
 @media (hover: hover) and (pointer: fine) {
-    .room-grid .room-card:hover .room-image::after,
-    .gallery figure:hover::after { opacity: 1; }
+    .room-grid .room-card:hover .room-image::after { opacity: 1; }
 }
 .room-grid .room-card:active .room-image::after { opacity: 1; transition-duration: 0.1s; }
 .room-grid .room-card:has(.room-open:focus-visible) .room-image::after { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
-    .room-image::after,
-    .gallery figure::after { transition: none; }
+    .room-image::after { transition: none; }
 }
 
 /* =========================================
@@ -3419,4 +3292,245 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     border-radius: 10px;
     background: var(--ink);
     color: var(--white);
+}
+
+/* =========================================
+   PHOTOS: a collage, like a photo grid.
+   One big photo and smaller ones around it, with thin white gaps and
+   rounded outer corners. Pointing at a photo darkens it a little and the
+   photo grows inside its frame; tapping opens it full screen (gallery.js).
+   Phone: two columns.  Tablet and computer: four columns, three rows.
+========================================= */
+.photo-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 118px;
+    gap: 6px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+    border-radius: 16px;
+    overflow: hidden;
+}
+/* phone: [1 1] [1 1] [2 3] [4 5] [4 6] [7 8] */
+.photo-tile:nth-child(1) { grid-column: 1 / -1; grid-row: span 2; }
+.photo-tile:nth-child(4) { grid-row: span 2; }
+
+.photo-tile { position: relative; min-width: 0; min-height: 0; }
+.photo-open {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    background: var(--soft);
+    cursor: zoom-in;
+}
+.photo-open img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.45s ease;
+}
+/* the dark layer (pointing at a photo, or tapping it) and the caption's shade */
+.photo-open::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: rgba(0, 0, 0, 0.22);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+.photo-open::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 56%;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
+    pointer-events: none;
+}
+.photo-caption {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+    z-index: 2;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: left;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.photo-tile:nth-child(1) .photo-caption { left: 16px; bottom: 14px; font-size: 18px; font-weight: 700; }
+.photo-open:active::before { opacity: 1; transition-duration: 0.1s; }
+.photo-open:focus-visible { outline: none; }
+.photo-open:focus-visible::before { opacity: 1; box-shadow: inset 0 0 0 3px #FFFFFF, inset 0 0 0 5px var(--ink); }
+
+@media (hover: hover) and (pointer: fine) {
+    .photo-open:hover::before { opacity: 1; }
+    .photo-open:hover img { transform: scale(1.05); }
+}
+
+/* "Show all photos": white, under the collage on a phone, on its top right corner on a computer */
+.photo-collage { position: relative; }
+.photo-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 1px solid var(--ink);
+    border-radius: 999px;
+    background: var(--white);
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.photo-all:hover { background: var(--soft); }
+
+@media (min-width: 768px) {
+    .photo-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-rows: 150px;
+        gap: 8px;
+        margin-top: 24px;
+        border-radius: 20px;
+    }
+    /* [1 1 2 3] [1 1 4 5] [6 7 7 8] */
+    .photo-tile:nth-child(1) { grid-column: span 2; grid-row: span 2; }
+    .photo-tile:nth-child(4) { grid-row: auto; }
+    .photo-tile:nth-child(7) { grid-column: span 2; }
+    .photo-caption { font-size: 14px; }
+    .photo-tile:nth-child(1) .photo-caption { left: 20px; bottom: 18px; font-size: 22px; }
+    .photo-all {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        margin: 0;
+        border-color: transparent;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+    }
+}
+@media (min-width: 1024px) {
+    .photo-grid { grid-auto-rows: 200px; }
+}
+
+/* ----- one photo, full screen ----- */
+.photo-viewer {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: #0B0B0B;
+    color: #FFFFFF;
+    overflow: hidden;
+}
+.photo-viewer[open] {
+    display: flex;
+    flex-direction: column;
+    animation: pv-in 0.22s ease-out;
+}
+.photo-viewer::backdrop { background: #0B0B0B; }
+@keyframes pv-in { from { opacity: 0; } }
+.pv-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 8px;
+}
+.pv-count { margin: 0; font-size: 14px; font-weight: 600; color: #D8D8D8; font-variant-numeric: tabular-nums; }
+.pv-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    touch-action: pan-y;
+    user-select: none;
+}
+.pv-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 6px;
+}
+.photo-viewer .glass-button { background: rgba(255, 255, 255, 0.14); }
+.photo-viewer .glass-button:hover { background: rgba(255, 255, 255, 0.26); }
+.pv-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.pv-arrow:active { transform: translateY(-50%) scale(0.94); }
+.pv-prev { left: 12px; }
+.pv-next { right: 12px; }
+.pv-caption {
+    margin: 0;
+    padding: 12px 16px 4px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+}
+.pv-thumbs {
+    display: flex;
+    justify-content: safe center;
+    gap: 8px;
+    padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.pv-thumbs::-webkit-scrollbar { display: none; }
+.pv-thumb {
+    flex: 0 0 auto;
+    width: 64px;
+    height: 46px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #222222;
+    opacity: 0.55;
+    cursor: pointer;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.pv-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pv-thumb:hover { opacity: 0.85; }
+.pv-thumb[aria-current="true"] { border-color: #FFFFFF; opacity: 1; }
+.pv-thumb:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+
+@media (max-width: 767px) {
+    /* a phone: swipe, the arrows sit low so the thumb reaches them */
+    .pv-arrow { width: 40px; height: 40px; }
+    .pv-thumb { width: 52px; height: 38px; }
+}
+@media (min-width: 1024px) {
+    .pv-prev { left: 28px; }
+    .pv-next { right: 28px; }
+    .pv-stage { padding: 0 96px; }
+    .pv-thumb { width: 84px; height: 58px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .photo-open img,
+    .photo-open::before,
+    .pv-thumb { transition: none; }
+    .photo-open:hover img { transform: none; }
+    .photo-viewer[open] { animation: none; }
 }

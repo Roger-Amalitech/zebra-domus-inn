@@ -1,109 +1,236 @@
-/* Zebra Dormus Inn: the photo row.
-   The photos sit in one row that slides sideways on every screen.
-   Phones and tablets: swipe. Computers (or any screen used with a mouse): the round
-   arrows beside the "Photos" title move one screenful at a time and turn grey at either end. */
+/* Zebra Dormus Inn: the photo grid.
+   The photos sit in a collage (index.html, #photoGrid): one big photo and smaller ones
+   around it. Tapping a photo, or "Show all photos", opens it full screen:
+   - swipe, the arrows or the keyboard's left and right keys go to the next photo
+   - a row of small photos along the bottom on a computer
+   - the X, Escape or the phone's back button closes it.
+   Captions follow the language chosen in the header (EN / RW / FR). */
 (function () {
     "use strict";
 
-    var LABELS = {
-        en: { prev: "Previous photos", next: "Next photos" },
-        rw: { prev: "Amafoto abanza", next: "Amafoto akurikira" },
-        fr: { prev: "Photos précédentes", next: "Photos suivantes" }
+    var TEXT = {
+        en: { close: "Close", prev: "Previous photo", next: "Next photo", all: "Show all photos", of: function (i, n) { return i + " / " + n; } },
+        rw: { close: "Funga", prev: "Ifoto ibanza", next: "Ifoto ikurikira", all: "Reba amafoto yose", of: function (i, n) { return i + " / " + n; } },
+        fr: { close: "Fermer", prev: "Photo précédente", next: "Photo suivante", all: "Voir toutes les photos", of: function (i, n) { return i + " / " + n; } }
     };
 
-    var ICON = {
-        prev: "M15 18l-6-6 6-6",
-        next: "M9 6l6 6-6 6"
+    var PATHS = {
+        close: '<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
+        prev: '<path d="M15 18l-6-6 6-6"/>',
+        next: '<path d="M9 6l6 6-6 6"/>',
+        grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'
     };
+
+    function byId(id) { return document.getElementById(id); }
 
     function lang() {
-        var select = document.getElementById("languageSelect");
+        var select = byId("languageSelect");
         var value = select && select.value;
-        return LABELS[value] ? value : "en";
+        return TEXT[value] ? value : "en";
     }
 
-    function arrow(kind) {
-        var button = document.createElement("button");
-        button.type = "button";
-        button.className = "gallery-arrow gallery-" + kind;
-        button.setAttribute("aria-controls", "photoRow");
-        button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="' + ICON[kind] +
-            '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        return button;
+    function tx() { return TEXT[lang()]; }
+
+    function icon(name, size) {
+        var template = document.createElement("template");
+        template.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + PATHS[name] + "</svg>";
+        return template.content.firstElementChild;
+    }
+
+    function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text != null) node.textContent = text;
+        return node;
     }
 
     function init() {
-        var section = document.getElementById("photos");
-        var row = section && section.querySelector(".gallery");
-        if (!row) return;
-        row.id = row.id || "photoRow";
+        var grid = byId("photoGrid");
+        if (!grid) return;
 
-        /* title and line of text on the left, arrows on the right */
-        var head = document.createElement("div");
-        head.className = "section-head";
-        var text = document.createElement("div");
-        text.className = "section-head-text";
-        var title = section.querySelector("h2");
-        var sub = section.querySelector(".section-sub");
-        section.insertBefore(head, row);
-        if (title) text.appendChild(title);
-        if (sub) text.appendChild(sub);
+        var tiles = Array.prototype.slice.call(grid.querySelectorAll(".photo-open"));
+        if (!tiles.length) return;
 
-        var nav = document.createElement("div");
-        nav.className = "gallery-nav";
-        var prev = arrow("prev");
-        var next = arrow("next");
-        nav.append(prev, next);
-        head.append(text, nav);
+        function photo(i) {
+            var img = tiles[i].querySelector("img");
+            var caption = tiles[i].querySelector(".photo-caption");
+            return { src: img.getAttribute("src"), alt: img.alt, caption: caption ? caption.textContent : "" };
+        }
+
+        /* "Show all photos": on the collage's corner on a computer, under it on a phone */
+        var collage = el("div", "photo-collage");
+        grid.parentNode.insertBefore(collage, grid);
+        collage.appendChild(grid);
+        var all = el("button", "photo-all");
+        all.type = "button";
+        var allText = el("span");
+        all.append(icon("grid", 16), allText);
+        collage.appendChild(all);
+
+        /* ---------- the full-screen view ---------- */
+
+        var dialog = null;
+        var els = {};
+        var index = 0;
+        var pushed = false;
+        var returnFocus = null;
+
+        function build() {
+            if (dialog) return;
+
+            dialog = el("dialog", "photo-viewer");
+            dialog.setAttribute("aria-labelledby", "pvCaption");
+
+            var top = el("div", "pv-top");
+            var count = el("p", "pv-count");
+            var close = el("button", "glass-button pv-close");
+            close.type = "button";
+            close.appendChild(icon("close", 20));
+            top.append(count, close);
+
+            var stage = el("div", "pv-stage");
+            var image = el("img", "pv-image");
+            image.decoding = "async";
+            image.draggable = false; // a drag with the mouse is a swipe, not "save the picture"
+            var prev = el("button", "glass-button pv-arrow pv-prev");
+            prev.type = "button";
+            prev.appendChild(icon("prev", 22));
+            var next = el("button", "glass-button pv-arrow pv-next");
+            next.type = "button";
+            next.appendChild(icon("next", 22));
+            stage.append(image, prev, next);
+
+            var caption = el("p", "pv-caption");
+            caption.id = "pvCaption";
+
+            var thumbs = el("div", "pv-thumbs");
+            tiles.forEach(function (tile, i) {
+                var thumb = el("button", "pv-thumb");
+                thumb.type = "button";
+                var small = el("img");
+                small.src = photo(i).src;
+                small.alt = "";
+                small.loading = "lazy";
+                thumb.appendChild(small);
+                thumb.addEventListener("click", function () { show(i); });
+                thumbs.appendChild(thumb);
+            });
+
+            dialog.append(top, stage, caption, thumbs);
+            document.body.appendChild(dialog);
+            els = { count: count, close: close, image: image, prev: prev, next: next, caption: caption, thumbs: thumbs };
+
+            close.addEventListener("click", requestClose);
+            prev.addEventListener("click", function () { show(index - 1); });
+            next.addEventListener("click", function () { show(index + 1); });
+            dialog.addEventListener("cancel", function (event) {
+                event.preventDefault();
+                requestClose();
+            });
+            dialog.addEventListener("keydown", function (event) {
+                if (event.key === "ArrowLeft") { event.preventDefault(); show(index - 1); }
+                if (event.key === "ArrowRight") { event.preventDefault(); show(index + 1); }
+            });
+
+            /* swipe left or right on the photo */
+            var startX = null;
+            var startY = null;
+            stage.addEventListener("pointerdown", function (event) {
+                if (event.target.closest("button")) return;
+                startX = event.clientX;
+                startY = event.clientY;
+            });
+            stage.addEventListener("pointerup", function (event) {
+                if (startX === null) return;
+                var dx = event.clientX - startX;
+                var dy = event.clientY - startY;
+                startX = null;
+                if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) show(index + (dx < 0 ? 1 : -1));
+            });
+            stage.addEventListener("pointercancel", function () { startX = null; });
+        }
 
         function label() {
-            var words = LABELS[lang()];
-            prev.setAttribute("aria-label", words.prev);
-            next.setAttribute("aria-label", words.next);
+            var t = tx();
+            allText.textContent = t.all;
+            if (!dialog) return;
+            dialog.setAttribute("lang", lang());
+            els.close.setAttribute("aria-label", t.close);
+            els.prev.setAttribute("aria-label", t.prev);
+            els.next.setAttribute("aria-label", t.next);
+            Array.prototype.forEach.call(els.thumbs.children, function (thumb, i) {
+                thumb.setAttribute("aria-label", photo(i).caption || photo(i).alt);
+            });
         }
 
-        /* one screenful: as many whole photos as are in view */
-        function step() {
-            var photo = row.querySelector("figure");
-            if (!photo) return row.clientWidth;
-            var gap = parseFloat(getComputedStyle(row).columnGap) || 0;
-            var width = photo.getBoundingClientRect().width + gap;
-            return Math.max(1, Math.floor((row.clientWidth + gap) / width)) * width;
+        function show(i) {
+            var n = tiles.length;
+            index = (i + n) % n; // the last photo goes round to the first
+            var p = photo(index);
+            els.image.src = p.src;
+            els.image.alt = p.alt;
+            els.caption.textContent = p.caption;
+            els.count.textContent = tx().of(index + 1, n);
+            Array.prototype.forEach.call(els.thumbs.children, function (thumb, j) {
+                if (j === index) thumb.setAttribute("aria-current", "true");
+                else thumb.removeAttribute("aria-current");
+            });
+            var current = els.thumbs.children[index];
+            if (current && current.scrollIntoView) current.scrollIntoView({ block: "nearest", inline: "center" });
+            // the next photo is ready before it is asked for
+            new Image().src = photo((index + 1) % n).src;
         }
 
-        function update() {
-            var end = row.scrollWidth - row.clientWidth;
-            var atStart = row.scrollLeft <= 2;
-            var atEnd = row.scrollLeft >= end - 2;
-            /* keep keyboard focus on an arrow that still works */
-            if (atEnd && document.activeElement === next && !atStart) prev.focus({ preventScroll: true });
-            if (atStart && document.activeElement === prev && !atEnd) next.focus({ preventScroll: true });
-            prev.disabled = atStart;
-            next.disabled = atEnd;
+        function open(i) {
+            build();
+            label();
+            show(i);
+            if (!dialog.open) {
+                returnFocus = document.activeElement;
+                dialog.showModal();
+                document.documentElement.classList.add("rs-lock");
+                els.close.focus({ preventScroll: true });
+                try {
+                    history.pushState({ zdPhoto: true }, ""); // same address: Back closes the photo
+                    pushed = true;
+                } catch (error) {
+                    pushed = false;
+                }
+            }
         }
 
-        function move(direction) {
-            var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-            row.scrollBy({ left: direction * step(), behavior: still ? "auto" : "smooth" });
+        function finishClose() {
+            pushed = false;
+            if (dialog && dialog.open) dialog.close();
+            document.documentElement.classList.remove("rs-lock");
+            if (returnFocus && document.contains(returnFocus) && returnFocus.focus) returnFocus.focus({ preventScroll: true });
+            returnFocus = null;
         }
 
-        prev.addEventListener("click", function () { move(-1); });
-        next.addEventListener("click", function () { move(1); });
-
-        var waiting = false;
-        function soon() {
-            if (waiting) return;
-            waiting = true;
-            requestAnimationFrame(function () { waiting = false; update(); });
+        function requestClose() {
+            if (pushed && history.state && history.state.zdPhoto) history.back(); /* popstate below finishes */
+            else finishClose();
         }
-        row.addEventListener("scroll", soon, { passive: true });
-        window.addEventListener("resize", soon);
 
-        var language = document.getElementById("languageSelect");
-        if (language) language.addEventListener("change", function () { setTimeout(label, 0); });
+        window.addEventListener("popstate", function () {
+            if (dialog && dialog.open && !(history.state && history.state.zdPhoto)) finishClose();
+        });
+
+        tiles.forEach(function (tile, i) {
+            tile.addEventListener("click", function () { open(i); });
+        });
+        all.addEventListener("click", function () { open(0); });
+
+        var language = byId("languageSelect");
+        if (language) language.addEventListener("change", function () {
+            setTimeout(function () {
+                label();
+                if (dialog && dialog.open) show(index);
+            }, 0);
+        });
 
         label();
-        update();
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
