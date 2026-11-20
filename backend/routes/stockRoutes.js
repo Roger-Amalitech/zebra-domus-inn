@@ -37,13 +37,14 @@ const StockCount = require("../models/StockCount");
 const Purchase = require("../models/Purchase");
 const SupplyRequest = require("../models/SupplyRequest");
 const Budget = require("../models/Budget");
+const Booking = require("../models/Booking");
 const { can, requirePermission, requireAny, denied } = require("../utils/permissions");
 const { parseDay, toDay, addDays, innToday } = require("../utils/availability");
 const { DEPARTMENTS } = require("../utils/departments");
 const { audit } = require("../utils/audit");
 const { validMonth, monthOverview } = require("../utils/budget");
 const { MAX_AMOUNT, round, amount, money, text, kigaliDay, qtyText, changeStock } = require("../utils/stockOps");
-const { UNIT_GROUPS, knownUnit, wholeNumberProblem } = require("../utils/units");
+const { UNIT_GROUPS, knownUnit, isWholeUnit, wholeNumberProblem } = require("../utils/units");
 
 // why something is written off
 const LOSS_REASONS = {
@@ -742,14 +743,60 @@ router.get("/movements", requirePermission("stock.view"), async (req, res) => {
   }
 });
 
-/* ---------- What was used and what is left, for a period ---------- */
+/* ---------- What was used and what is left, for a period ----------
+   Everyone with stock.view: quantities per item, write-offs, count differences,
+   and what is running low now with how much to buy.
+   The owner (stock.prices) also gets money: every value uses the item's last price paid,
+   so value at start + received - used - written off +/- count differences = value at the end.
+   Plus spending by category and supplier, budgets, issues by department,
+   room-nights sold and the same figures for the period just before. */
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const REORDER_DAYS = 30; // "how much to buy" covers this many days of use
+
+// rooms sold: nights of confirmed bookings between two days (both included)
+async function roomNightsBetween(from, to) {
+  const end = addDays(to, 1);
+  const bookings = await Booking.find({ bookingStatus: "confirmed", checkIn: { $lt: end }, checkOut: { $gt: from } })
+    .select("checkIn checkOut")
+    .lean();
+  return bookings.reduce((total, booking) => {
+    const first = Math.max(booking.checkIn.getTime(), from.getTime());
+    const last = Math.min(booking.checkOut.getTime(), end.getTime());
+    return total + Math.max(0, Math.round((last - first) / DAY_MS));
+  }, 0);
+}
+
+// money paid for purchases between two days (not cancelled)
+async function boughtBetween(from, to) {
+  const rows = await Purchase.aggregate([
+    { $match: { status: { $ne: "cancelled" }, day: { $gte: from, $lte: to } } },
+    { $unwind: "$lines" },
+    { $group: { _id: null, spent: { $sum: { $multiply: ["$lines.quantity", "$lines.unitCost"] } } } },
+  ]);
+  return rows.length ? Math.round(rows[0].spent) : 0;
+}
+
+// the months a period touches, as 2026-11 (at most the last 24)
+function monthsBetween(fromText, toText) {
+  const months = [];
+  let month = fromText.slice(0, 7);
+  const last = toText.slice(0, 7);
+  while (month <= last) {
+    months.push(month);
+    const [year, mon] = month.split("-").map(Number);
+    month = new Date(Date.UTC(year, mon, 1)).toISOString().slice(0, 7);
+  }
+  return months.slice(-24);
+}
 
 router.get("/report", requirePermission("stock.view"), async (req, res) => {
   try {
     const todayText = innToday();
     let fromText = parseDay(req.query.from) ? req.query.from : `${todayText.slice(0, 8)}01`;
+    const sinceStart = req.query.from === "all";
 
-    if (req.query.from === "all") {
+    if (sinceStart) {
       const first = await StockMovement.findOne().sort({ day: 1 }).select("day").lean();
       fromText = first ? toDay(first.day) : todayText;
       if (fromText > todayText) fromText = todayText;
@@ -763,25 +810,48 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
     const to = parseDay(toText);
     const prices = seesPrices(req);
 
-    const [items, moves] = await Promise.all([
+    // the period just before, of the same length (not for "since the start")
+    const periodDays = Math.round((to - from) / DAY_MS) + 1;
+    const comparePrevious = prices && !sinceStart;
+    const prevFrom = addDays(from, -periodDays);
+    const prevTo = addDays(from, -1);
+
+    const today = parseDay(todayText);
+    const recentFrom = addDays(today, -(REORDER_DAYS - 1));
+    const loadFrom = comparePrevious && prevFrom < from ? prevFrom : from;
+
+    const [items, moves, usedRecently, onOrder, countsWaiting] = await Promise.all([
       StockItem.find().sort({ category: 1, name: 1 }).lean(),
-      StockMovement.find({ day: { $gte: from } }).select("item itemName type quantity change day unitCost department reason note userName").lean(),
+      StockMovement.find({ day: { $gte: loadFrom } }).select("item itemName type quantity change day unitCost department reason note userName").lean(),
+      StockMovement.aggregate([
+        { $match: { type: "out", day: { $gte: recentFrom } } },
+        { $group: { _id: "$item", used: { $sum: { $multiply: ["$change", -1] } } } },
+      ]),
+      Purchase.aggregate([
+        { $match: { status: "waiting" } },
+        { $unwind: "$lines" },
+        { $group: { _id: "$lines.item", quantity: { $sum: "$lines.quantity" } } },
+      ]),
+      StockCount.countDocuments({ status: "waiting", day: { $gte: from, $lte: to } }),
     ]);
 
     const costOf = new Map(items.map((item) => [String(item._id), item.unitCost || 0]));
+    const unitOf = new Map(items.map((item) => [String(item._id), item.unit]));
+    const costOfMove = (move) => costOf.get(String(move.item)) || 0;
+    const inPeriod = (move) => move.day >= from && move.day <= to;
 
     const rows = items
       .map((item) => {
         const id = String(item._id);
         const mine = moves.filter((move) => String(move.item) === id);
-        const inPeriod = mine.filter((move) => move.day <= to);
+        const during = mine.filter(inPeriod);
         const afterPeriod = mine.filter((move) => move.day > to);
 
         const sum = (list) => round(list.reduce((total, move) => total + move.change, 0));
-        const received = sum(inPeriod.filter((move) => move.type === "in"));
-        const used = -sum(inPeriod.filter((move) => move.type === "out"));
-        const corrections = sum(inPeriod.filter((move) => move.type === "count"));
-        const writtenOff = -sum(inPeriod.filter((move) => move.type === "loss"));
+        const received = sum(during.filter((move) => move.type === "in"));
+        const used = -sum(during.filter((move) => move.type === "out"));
+        const corrections = sum(during.filter((move) => move.type === "count"));
+        const writtenOff = -sum(during.filter((move) => move.type === "loss"));
         const remaining = round(item.quantity - sum(afterPeriod));
         const atStart = round(remaining - received + used + writtenOff - corrections);
 
@@ -801,11 +871,14 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
         };
 
         if (prices) {
-          row.unitCost = item.unitCost || 0;
-          row.usedValue = round(used * (item.unitCost || 0));
-          row.correctionsValue = round(corrections * (item.unitCost || 0));
-          row.writtenOffValue = round(writtenOff * (item.unitCost || 0));
-          row.remainingValue = round(remaining * (item.unitCost || 0));
+          const cost = item.unitCost || 0;
+          row.unitCost = cost;
+          row.atStartValue = round(atStart * cost);
+          row.receivedValue = round(received * cost);
+          row.usedValue = round(used * cost);
+          row.correctionsValue = round(corrections * cost);
+          row.writtenOffValue = round(writtenOff * cost);
+          row.remainingValue = round(remaining * cost);
         }
 
         return row;
@@ -813,12 +886,11 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
       // archived items only matter if something happened in the period
       .filter((row) => row.active || row.received || row.used || row.writtenOff || row.corrections);
 
-    const report = { success: true, from: fromText, to: toText, rows };
+    const report = { success: true, from: fromText, to: toText, days: periodDays, rows, countsWaiting };
 
     // Expired, damaged, spoiled or lost in the period: every one, and by reason
-    const unitOf = new Map(items.map((item) => [String(item._id), item.unit]));
     const losses = moves
-      .filter((move) => move.type === "loss" && move.day <= to)
+      .filter((move) => move.type === "loss" && inPeriod(move))
       .sort((a, b) => b.day - a.day)
       .map((move) => {
         const loss = {
@@ -831,10 +903,7 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
           note: move.note || "",
           userName: move.userName || "",
         };
-        if (prices) {
-          const cost = move.unitCost !== undefined && move.unitCost !== null ? move.unitCost : costOf.get(String(move.item)) || 0;
-          loss.value = Math.round(move.quantity * cost);
-        }
+        if (prices) loss.value = round(move.quantity * costOfMove(move));
         return loss;
       });
 
@@ -842,36 +911,164 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
     report.lossesByReason = Object.keys(LOSS_REASONS).map((key) => {
       const mine = losses.filter((loss) => loss.reason === key);
       const row = { reason: key, reasonText: LOSS_REASONS[key], times: mine.length };
-      if (prices) row.value = mine.reduce((total, loss) => total + loss.value, 0);
+      if (prices) row.value = round(mine.reduce((total, loss) => total + loss.value, 0));
       return row;
     });
 
-    // Money (owner): what went to each department, and what was bought
-    if (prices) {
-      const departments = new Map(DEPARTMENTS.map((name) => [name, { department: name, issues: 0, value: 0 }]));
+    // Count differences in the period: each correction to the record
+    report.counts = moves
+      .filter((move) => move.type === "count" && inPeriod(move))
+      .sort((a, b) => b.day - a.day)
+      .map((move) => {
+        const count = {
+          day: toDay(move.day),
+          itemName: move.itemName,
+          unit: unitOf.get(String(move.item)) || "",
+          recorded: round(move.quantity - move.change),
+          counted: move.quantity,
+          change: move.change,
+          note: move.note || "",
+          userName: move.userName || "",
+        };
+        if (prices) count.value = round(move.change * costOfMove(move));
+        return count;
+      });
 
+    // Running low now, and how much to buy: enough for 30 days at the last 30 days' use,
+    // and at least twice the warning level, less what is already bought and on its way
+    const usedMap = new Map(usedRecently.map((row) => [String(row._id), row.used]));
+    const orderMap = new Map(onOrder.map((row) => [String(row._id), row.quantity]));
+
+    report.reorderDays = REORDER_DAYS;
+    report.reorder = items
+      .filter((item) => item.active !== false && (item.quantity <= 0 || (item.lowStockAt > 0 && item.quantity <= item.lowStockAt)))
+      .map((item) => {
+        const id = String(item._id);
+        const usedLately = round(usedMap.get(id) || 0);
+        const coming = round(orderMap.get(id) || 0);
+        const target = Math.max(usedLately, (item.lowStockAt || 0) * 2);
+        let buy = target - item.quantity - coming;
+        buy = buy > 0 ? (isWholeUnit(item.unit) ? Math.ceil(buy - 1e-9) : Math.ceil(buy * 10 - 1e-9) / 10) : 0;
+
+        const row = {
+          name: item.name,
+          category: item.category,
+          unit: item.unit,
+          quantity: item.quantity,
+          lowStockAt: item.lowStockAt || 0,
+          usedLately,
+          onOrder: coming,
+          buy,
+        };
+        if (prices) {
+          row.unitCost = item.unitCost || 0;
+          row.cost = Math.round(buy * (item.unitCost || 0));
+        }
+        return row;
+      });
+
+    // Money (owner)
+    if (prices) {
+      const totalOf = (key) => round(rows.reduce((total, row) => total + (row[key] || 0), 0));
+      report.totals = {
+        atStart: totalOf("atStartValue"),
+        received: totalOf("receivedValue"),
+        used: totalOf("usedValue"),
+        writtenOff: totalOf("writtenOffValue"),
+        corrections: totalOf("correctionsValue"),
+        remaining: totalOf("remainingValue"),
+      };
+
+      // what went to each department
+      const departments = new Map(DEPARTMENTS.map((name) => [name, { department: name, issues: 0, value: 0 }]));
       moves
-        .filter((move) => move.type === "out" && move.day <= to)
+        .filter((move) => move.type === "out" && inPeriod(move))
         .forEach((move) => {
           const name = move.department || "Not given";
           if (!departments.has(name)) departments.set(name, { department: name, issues: 0, value: 0 });
           const entry = departments.get(name);
-          const cost = move.unitCost !== undefined && move.unitCost !== null ? move.unitCost : costOf.get(String(move.item)) || 0;
           entry.issues += 1;
-          entry.value += -move.change * cost;
+          entry.value += -move.change * costOfMove(move);
         });
+      report.departments = [...departments.values()].map((d) => ({ ...d, value: round(d.value) }));
 
-      const bought = await Purchase.aggregate([
-        { $match: { status: { $ne: "cancelled" }, day: { $gte: from, $lte: to } } },
-        { $unwind: "$lines" },
-        { $group: { _id: "$lines.category", spent: { $sum: { $multiply: ["$lines.quantity", "$lines.unitCost"] } } } },
+      // what was bought: by category and by supplier
+      const purchaseMatch = { status: { $ne: "cancelled" }, day: { $gte: from, $lte: to } };
+      const [byCategory, bySupplier, roomNights, budgets] = await Promise.all([
+        Purchase.aggregate([
+          { $match: purchaseMatch },
+          { $unwind: "$lines" },
+          { $group: { _id: "$lines.category", spent: { $sum: { $multiply: ["$lines.quantity", "$lines.unitCost"] } } } },
+        ]),
+        Purchase.aggregate([
+          { $match: purchaseMatch },
+          { $unwind: "$lines" },
+          {
+            $group: {
+              _id: "$supplier",
+              purchases: { $addToSet: "$_id" },
+              spent: { $sum: { $multiply: ["$lines.quantity", "$lines.unitCost"] } },
+            },
+          },
+        ]),
+        roomNightsBetween(from, to),
+        Promise.all(monthsBetween(fromText, toText).map((month) => monthOverview(month))),
       ]);
 
-      report.departments = [...departments.values()].map((d) => ({ ...d, value: Math.round(d.value) }));
       report.spent = STOCK_CATEGORIES.map((category) => {
-        const found = bought.find((row) => row._id === category);
+        const found = byCategory.find((row) => row._id === category);
         return { category, spent: found ? Math.round(found.spent) : 0 };
       });
+
+      const suppliers = new Map();
+      bySupplier.forEach((row) => {
+        const name = String(row._id || "").trim() || "Not named";
+        const entry = suppliers.get(name) || { supplier: name, purchases: 0, spent: 0 };
+        entry.purchases += row.purchases.length;
+        entry.spent += Math.round(row.spent);
+        suppliers.set(name, entry);
+      });
+      report.suppliers = [...suppliers.values()].sort((a, b) => b.spent - a.spent);
+
+      // budgets for the whole months the period touches
+      report.budget = {
+        months: budgets.map((b) => b.month),
+        hasBudget: budgets.some((b) => b.hasBudget),
+        rows: STOCK_CATEGORIES.map((category) => {
+          let budget = null;
+          let spent = 0;
+          budgets.forEach((b) => {
+            const row = b.rows.find((r) => r.category === category);
+            if (!row) return;
+            if (row.budget !== null) budget = (budget || 0) + row.budget;
+            spent += row.spent;
+          });
+          return { category, budget, spent };
+        }),
+      };
+
+      // stock used per room-night sold
+      report.roomNights = roomNights;
+      report.usedByCategory = STOCK_CATEGORIES.map((category) => ({
+        category,
+        used: round(rows.filter((row) => row.category === category).reduce((total, row) => total + (row.usedValue || 0), 0)),
+      }));
+
+      // the same figures for the period just before
+      if (comparePrevious) {
+        const before = moves.filter((move) => move.day >= prevFrom && move.day <= prevTo);
+        const valueOf = (type) => round(before.filter((move) => move.type === type).reduce((total, move) => total + move.change * costOfMove(move), 0));
+        const [prevBought, prevNights] = await Promise.all([boughtBetween(prevFrom, prevTo), roomNightsBetween(prevFrom, prevTo)]);
+        report.previous = {
+          from: toDay(prevFrom),
+          to: toDay(prevTo),
+          bought: prevBought,
+          used: -valueOf("out"),
+          writtenOff: -valueOf("loss"),
+          corrections: valueOf("count"),
+          roomNights: prevNights,
+        };
+      }
     }
 
     return res.json(report);

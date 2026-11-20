@@ -3028,3 +3028,492 @@ html.sheet-open body {
         display: none;
     }
 }
+
+/* ---------- Stock report (see "Report" in admin.js) ---------- */
+
+/* the period, the dates and the two downloads */
+.report-dates {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
+}
+
+.report-date {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.report-date input {
+    width: 100%;
+    min-width: 0;
+}
+
+.report-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+}
+
+.report-actions .btn {
+    white-space: nowrap;
+}
+
+/* quantities or money */
+.report-view {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 340px;
+    margin-bottom: 12px;
+}
+
+/* the owner's six key figures: two in a row on a phone, three on a computer */
+.money-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.money-stat .stat-number {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 5px;
+    font-size: clamp(21px, 5.6vw, 30px);
+    white-space: nowrap;
+}
+
+.stat-currency {
+    color: var(--muted);
+    font-size: 0.5em;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+/* notes and checks under the tables */
+.report-note {
+    margin: 8px 2px 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.report-check {
+    display: inline-block;
+    margin: 10px 0 0;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.report-check.is-ok {
+    background: #EAF6EC;
+    color: #1E6B30;
+}
+
+.report-check.is-off {
+    background: #FFF4E0;
+    color: #7A4B00;
+}
+
+#reportSummary .report-wrap,
+#reorderReport .report-wrap,
+#countReport .report-wrap {
+    margin-top: 14px;
+}
+
+.report-table .is-left {
+    text-align: left;
+}
+
+.report-table .is-strong {
+    font-weight: 700;
+}
+
+.report-table .is-over {
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* the "adds up" statement: words on the left, amounts on the right */
+.statement .room-col {
+    width: 100%;
+    font-weight: 500;
+}
+
+/* in the smaller tables, long words wrap instead of pushing the amounts off the screen */
+.money-table tbody th.room-col,
+.money-table tfoot th.room-col {
+    white-space: normal;
+}
+
+@media (max-width: 559px) {
+    .money-table th,
+    .money-table td {
+        padding: 9px 8px;
+    }
+
+    /* wide lists become one card per row: each amount under its heading */
+    .stack,
+    .stack tbody,
+    .stack tfoot {
+        display: block;
+    }
+
+    .stack caption {
+        display: block;
+    }
+
+    .stack thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .stack tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 14px;
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .stack th,
+    .stack td,
+    .stack .total-row th,
+    .stack .total-row td {
+        display: block;
+        padding: 0;
+        border: 0;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .stack th.room-col {
+        grid-column: 1 / -1;
+        font-size: 15px;
+    }
+
+    .stack td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 1px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .stack td:empty {
+        display: none;
+    }
+
+    .stack td[data-label="Note"] {
+        grid-column: 1 / -1;
+    }
+
+    /* this period, the period before and the change sit side by side */
+    .compare.stack tr {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .stack .total-row {
+        border-top: 2px solid var(--ink);
+        border-bottom: 0;
+    }
+
+    .compare th,
+    .compare td {
+        font-size: 13px;
+    }
+
+    .compare thead th {
+        font-size: 11px;
+        white-space: normal;
+    }
+}
+
+.statement .total-row .room-col {
+    font-weight: 700;
+}
+
+/* words in these lists line up on the left */
+.count-list td.is-left,
+.reorder-list td.is-left {
+    white-space: normal;
+}
+
+.print-only,
+#printReport {
+    display: none;
+}
+
+@media (min-width: 720px) {
+    .report-dates {
+        display: flex;
+        width: auto;
+    }
+
+    .report-date {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .report-actions {
+        display: flex;
+        width: auto;
+        margin-left: auto;
+    }
+
+    .money-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+/* ---------- Printing the stock report (A4, black on white) ---------- */
+
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 14mm 12mm 16mm;
+
+        @bottom-left {
+            content: "Zebra Dormus Inn · Stock report";
+            color: #555555;
+            font-family: Arial, sans-serif;
+            font-size: 8pt;
+        }
+
+        @bottom-right {
+            content: "Page " counter(page) " of " counter(pages);
+            color: #555555;
+            font-family: Arial, sans-serif;
+            font-size: 8pt;
+        }
+    }
+
+    html,
+    body {
+        background: #FFFFFF !important;
+    }
+
+    body > *:not(#printReport) {
+        display: none !important;
+    }
+
+    #printReport {
+        display: block;
+        color: #111111;
+        font-size: 9.5pt;
+    }
+
+    #printReport .print-only {
+        display: block;
+    }
+
+    .pr-head {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 6px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #111111;
+    }
+
+    .pr-logo {
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: #111111;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .pr-logo img {
+        display: block;
+        width: 104px;
+        height: auto;
+    }
+
+    .pr-title h1 {
+        margin: 0;
+        font-size: 18pt;
+    }
+
+    .pr-title p {
+        margin: 2px 0 0;
+        color: #555555;
+    }
+
+    .pr-meta {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 2px 10px;
+        margin: 0;
+        font-size: 8.5pt;
+    }
+
+    .pr-meta dt {
+        color: #555555;
+        font-weight: 700;
+    }
+
+    .pr-meta dd {
+        margin: 0;
+    }
+
+    #printReport .section-title {
+        margin: 14px 0 6px;
+        font-size: 12pt;
+        break-after: avoid;
+    }
+
+    #printReport .report-check {
+        break-after: avoid;
+    }
+
+    #printReport .print-sub {
+        margin: 10px 0 4px;
+        font-size: 10pt;
+        break-after: avoid;
+    }
+
+    #printReport .grid-wrap {
+        overflow: visible !important;
+        border: 1px solid #CCCCCC;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    #printReport .report-table th,
+    #printReport .report-table td {
+        padding: 3px 6px;
+        font-size: 8.5pt;
+        white-space: normal;
+    }
+
+    #printReport .report-table .room-col {
+        position: static;
+    }
+
+    /* amounts and dates stay on one line; words may wrap */
+    #printReport .report-table td,
+    #printReport .report-table tbody th {
+        white-space: nowrap;
+    }
+
+    #printReport .report-table td.is-left {
+        white-space: normal;
+    }
+
+    #printReport .room-col-name {
+        font-size: 9pt;
+    }
+
+    #printReport .room-col-count {
+        font-size: 7.5pt;
+    }
+
+    #printReport .report-wrap + .report-wrap,
+    #printReport .report-note + .report-wrap,
+    #printReport .report-check + .report-note {
+        margin-top: 8px;
+    }
+
+    #printReport .report-table tr {
+        break-inside: avoid;
+    }
+
+    #printReport .report-table thead {
+        display: table-header-group;
+    }
+
+    /* the total comes once, after the last row (not at the bottom of every page) */
+    #printReport .report-table tfoot {
+        display: table-row-group;
+    }
+
+    /* a section's title stays with its table (a section longer than a page still breaks) */
+    #printReport .report-block {
+        break-inside: avoid;
+    }
+
+    /* a short table stays on one page */
+    #printReport .report-wrap:has(.money-table) {
+        break-inside: avoid;
+    }
+
+    #printReport .money-table caption {
+        padding: 6px 6px 4px;
+        font-size: 10pt;
+    }
+
+    #printReport .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    #printReport .stat {
+        min-height: 0;
+        padding: 6px 8px;
+        border: 1px solid #CCCCCC;
+        border-radius: 6px;
+        break-inside: avoid;
+    }
+
+    #printReport .stat-number {
+        font-size: 14pt;
+    }
+
+    #printReport .empty {
+        padding: 6px 8px;
+        font-size: 9pt;
+        text-align: left;
+    }
+
+    #printReport .report-note {
+        font-size: 8pt;
+    }
+
+    #printReport .report-check {
+        padding: 2px 8px;
+        border: 1px solid #999999;
+        font-size: 8.5pt;
+    }
+
+    .pr-sign {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 28px;
+        margin-top: 26px;
+        break-inside: avoid;
+    }
+
+    .pr-sign-title {
+        margin: 0 0 6px;
+        font-weight: 700;
+    }
+
+    .pr-line {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+        height: 28px;
+        margin: 0;
+        color: #555555;
+        font-size: 8.5pt;
+    }
+
+    .pr-line::after {
+        content: "";
+        flex: 1;
+        border-bottom: 1px solid #111111;
+    }
+}

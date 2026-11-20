@@ -322,18 +322,42 @@
                         <button type="button" class="btn btn-ghost btn-small" data-period="all">Since the start</button>
                     </div>
                     <div class="report-dates">
-                        <label for="reportFrom">From</label>
-                        <input type="date" id="reportFrom">
-                        <label for="reportTo">To</label>
-                        <input type="date" id="reportTo">
+                        <div class="report-date">
+                            <label for="reportFrom">From</label>
+                            <input type="date" id="reportFrom">
+                        </div>
+                        <div class="report-date">
+                            <label for="reportTo">To</label>
+                            <input type="date" id="reportTo">
+                        </div>
                     </div>
-                    <button type="button" class="btn btn-primary btn-small" id="reportDownload">Download for Excel</button>
+                    <div class="report-actions">
+                        <button type="button" class="btn btn-ghost btn-small" id="reportPrint">Print or save as PDF</button>
+                        <button type="button" class="btn btn-primary btn-small" id="reportDownload">Download Excel</button>
+                    </div>
                 </div>
                 <p class="count" id="reportRange" aria-live="polite"></p>
-                <div class="grid-wrap report-wrap" tabindex="0" role="region" aria-label="Stock report">
+
+                <!-- the owner's summary: key figures, how the value adds up, the period before -->
+                <div id="reportSummary"></div>
+
+                <h2 class="section-title" id="reportStockTitle">Stock in this period</h2>
+                <div class="segmented report-view" id="reportView" role="group" aria-label="Show the stock as" hidden>
+                    <button type="button" data-report-view="qty" aria-pressed="true">Quantities</button>
+                    <button type="button" data-report-view="money" aria-pressed="false">Money (RWF)</button>
+                </div>
+                <h3 class="print-only print-sub">Quantities</h3>
+                <div class="grid-wrap report-wrap" id="reportQtyWrap" tabindex="0" role="region" aria-label="Stock quantities for the period">
                     <table class="report-table" id="reportTable"></table>
                 </div>
-                <div id="lossReport"></div>
+                <h3 class="print-only print-sub">Money (RWF, at the last price paid)</h3>
+                <div class="grid-wrap report-wrap" id="reportMoneyWrap" tabindex="0" role="region" aria-label="Stock value for the period" hidden>
+                    <table class="report-table" id="reportMoneyTable"></table>
+                </div>
+
+                <div class="report-block" id="reorderReport"></div>
+                <div class="report-block" id="lossReport"></div>
+                <div class="report-block" id="countReport"></div>
                 <div id="moneyReport"></div>
             </div>
 
@@ -484,6 +508,7 @@
 </div>
 
 <script src="api-config.js"></script>
+<script src="xlsx-lite.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

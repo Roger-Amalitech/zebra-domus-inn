@@ -4193,7 +4193,14 @@
         loadChanges(true).catch(showLoadError);
     });
 
-    /* ----- Report: what came in, was used and remains, for a period ----- */
+    /* ----- Report: what came in, was used and remains, for a period -----
+       Everyone who sees stock: the stock table in quantities, what is running low and how much to buy,
+       write-offs and count differences.
+       The owner also gets money: a summary with key figures, how the store value adds up,
+       the period before, the stock table in RWF, budgets, spending by category and supplier,
+       issues by department and stock used per room-night sold.
+       "Print or save as PDF" prints all of it with the inn's name, who printed it, page numbers
+       and lines to sign; "Download Excel" saves the same as an Excel file with one sheet per part. */
 
     function setPeriod(kind) {
         var today = kigaliToday();
@@ -4234,6 +4241,86 @@
         });
     });
 
+    /* Quantities or money in the stock table (money: owner only) */
+    stock.reportView = "qty";
+
+    function showReportView() {
+        var money = stock.reportView === "money" && can("stock.prices");
+        $("reportView").hidden = !can("stock.prices");
+        $("reportQtyWrap").hidden = money;
+        $("reportMoneyWrap").hidden = !money;
+        document.querySelectorAll("[data-report-view]").forEach(function (b) {
+            b.setAttribute("aria-pressed", String(b.getAttribute("data-report-view") === (money ? "money" : "qty")));
+        });
+    }
+
+    document.querySelectorAll("[data-report-view]").forEach(function (b) {
+        b.addEventListener("click", function () {
+            stock.reportView = b.getAttribute("data-report-view");
+            showReportView();
+        });
+    });
+
+    /* ----- numbers and words ----- */
+
+    function rwf(value) { return formatRwf(Math.round(Number(value || 0))); }
+
+    function num(value) {
+        var n = Math.round(Number(value || 0));
+        return (n < 0 ? "−" : "") + Math.abs(n).toLocaleString("en-US");
+    }
+
+    function signedNum(value) {
+        var n = Math.round(Number(value || 0));
+        return (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n).toLocaleString("en-US");
+    }
+
+    function longDay(text) { return formatDay(text, { day: "numeric", month: "short", year: "numeric" }); }
+    function weekDay(text) { return formatDay(text, { weekday: "short", day: "numeric", month: "short" }); }
+    function rangeText(from, to) { return longDay(from) + " – " + longDay(to); }
+
+    function monthsText(months) {
+        var name = function (m) { return formatDay(m + "-01", { month: "long", year: "numeric" }); };
+        if (!months || !months.length) return "";
+        return months.length === 1 ? name(months[0]) : name(months[0]) + " – " + name(months[months.length - 1]);
+    }
+
+    // +12%, −5%, Same, New, —
+    function changeText(now, before) {
+        now = Math.round(Number(now || 0));
+        before = Math.round(Number(before || 0));
+        if (!now && !before) return "—";
+        if (!before) return "New";
+        var p = Math.round(((now - before) / Math.abs(before)) * 100);
+        return p === 0 ? "Same" : (p > 0 ? "+" : "−") + Math.abs(p) + "%";
+    }
+
+    function printedOn() {
+        return new Date().toLocaleString("en-GB", {
+            timeZone: "Africa/Kigali", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+        });
+    }
+
+    function boughtTotal(data) {
+        return (data.spent || []).reduce(function (sum, row) { return sum + row.spent; }, 0);
+    }
+
+    /* ----- building blocks ----- */
+
+    function moneyStat(amount, label, note, withSign) {
+        var none = amount === null || amount === undefined;
+        var n = none ? 0 : Math.round(Number(amount));
+        var sign = withSign ? (n > 0 ? "+" : n < 0 ? "−" : "") : (n < 0 ? "−" : "");
+        return el("div", { className: "stat is-static money-stat" }, [
+            el("span", { className: "stat-number" }, none ? [el("span", { text: "—" })] : [
+                el("span", { className: "stat-currency", text: sign + "RWF" }),
+                el("span", { text: Math.abs(n).toLocaleString("en-US") })
+            ]),
+            el("span", { className: "stat-label", text: label }),
+            el("span", { className: "stat-note", text: note })
+        ]);
+    }
+
     function staticStat(number, label, note) {
         return el("div", { className: "stat is-static" }, [
             el("span", { className: "stat-number", text: String(number) }),
@@ -4242,36 +4329,255 @@
         ]);
     }
 
-    function moneyTable(caption, heads, rows, total) {
-        var table = el("table", { className: "report-table money-table" }, [
-            el("caption", { text: caption }),
-            el("thead", {}, [el("tr", {}, heads.map(function (h, i) {
-                return el("th", { scope: "col", className: i === 0 ? "room-col" : null, text: h });
-            }))])
-        ]);
-        table.appendChild(el("tbody", {}, rows.map(function (cells) {
-            return el("tr", {}, cells.map(function (cell, i) {
-                return i === 0 ? el("th", { scope: "row", className: "room-col", text: cell }) : el("td", { text: cell });
-            }));
-        })));
-        if (total) {
-            table.appendChild(el("tfoot", {}, [el("tr", { className: "total-row" }, total.map(function (cell, i) {
-                return i === 0 ? el("th", { scope: "row", className: "room-col", text: cell }) : el("td", { text: cell });
-            }))]));
+    /* A table with a caption. cols: [{ head, left }]; a cell is text or { text, className }.
+       A "stack" table becomes one card per row on a phone (each amount under its heading);
+       the roles keep it a table for screen readers when its look changes. */
+    function dataTable(caption, cols, rows, total, extraClass) {
+        var stack = / stack\b|^stack\b/.test(extraClass || "");
+        var role = function (name) { return stack ? name : null; };
+
+        function cell(value, i) {
+            var c = cols[i] || {};
+            var opts = value !== null && typeof value === "object" ? value : { text: value };
+            var cls = [i === 0 ? "room-col" : "", c.left ? "is-left" : "", opts.className || ""].join(" ").trim() || null;
+            var textValue = opts.text === undefined || opts.text === null ? "" : String(opts.text);
+            return i === 0
+                ? el("th", { scope: "row", className: cls, text: textValue, role: role("rowheader") })
+                : el("td", { className: cls, text: textValue, "data-label": c.head, role: role("cell") });
         }
+
+        var table = el("table", { className: "report-table money-table" + (extraClass ? " " + extraClass : ""), role: role("table") }, [
+            el("caption", { text: caption }),
+            el("thead", { role: role("rowgroup") }, [el("tr", { role: role("row") }, cols.map(function (c, i) {
+                return el("th", { scope: "col", className: [i === 0 ? "room-col" : "", c.left ? "is-left" : ""].join(" ").trim() || null, text: c.head, role: role("columnheader") });
+            }))]),
+            el("tbody", { role: role("rowgroup") }, rows.map(function (row) {
+                return el("tr", { role: role("row") }, row.map(cell));
+            }))
+        ]);
+        if (total) {
+            table.appendChild(el("tfoot", { role: role("rowgroup") }, [el("tr", { className: "total-row", role: role("row") }, total.map(cell))]));
+        }
+
         return el("div", { className: "grid-wrap report-wrap", tabindex: "0", role: "region", "aria-label": caption }, [table]);
     }
 
-    /* Expired, damaged, spoiled or lost: by reason, then each one */
+    // kept for the tables that were here before
+    function moneyTable(caption, heads, rows, total) {
+        return dataTable(caption, heads.map(function (h) { return { head: h }; }), rows, total);
+    }
+
+    function note(text) { return el("p", { className: "report-note", text: text }); }
+    function title(text) { return el("h2", { className: "section-title", text: text }); }
+    function emptyNote(text) { return el("p", { className: "empty", text: text }); }
+
+    /* ----- the owner's summary ----- */
+
+    function renderSummary(data) {
+        var box = $("reportSummary");
+        box.textContent = "";
+        if (!data.totals) return;
+
+        var t = data.totals;
+        var bought = boughtTotal(data);
+        var perNight = data.roomNights ? t.used / data.roomNights : null;
+
+        box.appendChild(title("Summary"));
+        box.appendChild(el("div", { className: "stats money-stats" }, [
+            moneyStat(bought, "Paid to suppliers", "Purchases recorded"),
+            moneyStat(t.used, "Stock used", "Issued to departments"),
+            moneyStat(t.writtenOff, "Written off", "Expired, damaged or lost"),
+            moneyStat(t.corrections, "Count differences", t.corrections < 0 ? "Missing at counts" : t.corrections > 0 ? "Found at counts" : "Counts matched the record", true),
+            moneyStat(t.remaining, "Value in store", "At the end of the period"),
+            moneyStat(perNight, "Used per room-night", data.roomNights ? plural(data.roomNights, "room-night sold", "room-nights sold") : "No confirmed room-nights")
+        ]));
+
+        // how the store value adds up
+        var start = Math.round(t.atStart);
+        var lines = [Math.round(t.received), Math.round(t.used), Math.round(t.writtenOff), Math.round(t.corrections)];
+        var end = start + lines[0] - lines[1] - lines[2] + lines[3];
+        var off = end - Math.round(t.remaining);
+
+        box.appendChild(dataTable("How the store value adds up", [{ head: "Stock value", left: true }, { head: "RWF" }], [
+            ["Value in store at the start (" + longDay(data.from) + ")", num(start)],
+            ["+ Received into the store", num(lines[0])],
+            ["− Used (issued to departments)", num(lines[1])],
+            ["− Expired, damaged or lost", num(lines[2])],
+            [(lines[3] < 0 ? "− " : "+ ") + "Count differences", num(Math.abs(lines[3]))]
+        ], ["= Value in store at the end (" + longDay(data.to) + ")", num(t.remaining)], "statement"));
+
+        box.appendChild(el("p", {
+            className: "report-check" + (Math.abs(off) <= 1 ? " is-ok" : " is-off"),
+            text: Math.abs(off) <= 1 ? "✓ The figures add up." : "The figures are " + rwf(Math.abs(off)) + " apart. Check the stock history for this period."
+        }));
+        box.appendChild(note("All values use each item's last price paid. \"Received\" is purchases checked in plus starting stock. " +
+            "\"Paid to suppliers\" counts purchases on the day they were bought, even before they are checked in."));
+
+        // the period just before
+        var p = data.previous;
+        if (p) {
+            var perBefore = p.roomNights ? p.used / p.roomNights : null;
+            box.appendChild(dataTable("Compared with the period before (" + rangeText(p.from, p.to) + ")",
+                [{ head: "Measure", left: true }, { head: "This period" }, { head: "Period before" }, { head: "Change" }], [
+                    ["Paid to suppliers", rwf(bought), rwf(p.bought), changeText(bought, p.bought)],
+                    ["Stock used", rwf(t.used), rwf(p.used), changeText(t.used, p.used)],
+                    ["Written off", rwf(t.writtenOff), rwf(p.writtenOff), changeText(t.writtenOff, p.writtenOff)],
+                    ["Count differences", signedRwf(t.corrections), signedRwf(p.corrections), changeText(Math.abs(t.corrections), Math.abs(p.corrections))],
+                    ["Room-nights sold", String(data.roomNights), String(p.roomNights), changeText(data.roomNights, p.roomNights)],
+                    ["Stock used per room-night", perNight === null ? "—" : rwf(perNight), perBefore === null ? "—" : rwf(perBefore),
+                        perNight === null || perBefore === null ? "—" : changeText(perNight, perBefore)]
+                ], null, "compare stack"));
+        }
+    }
+
+    /* ----- the stock table: quantities, and money for the owner ----- */
+
+    function renderStockTables(data, prices) {
+        var table = $("reportTable");
+        table.textContent = "";
+        table.appendChild(el("caption", { className: "visually-hidden", text: "Stock quantities for the period" }));
+
+        var heads = ["Item", "At start", "Received", "Used", "Expired / damaged", "Count differences", "Remaining"];
+        table.appendChild(el("thead", {}, [el("tr", {}, heads.map(function (h, i) {
+            return el("th", { scope: "col", className: i === 0 ? "room-col" : null, text: h });
+        }))]));
+
+        var body = el("tbody");
+        var lastCategory = "";
+
+        if (!data.rows.length) {
+            body.appendChild(el("tr", {}, [el("td", { colspan: String(heads.length), className: "empty-cell", text: "No items yet." })]));
+        }
+
+        function itemCell(row, extra) {
+            return el("th", { scope: "row", className: "room-col" }, [
+                el("span", { className: "room-col-name", text: row.name }),
+                el("span", { className: "room-col-count", text: extra + (row.active ? "" : " · archived") })
+            ]);
+        }
+
+        function groupRow(row, span) {
+            return el("tr", { className: "group-row" }, [el("th", { scope: "colgroup", colspan: String(span), text: row.category })]);
+        }
+
+        data.rows.forEach(function (row) {
+            if (row.category !== lastCategory) {
+                lastCategory = row.category;
+                body.appendChild(groupRow(row, heads.length));
+            }
+            var lowNow = row.remaining <= 0 || (row.lowStockAt > 0 && row.remaining <= row.lowStockAt);
+            body.appendChild(el("tr", {}, [
+                itemCell(row, row.unit),
+                el("td", { text: qty(row.atStart) }),
+                el("td", { text: row.received ? "+" + qty(row.received) : "0" }),
+                el("td", { text: row.used ? "−" + qty(row.used) : "0" }),
+                el("td", { className: row.writtenOff ? "is-lost" : null, text: row.writtenOff ? "−" + qty(row.writtenOff) : "0" }),
+                el("td", { text: row.corrections ? signed(row.corrections) : "0" }),
+                el("td", { className: lowNow ? "is-low" : null, text: qty(row.remaining) + (lowNow ? " ⚠" : "") })
+            ]));
+        });
+        table.appendChild(body);
+
+        // the same items in RWF, at the last price paid
+        var money = $("reportMoneyTable");
+        money.textContent = "";
+        if (!prices) return;
+
+        money.appendChild(el("caption", { className: "visually-hidden", text: "Stock value for the period, in RWF" }));
+        var moneyHeads = ["Item", "Price for one", "At start", "Received", "Used", "Written off", "Count differences", "Remaining"];
+        money.appendChild(el("thead", {}, [el("tr", {}, moneyHeads.map(function (h, i) {
+            return el("th", { scope: "col", className: i === 0 ? "room-col" : null, text: h });
+        }))]));
+
+        var moneyBody = el("tbody");
+        lastCategory = "";
+        data.rows.forEach(function (row) {
+            if (row.category !== lastCategory) {
+                lastCategory = row.category;
+                moneyBody.appendChild(groupRow(row, moneyHeads.length));
+            }
+            moneyBody.appendChild(el("tr", {}, [
+                itemCell(row, "RWF for one " + oneUnit(row.unit)),
+                el("td", { text: num(row.unitCost) }),
+                el("td", { text: num(row.atStartValue) }),
+                el("td", { text: num(row.receivedValue) }),
+                el("td", { text: num(row.usedValue) }),
+                el("td", { className: row.writtenOffValue ? "is-lost" : null, text: num(row.writtenOffValue) }),
+                el("td", { text: signedNum(row.correctionsValue) }),
+                el("td", { text: num(row.remainingValue) })
+            ]));
+        });
+        money.appendChild(moneyBody);
+
+        if (data.rows.length && data.totals) {
+            var t = data.totals;
+            money.appendChild(el("tfoot", {}, [el("tr", { className: "total-row" }, [
+                el("th", { scope: "row", className: "room-col", text: "Total (RWF)" }),
+                el("td", { text: "" }),
+                el("td", { text: num(t.atStart) }),
+                el("td", { text: num(t.received) }),
+                el("td", { text: num(t.used) }),
+                el("td", { text: num(t.writtenOff) }),
+                el("td", { text: signedNum(t.corrections) }),
+                el("td", { text: num(t.remaining) })
+            ])]));
+        }
+    }
+
+    /* ----- running low now, and how much to buy ----- */
+
+    function reorderRule(data) {
+        return "Suggested amount: enough for " + data.reorderDays + " days at the rate used in the last " + data.reorderDays +
+            " days, and at least twice the warning level, less what is already bought and on its way.";
+    }
+
+    function renderReorder(data, prices) {
+        var box = $("reorderReport");
+        box.textContent = "";
+        box.appendChild(title("Running low: what to buy"));
+
+        if (!data.reorder || !data.reorder.length) {
+            box.appendChild(emptyNote("Nothing is running low right now."));
+            return;
+        }
+
+        var cols = [{ head: "Item", left: true }, { head: "In stock" }, { head: "Warn at" }, { head: "Used in last " + data.reorderDays + " days" },
+            { head: "On its way" }, { head: "Suggested to buy" }];
+        if (prices) cols.push({ head: "Price for one" }, { head: "Estimated cost" });
+
+        var cost = 0;
+        var rows = data.reorder.map(function (r) {
+            var line = [
+                r.name,
+                { text: amountText(r.quantity, r.unit), className: r.quantity <= 0 ? "is-low" : null },
+                amountText(r.lowStockAt, r.unit),
+                amountText(r.usedLately, r.unit),
+                r.onOrder ? amountText(r.onOrder, r.unit) : "—",
+                { text: r.buy ? amountText(r.buy, r.unit) : "—", className: "is-strong" }
+            ];
+            if (prices) {
+                cost += r.cost || 0;
+                line.push(rwf(r.unitCost), r.buy ? rwf(r.cost) : "—");
+            }
+            return line;
+        });
+
+        var total = prices ? ["Total", "", "", "", "", "", "", rwf(cost)] : null;
+        box.appendChild(dataTable("Items at or below their warning level today", cols, rows, total, "reorder-list stack"));
+        box.appendChild(note(reorderRule(data)));
+    }
+
+    /* ----- expired, damaged, spoiled or lost: by reason, then each one ----- */
+
     function renderLosses(data, prices) {
         var box = $("lossReport");
         box.textContent = "";
         if (!data.losses) return;
 
-        box.appendChild(el("h2", { className: "section-title", text: "Expired and damaged in this period" }));
+        box.appendChild(title("Expired and damaged in this period"));
 
         if (!data.losses.length) {
-            box.appendChild(el("p", { className: "empty", text: "Nothing was written off in this period." }));
+            box.appendChild(emptyNote("Nothing was written off in this period."));
             return;
         }
 
@@ -4281,36 +4587,129 @@
         box.appendChild(moneyTable("Written off, by reason",
             prices ? ["Reason", "Times", "Value"] : ["Reason", "Times"],
             data.lossesByReason.filter(function (r) { return r.times; }).map(function (r) {
-                return prices ? [r.reasonText, String(r.times), formatRwf(r.value)] : [r.reasonText, String(r.times)];
+                return prices ? [r.reasonText, String(r.times), rwf(r.value)] : [r.reasonText, String(r.times)];
             }),
-            prices ? ["Total", String(times), formatRwf(lostTotal)] : ["Total", String(times)]));
+            prices ? ["Total", String(times), rwf(lostTotal)] : ["Total", String(times)]));
 
-        var heads = ["Day", "Item", "Amount", "Why", "Note", "By"];
-        if (prices) heads.push("Value");
+        var cols = [{ head: "Day", left: true }, { head: "Item", left: true }, { head: "Amount", left: true }, { head: "Why", left: true },
+            { head: "Note", left: true }, { head: "By", left: true }];
+        if (prices) cols.push({ head: "Value" });
 
-        var each = moneyTable("Each write-off, newest first", heads,
-            data.losses.map(function (l) {
-                var cells = [
-                    formatDay(l.day, { weekday: "short", day: "numeric", month: "short" }),
-                    l.itemName,
-                    amountText(l.quantity, l.unit),
-                    l.reasonText,
-                    l.note || "",
-                    l.userName || ""
+        box.appendChild(dataTable("Each write-off, newest first", cols, data.losses.map(function (l) {
+            var line = [weekDay(l.day), l.itemName, amountText(l.quantity, l.unit), l.reasonText, l.note || "", l.userName || ""];
+            if (prices) line.push(rwf(l.value));
+            return line;
+        }), null, "loss-list stack"));
+    }
+
+    /* ----- count differences: each correction to the record ----- */
+
+    function renderCounts(data, prices) {
+        var box = $("countReport");
+        box.textContent = "";
+        if (!data.counts) return;
+
+        box.appendChild(title("Count differences in this period"));
+
+        if (data.countsWaiting) {
+            box.appendChild(el("p", {
+                className: "report-check is-off",
+                text: plural(data.countsWaiting, "count is", "counts are") + " waiting for approval and not in these figures yet."
+            }));
+        }
+
+        if (!data.counts.length) {
+            box.appendChild(emptyNote("Every count in this period matched the record."));
+            return;
+        }
+
+        var cols = [{ head: "Day", left: true }, { head: "Item", left: true }, { head: "Record said" }, { head: "Counted" }, { head: "Difference" },
+            { head: "Note", left: true }, { head: "Recorded by", left: true }];
+        if (prices) cols.push({ head: "Value" });
+
+        var sum = 0;
+        var rows = data.counts.map(function (c) {
+            var line = [weekDay(c.day), c.itemName, amountText(c.recorded, c.unit), amountText(c.counted, c.unit),
+                { text: signed(c.change) + " " + (Math.abs(c.change) === 1 ? oneUnit(c.unit) : c.unit), className: "is-strong" }, c.note || "", c.userName || ""];
+            if (prices) {
+                sum += c.value || 0;
+                line.push(signedRwf(c.value));
+            }
+            return line;
+        });
+
+        box.appendChild(dataTable("Each count that changed the record, newest first", cols, rows,
+            prices ? ["Total", "", "", "", "", "", "", signedRwf(sum)] : null, "count-list stack"));
+    }
+
+    /* ----- spending and use (owner) ----- */
+
+    function renderMoney(data) {
+        var box = $("moneyReport");
+        box.textContent = "";
+        if (!data.departments) return;
+
+        var spentTotal = boughtTotal(data);
+
+        box.appendChild(title("Spending"));
+
+        // budgets for the months the period touches
+        var b = data.budget;
+        var label = monthsText(b && b.months);
+        if (!b || !b.hasBudget) {
+            box.appendChild(emptyNote("No budget is set for " + label + ". Set one in the Budget tab to compare it here."));
+        } else {
+            var budgetSum = 0;
+            var spentSum = 0;
+            var rows = b.rows.filter(function (r) { return r.budget !== null || r.spent; }).map(function (r) {
+                if (r.budget !== null) budgetSum += r.budget;
+                spentSum += r.spent;
+                var left = r.budget === null ? null : r.budget - r.spent;
+                return [
+                    r.category,
+                    r.budget === null ? "Not set" : rwf(r.budget),
+                    rwf(r.spent),
+                    left === null ? "—" : left >= 0 ? rwf(left) : { text: "Over by " + rwf(-left), className: "is-over" }
                 ];
-                if (prices) cells.push(formatRwf(l.value));
-                return cells;
-            }),
-            null);
-        each.classList.add("loss-list"); // words, so they line up on the left
-        if (prices) each.classList.add("has-value");
-        box.appendChild(each);
+            });
+            var leftSum = budgetSum - spentSum;
+            box.appendChild(dataTable("Budget and spending: " + label,
+                [{ head: "Category", left: true }, { head: "Budget" }, { head: "Spent" }, { head: "Left" }], rows,
+                ["Total", rwf(budgetSum), rwf(spentSum), leftSum >= 0 ? rwf(leftSum) : { text: "Over by " + rwf(-leftSum), className: "is-over" }], "budget-list stack"));
+            box.appendChild(note("Budgets are for whole months, so this can include purchases outside the report dates."));
+        }
+
+        box.appendChild(moneyTable("Bought, by category", ["Category", "Spent"],
+            data.spent.filter(function (r) { return r.spent; }).map(function (r) { return [r.category, rwf(r.spent)]; }),
+            ["Total", rwf(spentTotal)]));
+
+        var suppliers = data.suppliers || [];
+        box.appendChild(dataTable("Bought, by supplier",
+            [{ head: "Supplier", left: true }, { head: "Purchases" }, { head: "Spent" }],
+            suppliers.length ? suppliers.map(function (s) { return [s.supplier, String(s.purchases), rwf(s.spent)]; }) : [["No purchases in this period", "", ""]],
+            ["Total", String(suppliers.reduce(function (sum, s) { return sum + s.purchases; }, 0)), rwf(spentTotal)]));
+
+        box.appendChild(title("Where the stock went"));
+
+        var deptTotal = data.departments.reduce(function (sum, row) { return sum + row.value; }, 0);
+        box.appendChild(moneyTable("Issued to departments", ["Department", "Times issued", "Value"],
+            data.departments.filter(function (d) { return d.issues; }).map(function (d) { return [d.department, String(d.issues), rwf(d.value)]; }),
+            ["Total", String(data.departments.reduce(function (sum, d) { return sum + d.issues; }, 0)), rwf(deptTotal)]));
+
+        var used = (data.usedByCategory || []).filter(function (r) { return r.used; });
+        var usedTotal = used.reduce(function (sum, r) { return sum + r.used; }, 0);
+        var nights = data.roomNights || 0;
+        var per = function (value) { return nights ? rwf(value / nights) : "—"; };
+        box.appendChild(dataTable("Stock used per room-night sold (" + plural(nights, "room-night", "room-nights") + ", confirmed bookings)",
+            [{ head: "Category", left: true }, { head: "Used" }, { head: "Per room-night" }],
+            used.length ? used.map(function (r) { return [r.category, rwf(r.used), per(r.used)]; }) : [["Nothing was used in this period", "", ""]],
+            ["Total", rwf(usedTotal), per(usedTotal)]));
+        if (!nights) box.appendChild(note("There were no confirmed room-nights in this period, so there is no cost per room-night."));
     }
 
     async function loadReport() {
         if (!stock.reportFrom) setPeriod("month");
 
-        var table = $("reportTable");
         $("reportRange").textContent = "Loading…";
 
         var data = await api("GET", "/admin/stock/report?from=" + stock.reportFrom + "&to=" + stock.reportTo);
@@ -4319,106 +4718,329 @@
         $("reportTo").value = data.to;
 
         var prices = can("stock.prices");
-        $("reportRange").textContent = formatDay(data.from, { day: "numeric", month: "short", year: "numeric" }) + " – " +
-            formatDay(data.to, { day: "numeric", month: "short", year: "numeric" }) + " · " + plural(data.rows.length, "item", "items");
+        $("reportRange").textContent = rangeText(data.from, data.to) + " · " + plural(data.days, "day", "days") + " · " +
+            plural(data.rows.length, "item", "items");
 
-        table.textContent = "";
-        table.appendChild(el("caption", { className: "visually-hidden", text: "Stock used and remaining for the period" }));
+        renderSummary(data);
+        renderStockTables(data, prices);
+        showReportView();
+        renderReorder(data, prices);
+        renderLosses(data, prices);
+        renderCounts(data, prices);
+        renderMoney(data);
+    }
 
-        var heads = ["Item", "At start", "Received", "Used", "Expired / damaged", "Corrections", "Remaining"];
-        if (prices) heads.push("Value used", "Value written off", "Value remaining");
+    /* ----- print, or save as PDF from the print window ----- */
 
-        table.appendChild(el("thead", {}, [el("tr", {}, heads.map(function (h, i) {
-            return el("th", { scope: "col", className: i === 0 ? "room-col" : null, text: h });
-        }))]));
+    function signBox(label) {
+        return el("div", { className: "pr-sign-box" }, [
+            el("p", { className: "pr-sign-title", text: label }),
+            el("p", { className: "pr-line", text: "Name" }),
+            el("p", { className: "pr-line", text: "Signature" }),
+            el("p", { className: "pr-line", text: "Date" })
+        ]);
+    }
 
-        var body = el("tbody");
-        var lastCategory = "";
-        var totalUsed = 0;
-        var totalLost = 0;
-        var totalLeft = 0;
-        var totalCorrections = 0;
+    function buildPrint() {
+        var data = stock.report;
+        var old = $("printReport");
+        if (old) old.remove();
+        if (!data) return null;
 
-        if (!data.rows.length) {
-            body.appendChild(el("tr", {}, [el("td", { colspan: String(heads.length), className: "empty-cell", text: "No items yet." })]));
+        var copy = $("stock-report").cloneNode(true);
+        copy.hidden = false;
+        copy.querySelectorAll(".report-controls, .report-view, .count").forEach(function (n) { n.remove(); });
+        if (!can("stock.prices")) {
+            copy.querySelectorAll("#reportMoneyWrap, .print-sub").forEach(function (n) { n.remove(); });
+        }
+        copy.querySelectorAll("[hidden]").forEach(function (n) { n.hidden = false; });
+        copy.querySelectorAll("[id]").forEach(function (n) { n.removeAttribute("id"); });
+        copy.querySelectorAll("[tabindex]").forEach(function (n) { n.removeAttribute("tabindex"); });
+        copy.removeAttribute("id");
+        copy.className = "pr-body";
+
+        var head = el("header", { className: "pr-head" }, [
+            el("div", { className: "pr-logo" }, [el("img", { src: "images/logo/zebra-domus-logo-white.png", alt: "Zebra Dormus Inn" })]),
+            el("div", { className: "pr-title" }, [
+                el("h1", { text: "Stock report" }),
+                el("p", { text: "Zebra Dormus Inn · Huye, Rwanda" })
+            ]),
+            el("dl", { className: "pr-meta" }, [
+                el("dt", { text: "Period" }), el("dd", { text: rangeText(data.from, data.to) + " (" + plural(data.days, "day", "days") + ")" }),
+                el("dt", { text: "Printed by" }), el("dd", { text: user.name + " (" + (ROLE_NAMES[user.role] || user.role) + ")" }),
+                el("dt", { text: "Printed on" }), el("dd", { text: printedOn() })
+            ])
+        ]);
+
+        var sign = el("footer", { className: "pr-sign" }, [signBox("Prepared by"), signBox("Checked and approved by")]);
+        var page = el("div", { id: "printReport" }, [head, copy, sign]);
+        document.body.appendChild(page);
+        return page;
+    }
+
+    $("reportPrint").addEventListener("click", function () {
+        if (!buildPrint()) return;
+        window.print();
+        setTimeout(function () {
+            var page = $("printReport");
+            if (page) page.remove();
+        }, 500);
+    });
+
+    // Ctrl+P on the report prints the report too
+    window.addEventListener("beforeprint", function () {
+        if (stock.tab === "report" && !$("view-stock").hidden && !$("printReport")) buildPrint();
+    });
+    window.addEventListener("afterprint", function () {
+        var page = $("printReport");
+        if (page) page.remove();
+    });
+
+    /* ----- Excel: one sheet per part, with RWF formats and totals that Excel adds up ----- */
+
+    function excelSheets(data) {
+        var X = window.ZDXlsx;
+        var prices = can("stock.prices");
+        var footer = "Zebra Dormus Inn · Stock report · " + rangeText(data.from, data.to);
+        var H = function (text) { return { v: text, s: "head" }; };
+        var M = function (value) { return { v: Math.round(Number(value || 0)), s: "money" }; };
+        var D = function (day) { return { v: X.excelDay(day), s: "date" }; };
+        var sheets = [];
+
+        // a SUM of one column, from row a to row b (1-based)
+        function sumOf(col, a, b, value, style) {
+            return { v: Math.round(value), s: style || "moneyTotal", f: "SUM(" + X.column(col) + a + ":" + X.column(col) + b + ")" };
         }
 
-        data.rows.forEach(function (row) {
-            if (row.category !== lastCategory) {
-                lastCategory = row.category;
-                body.appendChild(el("tr", { className: "group-row" }, [
-                    el("th", { scope: "colgroup", colspan: String(heads.length), text: row.category })
-                ]));
-            }
+        /* Summary */
+        var s = [
+            [{ v: "Zebra Dormus Inn · Stock report", s: "title" }],
+            [{ v: "Huye, Rwanda", s: "note" }],
+            [],
+            [{ v: "Period", s: "bold" }, rangeText(data.from, data.to) + " (" + plural(data.days, "day", "days") + ")"],
+            [{ v: "Downloaded by", s: "bold" }, user.name + " (" + (ROLE_NAMES[user.role] || user.role) + ")"],
+            [{ v: "Downloaded on", s: "bold" }, printedOn()],
+            []
+        ];
 
-            var lowNow = row.remaining <= 0 || (row.lowStockAt > 0 && row.remaining <= row.lowStockAt);
-            var cells = [
-                el("th", { scope: "row", className: "room-col" }, [
-                    el("span", { className: "room-col-name", text: row.name }),
-                    el("span", { className: "room-col-count", text: row.unit + (row.active ? "" : " · archived") })
-                ]),
-                el("td", { text: qty(row.atStart) }),
-                el("td", { text: row.received ? "+" + qty(row.received) : "0" }),
-                el("td", { text: row.used ? "−" + qty(row.used) : "0" }),
-                el("td", { className: row.writtenOff ? "is-lost" : null, text: row.writtenOff ? "−" + qty(row.writtenOff) : "0" }),
-                el("td", { text: row.corrections ? signed(row.corrections) : "0" }),
-                el("td", { className: lowNow ? "is-low" : null, text: qty(row.remaining) + (lowNow ? " ⚠" : "") })
+        if (prices && data.totals) {
+            var t = data.totals;
+            var bought = boughtTotal(data);
+            var start = Math.round(t.atStart);
+            var lines = [Math.round(t.received), Math.round(t.used), Math.round(t.writtenOff), Math.round(t.corrections)];
+
+            s.push([{ v: "How the store value adds up", s: "subtitle" }]);
+            var r0 = s.length + 1;
+            s.push(["Value in store at the start (" + longDay(data.from) + ")", M(start)]);
+            s.push(["+ Received into the store", M(lines[0])]);
+            s.push(["− Used (issued to departments)", M(lines[1])]);
+            s.push(["− Expired, damaged or lost", M(lines[2])]);
+            s.push(["± Count differences", M(lines[3])]);
+            s.push([{ v: "= Value in store at the end (" + longDay(data.to) + ")", s: "total" },
+                { v: start + lines[0] - lines[1] - lines[2] + lines[3], s: "moneyTotal", f: "B" + r0 + "+B" + (r0 + 1) + "-B" + (r0 + 2) + "-B" + (r0 + 3) + "+B" + (r0 + 4) }]);
+            s.push([{ v: "All values use each item's last price paid. Received = purchases checked in plus starting stock.", s: "note" }]);
+            s.push([]);
+
+            var p = data.previous;
+            var perNight = data.roomNights ? t.used / data.roomNights : null;
+            s.push([{ v: "Key figures", s: "subtitle" }]);
+            s.push(p ? [H("Measure"), H("This period"), H("Period before"), H("Change")] : [H("Measure"), H("This period")]);
+
+            var keyRows = [
+                ["Paid to suppliers", bought, p && p.bought, true],
+                ["Stock used", t.used, p && p.used, true],
+                ["Written off", t.writtenOff, p && p.writtenOff, true],
+                ["Count differences", t.corrections, p && p.corrections, true],
+                ["Value in store at the end", t.remaining, null, true],
+                ["Room-nights sold", data.roomNights, p && p.roomNights, false],
+                ["Stock used per room-night", perNight, p ? (p.roomNights ? p.used / p.roomNights : null) : null, true]
             ];
+            keyRows.forEach(function (k) {
+                var row = s.length + 1;
+                var cell = function (value) {
+                    if (value === null || value === undefined) return "";
+                    return k[3] ? M(value) : { v: value };
+                };
+                var line = [k[0], cell(k[1])];
+                if (p) {
+                    line.push(k[0] === "Value in store at the end" ? "" : cell(k[2]));
+                    var now = Math.round(Number(k[1] || 0));
+                    var before = Math.round(Number(k[2] || 0));
+                    line.push(before && k[1] !== null && k[0] !== "Value in store at the end"
+                        ? {
+                            v: Math.round(((Math.abs(now) - Math.abs(before)) / Math.abs(before)) * 100) / 100,
+                            s: "pct",
+                            f: "IF(C" + row + "=0,\"\",ABS(B" + row + ")/ABS(C" + row + ")-1)"
+                        }
+                        : "");
+                }
+                s.push(line);
+            });
+            if (p) s.push([{ v: "Period before: " + rangeText(p.from, p.to), s: "note" }]);
+        } else {
+            s.push([{ v: "In this period", s: "subtitle" }]);
+            s.push([H("Measure"), H("Number")]);
+            s.push(["Items", { v: data.rows.length }]);
+            s.push(["Write-offs (expired, damaged, lost)", { v: (data.losses || []).length }]);
+            s.push(["Count differences", { v: (data.counts || []).length }]);
+            s.push(["Items running low today", { v: (data.reorder || []).length }]);
+        }
+        sheets.push({ name: "Summary", cols: [52, 22, 18, 12], rows: s, footer: footer });
 
-            if (prices) {
-                cells.push(
-                    el("td", { text: formatRwf(row.usedValue) }),
-                    el("td", { text: formatRwf(row.writtenOffValue || 0) }),
-                    el("td", { text: formatRwf(row.remainingValue) })
-                );
-                totalUsed += row.usedValue;
-                totalLost += row.writtenOffValue || 0;
-                totalLeft += row.remainingValue;
-                totalCorrections += row.correctionsValue || 0;
-            }
-
-            body.appendChild(el("tr", {}, cells));
+        /* Items */
+        var itemHead = ["Category", "Item", "Counted in", "At start", "Received", "Used", "Expired / damaged", "Count differences", "Remaining", "Warn at"];
+        if (prices) itemHead.push("Price for one (RWF)", "Value at start", "Value received", "Value used", "Value written off", "Value of count differences", "Value remaining");
+        var items = [itemHead.map(H)];
+        data.rows.forEach(function (r) {
+            var line = [r.category, r.name + (r.active ? "" : " (archived)"), r.unit, { v: r.atStart }, { v: r.received }, { v: r.used },
+                { v: r.writtenOff || 0 }, { v: r.corrections }, { v: r.remaining }, { v: r.lowStockAt || 0 }];
+            if (prices) line.push(M(r.unitCost), M(r.atStartValue), M(r.receivedValue), M(r.usedValue), M(r.writtenOffValue), M(r.correctionsValue), M(r.remainingValue));
+            items.push(line);
+        });
+        if (prices && data.rows.length && data.totals) {
+            var last = items.length;
+            var tt = data.totals;
+            var totalLine = [{ v: "Total", s: "total" }, { v: "", s: "total" }, { v: "", s: "total" }];
+            for (var i = 3; i < 11; i += 1) totalLine.push({ v: "", s: "total" });
+            totalLine.push(sumOf(11, 2, last, tt.atStart), sumOf(12, 2, last, tt.received), sumOf(13, 2, last, tt.used),
+                sumOf(14, 2, last, tt.writtenOff), sumOf(15, 2, last, tt.corrections), sumOf(16, 2, last, tt.remaining));
+            items.push(totalLine);
+        }
+        sheets.push({
+            name: "Items", freeze: 1, landscape: true, footer: footer,
+            cols: [18, 26, 12, 10, 10, 10, 12, 12, 11, 9].concat(prices ? [12, 14, 14, 13, 14, 15, 15] : []),
+            rows: items
         });
 
-        table.appendChild(body);
-
-        if (prices && data.rows.length) {
-            var foot = el("tr", { className: "total-row" }, [el("th", { scope: "row", className: "room-col", text: "Total" })]);
-            for (var i = 0; i < 6; i += 1) foot.appendChild(el("td", { text: "" }));
-            foot.appendChild(el("td", { text: formatRwf(totalUsed) }));
-            foot.appendChild(el("td", { text: formatRwf(totalLost) }));
-            foot.appendChild(el("td", { text: formatRwf(totalLeft) }));
-            table.appendChild(el("tfoot", {}, [foot]));
+        /* Running low */
+        var lowHead = ["Item", "Category", "Counted in", "In stock", "Warn at", "Used in last " + data.reorderDays + " days", "On its way", "Suggested to buy"];
+        if (prices) lowHead.push("Price for one (RWF)", "Estimated cost");
+        var low = [lowHead.map(H)];
+        (data.reorder || []).forEach(function (r) {
+            var line = [r.name, r.category, r.unit, { v: r.quantity }, { v: r.lowStockAt }, { v: r.usedLately }, { v: r.onOrder }, { v: r.buy, s: "bold" }];
+            if (prices) line.push(M(r.unitCost), M(r.cost));
+            low.push(line);
+        });
+        if (!(data.reorder || []).length) low.push(["Nothing is running low right now."]);
+        else if (prices) {
+            var lowCost = data.reorder.reduce(function (sum, r) { return sum + (r.cost || 0); }, 0);
+            low.push([{ v: "Total", s: "total" }, "", "", "", "", "", "", "", "", sumOf(9, 2, low.length, lowCost)]);
         }
+        low.push([], [{ v: reorderRule(data), s: "note" }]);
+        sheets.push({ name: "Running low", freeze: 1, landscape: true, footer: footer, cols: [26, 18, 12, 10, 10, 14, 11, 14, 14, 14], rows: low });
 
-        renderLosses(data, prices);
-
-        // Money (owner): spending, issues by department, count differences
-        var money = $("moneyReport");
-        money.textContent = "";
-
-        if (data.departments) {
-            var spentTotal = data.spent.reduce(function (sum, row) { return sum + row.spent; }, 0);
-            var deptTotal = data.departments.reduce(function (sum, row) { return sum + row.value; }, 0);
-
-            money.appendChild(el("h2", { className: "section-title", text: "Money for this period" }));
-            money.appendChild(el("div", { className: "stats money-stats" }, [
-                staticStat(formatRwf(spentTotal), "Bought", "Purchases recorded"),
-                staticStat(formatRwf(deptTotal), "Issued", "Value given to departments"),
-                staticStat(formatRwf(totalLost), "Written off", "Expired, damaged or lost"),
-                staticStat(signedRwf(totalCorrections), "Count differences", totalCorrections < 0 ? "Missing at counts" : "Found at counts"),
-                staticStat(formatRwf(totalLeft), "Remaining", "Value in store at the end")
-            ]));
-
-            money.appendChild(moneyTable("Bought, by category", ["Category", "Spent"],
-                data.spent.filter(function (r) { return r.spent; }).map(function (r) { return [r.category, formatRwf(r.spent)]; }),
-                ["Total", formatRwf(spentTotal)]));
-
-            money.appendChild(moneyTable("Issued to departments", ["Department", "Times issued", "Value"],
-                data.departments.filter(function (d) { return d.issues; }).map(function (d) { return [d.department, String(d.issues), formatRwf(d.value)]; }),
-                ["Total", "", formatRwf(deptTotal)]));
+        /* Write-offs */
+        var lossHead = ["Day", "Item", "Amount", "Counted in", "Why", "Note", "By"];
+        if (prices) lossHead.push("Value (RWF)");
+        var losses = [lossHead.map(H)];
+        (data.losses || []).forEach(function (l) {
+            var line = [D(l.day), l.itemName, { v: l.quantity }, l.unit, l.reasonText, l.note || "", l.userName || ""];
+            if (prices) line.push(M(l.value));
+            losses.push(line);
+        });
+        if (!(data.losses || []).length) losses.push(["Nothing was written off in this period."]);
+        else if (prices) {
+            var lossSum = data.losses.reduce(function (sum, l) { return sum + (l.value || 0); }, 0);
+            losses.push([{ v: "Total", s: "total" }, "", "", "", "", "", "", sumOf(7, 2, losses.length, lossSum)]);
         }
+        sheets.push({ name: "Write-offs", freeze: 1, landscape: true, footer: footer, cols: [13, 24, 9, 11, 18, 34, 18, 13], rows: losses });
+
+        /* Count differences */
+        var countHead = ["Day", "Item", "Counted in", "Record said", "Counted", "Difference", "Note", "Recorded by"];
+        if (prices) countHead.push("Value (RWF)");
+        var counts = [countHead.map(H)];
+        (data.counts || []).forEach(function (c) {
+            var line = [D(c.day), c.itemName, c.unit, { v: c.recorded }, { v: c.counted }, { v: c.change, s: "bold" }, c.note || "", c.userName || ""];
+            if (prices) line.push(M(c.value));
+            counts.push(line);
+        });
+        if (!(data.counts || []).length) counts.push(["Every count in this period matched the record."]);
+        else if (prices) {
+            var countSum = data.counts.reduce(function (sum, c) { return sum + (c.value || 0); }, 0);
+            counts.push([{ v: "Total", s: "total" }, "", "", "", "", "", "", "", sumOf(8, 2, counts.length, countSum)]);
+        }
+        if (data.countsWaiting) counts.push([], [{ v: plural(data.countsWaiting, "count is", "counts are") + " waiting for approval and not in these figures yet.", s: "note" }]);
+        sheets.push({ name: "Count differences", freeze: 1, landscape: true, footer: footer, cols: [13, 24, 11, 12, 10, 11, 38, 18, 13], rows: counts });
+
+        if (!prices || !data.departments) return sheets;
+
+        /* Spending */
+        var sp = [];
+        var b = data.budget;
+        sp.push([{ v: "Budget and spending: " + monthsText(b && b.months), s: "subtitle" }]);
+        if (b && b.hasBudget) {
+            sp.push([H("Category"), H("Budget"), H("Spent"), H("Left")]);
+            var first = sp.length + 1;
+            var budgetRows = b.rows.filter(function (r) { return r.budget !== null || r.spent; });
+            budgetRows.forEach(function (r) {
+                var row = sp.length + 1;
+                sp.push([r.category, r.budget === null ? "Not set" : M(r.budget), M(r.spent),
+                    r.budget === null ? "" : { v: r.budget - r.spent, s: "money", f: "B" + row + "-C" + row }]);
+            });
+            var lastRow = sp.length;
+            var bSum = budgetRows.reduce(function (sum, r) { return sum + (r.budget || 0); }, 0);
+            var sSum = budgetRows.reduce(function (sum, r) { return sum + r.spent; }, 0);
+            sp.push([{ v: "Total", s: "total" }, sumOf(1, first, lastRow, bSum), sumOf(2, first, lastRow, sSum),
+                { v: bSum - sSum, s: "moneyTotal", f: "B" + (lastRow + 1) + "-C" + (lastRow + 1) }]);
+            sp.push([{ v: "Budgets are for whole months, so this can include purchases outside the report dates. A negative Left means over budget.", s: "note" }]);
+        } else {
+            sp.push([{ v: "No budget is set for these months.", s: "note" }]);
+        }
+        sp.push([]);
+
+        sp.push([{ v: "Bought, by category", s: "subtitle" }], [H("Category"), H("Spent")]);
+        var catFirst = sp.length + 1;
+        var spentRows = data.spent.filter(function (r) { return r.spent; });
+        spentRows.forEach(function (r) { sp.push([r.category, M(r.spent)]); });
+        sp.push([{ v: "Total", s: "total" }, spentRows.length ? sumOf(1, catFirst, sp.length, boughtTotal(data)) : M(0)]);
+        sp.push([]);
+
+        sp.push([{ v: "Bought, by supplier", s: "subtitle" }], [H("Supplier"), H("Purchases"), H("Spent")]);
+        var supFirst = sp.length + 1;
+        (data.suppliers || []).forEach(function (r) { sp.push([r.supplier, { v: r.purchases }, M(r.spent)]); });
+        var supSum = (data.suppliers || []).reduce(function (sum, r) { return sum + r.spent; }, 0);
+        var supCount = (data.suppliers || []).reduce(function (sum, r) { return sum + r.purchases; }, 0);
+        sp.push([{ v: "Total", s: "total" },
+            (data.suppliers || []).length ? sumOf(1, supFirst, sp.length, supCount, "numberTotal") : { v: 0, s: "numberTotal" },
+            (data.suppliers || []).length ? sumOf(2, supFirst, sp.length, supSum) : M(0)]);
+        sheets.push({ name: "Spending", cols: [30, 16, 16, 16], footer: footer, rows: sp });
+
+        /* Where the stock went */
+        var use = [];
+        use.push([{ v: "Issued to departments", s: "subtitle" }], [H("Department"), H("Times issued"), H("Value")]);
+        var depFirst = use.length + 1;
+        var deps = data.departments.filter(function (d) { return d.issues; });
+        deps.forEach(function (d) { use.push([d.department, { v: d.issues }, M(d.value)]); });
+        use.push([{ v: "Total", s: "total" },
+            deps.length ? sumOf(1, depFirst, use.length, deps.reduce(function (sum, d) { return sum + d.issues; }, 0), "numberTotal") : { v: 0, s: "numberTotal" },
+            deps.length ? sumOf(2, depFirst, use.length, deps.reduce(function (sum, d) { return sum + d.value; }, 0)) : M(0)]);
+        use.push([]);
+
+        var nights = data.roomNights || 0;
+        use.push([{ v: "Stock used per room-night sold (" + plural(nights, "room-night", "room-nights") + ", confirmed bookings)", s: "subtitle" }]);
+        use.push([H("Category"), H("Used"), H("Per room-night")]);
+        var nightsRow = null;
+        var usedFirst = use.length + 1;
+        var usedRows = (data.usedByCategory || []).filter(function (r) { return r.used; });
+        usedRows.forEach(function (r) {
+            var row = use.length + 1;
+            use.push([r.category, M(r.used), nights ? { v: Math.round(r.used / nights), s: "money", f: "ROUND(B" + row + "/" + nights + ",0)" } : "—"]);
+        });
+        var usedSum = usedRows.reduce(function (sum, r) { return sum + r.used; }, 0);
+        nightsRow = use.length + 1;
+        use.push([{ v: "Total", s: "total" }, usedRows.length ? sumOf(1, usedFirst, use.length, usedSum) : M(0),
+            nights ? { v: Math.round(usedSum / nights), s: "moneyTotal", f: "ROUND(B" + nightsRow + "/" + nights + ",0)" } : { v: "—", s: "total" }]);
+        if (!nights) use.push([{ v: "There were no confirmed room-nights in this period.", s: "note" }]);
+        sheets.push({ name: "Where it went", cols: [34, 16, 16], footer: footer, rows: use });
+
+        return sheets;
     }
+
+    $("reportDownload").addEventListener("click", function () {
+        var data = stock.report;
+        if (!data || !window.ZDXlsx) return;
+        window.ZDXlsx.download("zebra-dormus-stock-report-" + data.from + "-to-" + data.to + ".xlsx", excelSheets(data));
+    });
 
     /* A file Excel opens: comma separated, with the BOM so letters like é show correctly. */
     function csvCell(value) {
@@ -4444,41 +5066,6 @@
             link.remove();
         }, 1000);
     }
-
-    $("reportDownload").addEventListener("click", function () {
-        var data = stock.report;
-        if (!data) return;
-
-        var prices = can("stock.prices");
-        var head = ["Item", "Category", "Counted in", "At start", "Received", "Used", "Expired / damaged", "Corrections", "Remaining", "Warn at"];
-        if (prices) head.push("Price for one (RWF)", "Value used (RWF)", "Value written off (RWF)", "Value remaining (RWF)");
-
-        var lines = [head].concat(data.rows.map(function (row) {
-            var line = [row.name, row.category, row.unit, row.atStart, row.received, row.used, row.writtenOff || 0, row.corrections, row.remaining, row.lowStockAt];
-            if (prices) line.push(row.unitCost, row.usedValue, row.writtenOffValue || 0, row.remainingValue);
-            return line;
-        }));
-
-        if (data.losses && data.losses.length) {
-            var lossHead = ["Expired or damaged: day", "Item", "Amount", "Counted in", "Why", "Note", "By"];
-            if (prices) lossHead.push("Value (RWF)");
-            lines.push([], lossHead);
-            data.losses.forEach(function (l) {
-                var line = [l.day, l.itemName, l.quantity, l.unit, l.reasonText, l.note || "", l.userName || ""];
-                if (prices) line.push(l.value);
-                lines.push(line);
-            });
-        }
-
-        if (data.departments) {
-            lines.push([], ["Bought, by category", "Spent (RWF)"]);
-            data.spent.forEach(function (r) { lines.push([r.category, r.spent]); });
-            lines.push([], ["Issued to departments", "Times issued", "Value (RWF)"]);
-            data.departments.forEach(function (d) { lines.push([d.department, d.issues, d.value]); });
-        }
-
-        downloadCsv(lines, "zebra-dormus-stock-" + data.from + "-to-" + data.to + ".csv");
-    });
 
     /* ----- Audit log (owner) ----- */
 
