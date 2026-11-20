@@ -1399,23 +1399,18 @@ h3 {
     height: clamp(440px, 64svh, 560px);
 }
 .hero-image img { object-position: 50% 45%; }
-/* an even dark tint over every photo, a little deeper at the top (header) and bottom (date card),
-   so the white words read on bright and dark photos alike */
+/* a light, even dark tint over the photo, a little deeper at the top (header) and at the
+   bottom (quick links), so the white words read. No white fade: it made the photo look
+   washed out; the photo now keeps its colours down to its bottom edge. */
 .hero-image::after {
     content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
-    /* top to bottom: a dark tint so the white words read, then (like Marriott) the photo
-       fades softly into the white page, so there's no hard edge under the photo */
     background:
-        linear-gradient(to bottom,
-            rgba(255, 255, 255, 0) var(--fade-start, 68%),
-            rgba(255, 255, 255, 0.55) calc(var(--fade-start, 68%) + 14%),
-            rgba(255, 255, 255, 0.9) calc(var(--fade-start, 68%) + 24%),
-            #FFFFFF 100%),
-        linear-gradient(to bottom, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0) 26%),
-        rgba(0, 0, 0, 0.42);
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0) 28%),
+        linear-gradient(to top, rgba(0, 0, 0, 0.46) 0%, rgba(0, 0, 0, 0) 30%),
+        rgba(0, 0, 0, 0.3);
 }
 /* headline, text and photo controls, centred in the photo */
 .hero-text {
@@ -2548,7 +2543,6 @@ h3,
     :root {
         --hero-h: calc(clamp(540px, 74vh, 720px) + var(--header-height));
         --hero-top: clamp(64px, 11vh, 110px);
-        --fade-start: 62%;
     }
     h2 { font-size: 30px; }
     .about-body h2 { font-size: 30px; }
