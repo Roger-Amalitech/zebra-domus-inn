@@ -3376,27 +3376,29 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 @media (hover: hover) and (pointer: fine) {
     .photo-open:hover::before { opacity: 1; }
     .photo-open:hover img { transform: scale(1.05); }
+    .photo-open.has-more:hover img { filter: blur(1px) brightness(0.55); transform: scale(1.1); }
 }
 
-/* "Show all photos": white, under the collage on a phone, on its top right corner on a computer */
-.photo-collage { position: relative; }
-.photo-all {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 12px;
-    min-height: 44px;
-    padding: 0 18px;
-    border: 1px solid var(--ink);
-    border-radius: 999px;
-    background: var(--white);
-    color: var(--ink);
-    font: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
+/* the last photo in the collage: shaded and soft, with "+8 photos" on it */
+.photo-open.has-more img { filter: blur(2px) brightness(0.62); transform: scale(1.06); }
+.photo-open.has-more::after,
+.photo-open.has-more .photo-caption { display: none; }
+.photo-more {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    padding: 8px;
+    color: #FFFFFF;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 5px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
-.photo-all:hover { background: var(--soft); }
 
 @media (min-width: 768px) {
     .photo-grid {
@@ -3412,14 +3414,7 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     .photo-tile:nth-child(7) { grid-column: span 2; }
     .photo-caption { font-size: 14px; }
     .photo-tile:nth-child(1) .photo-caption { left: 20px; bottom: 18px; font-size: 22px; }
-    .photo-all {
-        position: absolute;
-        top: 16px;
-        right: 16px;
-        margin: 0;
-        border-color: transparent;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-    }
+    .photo-more { font-size: 24px; }
 }
 @media (min-width: 1024px) {
     .photo-grid { grid-auto-rows: 200px; }
@@ -3531,6 +3526,7 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     .photo-open img,
     .photo-open::before,
     .pv-thumb { transition: none; }
-    .photo-open:hover img { transform: none; }
+    .photo-open:hover img,
+    .photo-open.has-more:hover img { transform: none; }
     .photo-viewer[open] { animation: none; }
 }

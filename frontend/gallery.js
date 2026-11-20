@@ -1,6 +1,7 @@
 /* Zebra Dormus Inn: the photo grid.
    The photos sit in a collage (index.html, #photoGrid): one big photo and smaller ones
-   around it. Tapping a photo, or "Show all photos", opens it full screen:
+   around it. The last photo in the collage is shaded with "+8 photos" on it: the photos
+   that are only in the full-screen view. Tapping any photo opens it full screen:
    - swipe, the arrows or the keyboard's left and right keys go to the next photo
    - a row of small photos along the bottom on a computer
    - the X, Escape or the phone's back button closes it.
@@ -9,16 +10,15 @@
     "use strict";
 
     var TEXT = {
-        en: { close: "Close", prev: "Previous photo", next: "Next photo", all: "Show all photos", of: function (i, n) { return i + " / " + n; } },
-        rw: { close: "Funga", prev: "Ifoto ibanza", next: "Ifoto ikurikira", all: "Reba amafoto yose", of: function (i, n) { return i + " / " + n; } },
-        fr: { close: "Fermer", prev: "Photo précédente", next: "Photo suivante", all: "Voir toutes les photos", of: function (i, n) { return i + " / " + n; } }
+        en: { close: "Close", prev: "Previous photo", next: "Next photo", more: function (n) { return "+" + n + " photos"; }, of: function (i, n) { return i + " / " + n; } },
+        rw: { close: "Funga", prev: "Ifoto ibanza", next: "Ifoto ikurikira", more: function (n) { return "+" + n + " amafoto"; }, of: function (i, n) { return i + " / " + n; } },
+        fr: { close: "Fermer", prev: "Photo précédente", next: "Photo suivante", more: function (n) { return "+" + n + " photos"; }, of: function (i, n) { return i + " / " + n; } }
     };
 
     var PATHS = {
         close: '<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
         prev: '<path d="M15 18l-6-6 6-6"/>',
-        next: '<path d="M9 6l6 6-6 6"/>',
-        grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'
+        next: '<path d="M9 6l6 6-6 6"/>'
     };
 
     function byId(id) { return document.getElementById(id); }
@@ -58,15 +58,17 @@
             return { src: img.getAttribute("src"), alt: img.alt, caption: caption ? caption.textContent : "" };
         }
 
-        /* "Show all photos": on the collage's corner on a computer, under it on a phone */
-        var collage = el("div", "photo-collage");
-        grid.parentNode.insertBefore(collage, grid);
-        collage.appendChild(grid);
-        var all = el("button", "photo-all");
-        all.type = "button";
-        var allText = el("span");
-        all.append(icon("grid", 16), allText);
-        collage.appendChild(all);
+        /* the last photo in the collage: "+8 photos" (the ones only seen full screen,
+           counting this shaded one) */
+        var shown = tiles.filter(function (tile) { return !tile.parentNode.hidden; });
+        var last = shown[shown.length - 1];
+        var extra = tiles.length - shown.length + 1;
+        var moreText = null;
+        if (extra > 1) {
+            last.classList.add("has-more");
+            moreText = el("span", "photo-more");
+            last.appendChild(moreText);
+        }
 
         /* ---------- the full-screen view ---------- */
 
@@ -153,7 +155,7 @@
 
         function label() {
             var t = tx();
-            allText.textContent = t.all;
+            if (moreText) moreText.textContent = t.more(extra);
             if (!dialog) return;
             dialog.setAttribute("lang", lang());
             els.close.setAttribute("aria-label", t.close);
@@ -220,7 +222,6 @@
         tiles.forEach(function (tile, i) {
             tile.addEventListener("click", function () { open(i); });
         });
-        all.addEventListener("click", function () { open(0); });
 
         var language = byId("languageSelect");
         if (language) language.addEventListener("change", function () {
