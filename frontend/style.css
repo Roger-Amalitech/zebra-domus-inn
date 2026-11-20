@@ -3637,16 +3637,6 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .about-more { margin-top: 2px; }
-.about-photos {
-    position: absolute;
-    left: 12px;
-    bottom: 12px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 500;
-    pointer-events: none;
-}
 @media (hover: hover) and (pointer: fine) {
     .about-card.has-details:hover {
         border-color: var(--line-strong);
@@ -3702,8 +3692,7 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 .xp-caption { left: 12px; }
 /* a darker pill than on the cards, so the words stay clear on bright photos */
 .xp-caption,
-.xp-count,
-.about-photos { background: rgba(17, 17, 17, 0.62); }
+.xp-count { background: rgba(17, 17, 17, 0.62); }
 .xp-count { right: 12px; font-variant-numeric: tabular-nums; }
 
 .xp-eyebrow {

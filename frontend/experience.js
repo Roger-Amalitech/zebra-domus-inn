@@ -21,7 +21,6 @@
     var TEXT = {
         en: {
             explore: "Explore the inn",
-            photos: function (n) { return n + " photos"; },
             close: "Close",
             prev: "Previous photo",
             next: "Next photo",
@@ -50,7 +49,6 @@
         },
         rw: {
             explore: "Reba ibiri ku icumbi",
-            photos: function (n) { return "Amafoto " + n; },
             close: "Funga",
             prev: "Ifoto ibanza",
             next: "Ifoto ikurikira",
@@ -79,7 +77,6 @@
         },
         fr: {
             explore: "Découvrir l'auberge",
-            photos: function (n) { return n + " photos"; },
             close: "Fermer",
             prev: "Photo précédente",
             next: "Photo suivante",
@@ -115,7 +112,6 @@
         prev: '<svg ' + SVG + '><path d="M15 18l-6-6 6-6"/></svg>',
         next: '<svg ' + SVG + '><path d="M9 6l6 6-6 6"/></svg>',
         arrow: '<svg ' + SVG + '><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',
-        camera: '<svg ' + SVG + '><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>',
         place: '<svg ' + SVG + '><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>',
         pool: '<svg ' + SVG + '><path d="M2 12c2 0 2-1.5 4-1.5S8 12 10 12s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M2 17c2 0 2-1.5 4-1.5S8 17 10 17s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M8 9V4a2 2 0 0 1 4 0"/><path d="M16 9V4a2 2 0 0 0-4 0"/></svg>',
         spa: '<svg ' + SVG + '><path d="M12 22c4-2.5 6-6 6-10a6 6 0 0 0-12 0c0 4 2 7.5 6 10z"/><path d="M12 22V12"/><path d="M12 15l-3-3M12 13l3-3"/></svg>',
@@ -464,7 +460,7 @@
         if (!card) return;
         card.classList.add("has-details");
 
-        /* a clear link under the text, and "6 photos" on the picture */
+        /* a clear link under the text */
         var more = el("button", "room-more about-more");
         more.type = "button";
         var moreText = el("span");
@@ -473,21 +469,9 @@
         if (bookLink) bookLink.parentNode.insertBefore(more, bookLink);
         else card.querySelector(".about-body").appendChild(more);
 
-        var photo = card.querySelector(".about-photo");
-        var pill = null;
-        var pillText = null;
-        if (photo) {
-            pill = el("span", "glass-pill about-photos");
-            pill.setAttribute("aria-hidden", "true");
-            pillText = el("span");
-            pill.append(icon("camera", 15), pillText);
-            photo.appendChild(pill);
-        }
-
         function label() {
             var t = tx();
             moreText.textContent = t.explore;
-            if (pillText) pillText.textContent = t.photos(PHOTOS.length);
         }
 
         /* a tap anywhere on the card opens the view; "Book your stay" keeps its own job */
