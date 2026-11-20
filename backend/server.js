@@ -10,6 +10,7 @@ const connectDB = require("./config/db");
 const roomRoutes = require("./routes/roomRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const availabilityRoutes = require("./routes/availabilityRoutes");
+const eventRoutes = require("./routes/eventRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const { ensureOwnerFromEnv } = require("./utils/adminAuth");
 
@@ -59,6 +60,7 @@ app.use(express.json({ limit: "20kb" }));
 app.use("/api/rooms", roomRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/availability", availabilityRoutes);
+app.use("/api/events", eventRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.get("/api", (req, res) => {

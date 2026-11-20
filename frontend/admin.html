@@ -61,6 +61,10 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M8 12h8M8 16h5"/></svg>
                 <span>Bookings</span>
             </a>
+            <a href="#events" class="tab" data-view="events" data-perm="bookings.view" hidden>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5a5.5 5.5 0 0 0-5.5 5.5c0 3.6 3.4 7.2 5.5 8.5 2.1-1.3 5.5-4.9 5.5-8.5A5.5 5.5 0 0 0 12 2.5z"/><path d="M11 16.5l-1 1.5h4l-1-1.5"/><path d="M12 18c0 1.5-1.5 2-1.5 3.5"/></svg>
+                <span>Events</span>
+            </a>
             <a href="#availability" class="tab" data-view="availability" data-perm="bookings.view" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 <span>Availability</span>
@@ -102,6 +106,11 @@
             </div>
 
             <div class="stats" id="todayStats"></div>
+
+            <div id="eventsTodayBox" hidden>
+                <h2 class="section-title" id="eventsTodayTitle">Event today</h2>
+                <div class="list" id="eventsTodayList"></div>
+            </div>
 
             <h2 class="section-title">Rooms tonight</h2>
             <div class="tonight" id="roomsTonight"></div>
@@ -148,6 +157,33 @@
 
             <p class="count" id="bookingCount" aria-live="polite"></p>
             <div class="list" id="bookingList"></div>
+        </section>
+
+        <!-- EVENTS: house parties and swimming competitions -->
+        <section class="view" id="view-events" aria-labelledby="eventsHeading" hidden>
+            <div class="view-head">
+                <h1 id="eventsHeading">Events</h1>
+                <p class="muted">House parties and swimming competitions. One event per day: a confirmed event takes the whole day.</p>
+            </div>
+
+            <div class="event-toolbar">
+                <p class="event-prices" id="eventPrices"></p>
+                <div class="event-toolbar-buttons">
+                    <button type="button" class="btn btn-ghost btn-small" id="eventPricesButton" data-perm="rooms.manage" hidden>Prices</button>
+                    <button type="button" class="btn btn-primary btn-small" id="addEventButton" data-perm="bookings.manage" hidden>Add event booking</button>
+                </div>
+            </div>
+
+            <div class="filters">
+                <div class="segmented" id="eventShow" role="group" aria-label="Which events">
+                    <button type="button" data-show="waiting" aria-pressed="true">Waiting <span class="seg-count" hidden></span></button>
+                    <button type="button" data-show="upcoming" aria-pressed="false">Coming up <span class="seg-count" hidden></span></button>
+                    <button type="button" data-show="past" aria-pressed="false">Past &amp; cancelled</button>
+                </div>
+            </div>
+
+            <p class="count" id="eventCount" aria-live="polite"></p>
+            <div class="list" id="eventList"></div>
         </section>
 
         <!-- AVAILABILITY -->
@@ -314,6 +350,7 @@
                             <option value="stock">Stock</option>
                             <option value="budget">Budget</option>
                             <option value="bookings">Bookings</option>
+                            <option value="events">Events</option>
                             <option value="rooms">Rooms</option>
                             <option value="users">Users</option>
                             <option value="sign-in">Sign-ins</option>

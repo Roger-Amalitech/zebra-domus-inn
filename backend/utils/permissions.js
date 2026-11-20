@@ -12,9 +12,9 @@
 ========================================= */
 
 const PERMISSIONS = [
-  { key: "bookings.view", label: "See today, bookings and availability" },
-  { key: "bookings.manage", label: "Confirm, cancel and mark bookings paid" },
-  { key: "rooms.manage", label: "Change rooms, prices and online booking" },
+  { key: "bookings.view", label: "See today, bookings, events and availability" },
+  { key: "bookings.manage", label: "Confirm, cancel and mark bookings and events paid" },
+  { key: "rooms.manage", label: "Change rooms, event prices and online booking" },
   { key: "users.manage", label: "Add staff and manage their accounts" },
   { key: "stock.view", label: "See stock: in stock, used, remaining" },
   { key: "stock.items", label: "Add and change stock items" },

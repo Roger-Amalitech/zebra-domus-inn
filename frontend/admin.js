@@ -1,6 +1,6 @@
 /* =========================================
    ZEBRA DORMUS INN
-   Staff dashboard: sign in, today, bookings,
+   Staff dashboard: sign in, today, bookings, events,
    availability grid, stock, rooms and users.
    Each person sees only what their role may do:
    owner, manager or staff (see backend/utils/permissions.js).
@@ -12,11 +12,12 @@
 
     var API = window.ZD_API || "/api";
     var TOKEN_KEY = "zdAdminToken";
-    var VIEWS = ["today", "bookings", "availability", "stock", "rooms", "users", "account"];
+    var VIEWS = ["today", "bookings", "events", "availability", "stock", "rooms", "users", "account"];
     // what each section needs ("" = everyone, "a|b" = either)
     var VIEW_NEEDS = {
         today: "bookings.view",
         bookings: "bookings.view",
+        events: "bookings.view",
         availability: "bookings.view",
         stock: "stock.view|requests.make",
         rooms: "rooms.manage",
@@ -619,7 +620,7 @@
         return view;
     }
 
-    var TITLES = { today: "Today", bookings: "Bookings", availability: "Availability", stock: "Stock", rooms: "Rooms", users: "Users", account: "My account" };
+    var TITLES = { today: "Today", bookings: "Bookings", events: "Events", availability: "Availability", stock: "Stock", rooms: "Rooms", users: "Users", account: "My account" };
 
     function show(view, first) {
         var changed = view !== current || first;
@@ -657,6 +658,7 @@
     var LOADERS = {
         today: loadToday,
         bookings: loadBookings,
+        events: loadEvents,
         availability: loadAvailability,
         rooms: loadRooms,
         stock: loadStock,
@@ -705,6 +707,7 @@
         if (sheetIsOpen()) return;
         if (current === "stock" && !stockCanRefresh()) return;
         if (document.querySelector(".confirm-text, .doc-form")) return;
+        if (current === "events" && document.querySelector("#view-events form")) return;
         if (document.activeElement === $("searchBox")) return;
         load(current, true);
     }, AUTO_REFRESH_MS);
@@ -906,6 +909,32 @@
         }, 0);
     }
 
+    // today's confirmed event (one per day) on the Today page
+    function renderEventsToday(list) {
+        var box = $("eventsTodayList");
+        box.textContent = "";
+        $("eventsTodayBox").hidden = !list.length;
+
+        list.forEach(function (event) {
+            box.appendChild(el("article", { className: "booking event-today" }, [
+                el("div", { className: "booking-main" }, [
+                    el("div", { className: "booking-top" }, [
+                        el("h3", { className: "booking-name", text: event.typeName + ", " + event.startTime + "–" + event.endTime }),
+                        el("div", { className: "badges" }, [badge(PAYMENT_BADGE, event.paid ? "paid" : "pending")])
+                    ]),
+                    el("div", { className: "booking-details" }, [
+                        el("p", { className: "booking-room", text: event.name + (event.organisation ? " · " + event.organisation : "") + " · " + plural(event.people, "person", "people") }),
+                        el("p", { className: "booking-ref", text: event.ref })
+                    ])
+                ]),
+                el("div", { className: "booking-contact" }, [
+                    el("a", { className: "contact-link", href: telHref(event.phone), "aria-label": "Call " + event.name }, [icon("phone"), el("span", { text: event.phone })]),
+                    el("a", { className: "contact-link", href: "#events", onclick: function (e) { e.preventDefault(); goToEvents("upcoming"); } }, [el("span", { text: "See in Events" })])
+                ])
+            ]));
+        });
+    }
+
     async function loadToday(quiet) {
         if (!quiet) {
             $("todayStats").textContent = "";
@@ -931,6 +960,11 @@
             syncBookingControls();
             window.location.hash = "#bookings";
         }, data.waitingForConfirmation > 0));
+        stats.appendChild(stat(data.eventsWaiting || 0, "Event requests", "House parties and competitions", function () {
+            goToEvents("waiting");
+        }, data.eventsWaiting > 0));
+
+        renderEventsToday(data.eventsToday || []);
 
         var tonight = $("roomsTonight");
         tonight.textContent = "";
@@ -960,14 +994,14 @@
     /* ---------- Bookings ---------- */
 
     function syncBookingControls() {
-        document.querySelectorAll(".segmented button").forEach(function (b) {
+        document.querySelectorAll("#view-bookings .segmented button").forEach(function (b) {
             b.setAttribute("aria-pressed", String(b.getAttribute("data-when") === state.when));
         });
         $("statusFilter").value = state.status;
         $("searchBox").value = state.q;
     }
 
-    document.querySelectorAll(".segmented button").forEach(function (b) {
+    document.querySelectorAll("#view-bookings .segmented button").forEach(function (b) {
         b.addEventListener("click", function () {
             state.when = b.getAttribute("data-when");
             syncBookingControls();
@@ -1017,6 +1051,457 @@
 
         renderBookings(list, data.bookings, empty, "h2");
     }
+
+    /* ---------- Events: house parties and swimming competitions ---------- */
+
+    var EVENT_STATUS = {
+        waiting: { text: "Waiting to confirm", className: "badge badge-dashed" },
+        confirmed: { text: "Confirmed", className: "badge badge-solid" },
+        declined: { text: "Turned down", className: "badge badge-muted" },
+        cancelled: { text: "Cancelled", className: "badge badge-muted" }
+    };
+
+    var EVENT_TYPES = [
+        { key: "house-party", name: "House party" },
+        { key: "swimming-competition", name: "Swimming competition" }
+    ];
+
+    var USUAL_EVENT_TIMES = { "house-party": ["14:00", "20:00"], "swimming-competition": ["08:00", "17:00"] };
+
+    var events = { show: "waiting", types: [], request: 0 };
+
+    // 06:00, 06:30 ... 23:30, the same as the website
+    function eventTimes() {
+        var times = [];
+        for (var hour = 6; hour <= 23; hour += 1) {
+            var h = (hour < 10 ? "0" : "") + hour;
+            times.push(h + ":00", h + ":30");
+        }
+        return times;
+    }
+
+    function eventDay(text) {
+        var opts = { weekday: "long", day: "numeric", month: "long" };
+        if (text.slice(0, 4) !== kigaliToday().slice(0, 4)) opts.year = "numeric";
+        return formatDay(text, opts);
+    }
+
+    function eventPriceText(price) {
+        return price ? formatRwf(price) : "Price not set yet";
+    }
+
+    function eventCard(event, headingLevel) {
+        var closed = event.status === "declined" || event.status === "cancelled";
+        var whatsapp = whatsappNumber(event.phone);
+
+        var badges = el("div", { className: "badges" }, [
+            badge(EVENT_STATUS, event.status),
+            event.status === "confirmed" ? badge(PAYMENT_BADGE, event.paid ? "paid" : "pending") : null
+        ]);
+
+        var where = event.source === "website"
+            ? "asked on the website " + bookedAt(event.createdAt)
+            : "added by " + (event.createdByName || "staff") + (event.source === "phone" ? " (phone)" : " (walk-in)") + " " + bookedAt(event.createdAt);
+
+        var handled = "";
+        if (event.status === "confirmed" && event.handledByName) handled = "Confirmed by " + event.handledByName;
+        if (event.status === "declined") handled = "Turned down by " + event.handledByName + (event.reason ? ": " + event.reason : "");
+        if (event.status === "cancelled") handled = "Cancelled by " + event.handledByName + (event.reason ? ": " + event.reason : "");
+
+        var main = el("div", { className: "booking-main" }, [
+            el("div", { className: "booking-top" }, [
+                el(headingLevel || "h3", { className: "booking-name", text: event.name }),
+                badges
+            ]),
+            el("div", { className: "booking-details" }, [
+                el("p", { className: "booking-room event-type", text: event.typeName + " · " + plural(event.people, "person", "people") }),
+                el("p", { className: "booking-dates", text: eventDay(event.day) + " · " + event.startTime + "–" + event.endTime }),
+                event.organisation ? el("p", { className: "booking-meta", text: event.organisation }) : null,
+                el("p", { className: "booking-meta", text: eventPriceText(event.price) }),
+                event.note ? el("p", { className: "event-note", text: "“" + event.note + "”" }) : null,
+                el("p", { className: "booking-ref", text: event.ref + " · " + where }),
+                handled ? el("p", { className: "booking-ref", text: handled }) : null,
+                event.dayTaken ? el("p", { className: "event-clash", text: "Another event is already confirmed on this day. Turn this down, or agree another day with them." }) : null
+            ])
+        ]);
+
+        var contact = el("div", { className: "booking-contact" }, [
+            el("a", { className: "contact-link", href: telHref(event.phone), "aria-label": "Call " + event.name }, [
+                icon("phone"),
+                el("span", { text: event.phone })
+            ]),
+            whatsapp ? el("a", {
+                className: "contact-link",
+                href: "https://wa.me/" + whatsapp,
+                target: "_blank",
+                rel: "noopener noreferrer",
+                "aria-label": "WhatsApp " + event.name
+            }, [icon("whatsapp"), el("span", { text: "WhatsApp" })]) : null,
+            event.email ? el("a", { className: "contact-link", href: "mailto:" + event.email, "aria-label": "Email " + event.name }, [
+                icon("mail"),
+                el("span", { text: event.email })
+            ]) : null
+        ]);
+
+        var actions = el("div", { className: "booking-actions" });
+
+        var card = el("article", {
+            className: "booking event-card-admin" + (closed ? " is-cancelled" : ""),
+            "data-key": "event-" + event._id
+        }, [main, contact, actions]);
+
+        async function send(what, body, doneMessage) {
+            actions.querySelectorAll("button, input").forEach(function (b) {
+                b.disabled = true;
+            });
+
+            try {
+                await api("POST", "/admin/events/" + event._id + "/" + what, body || {});
+                toast(doneMessage);
+                await load(current, true);
+            } catch (error) {
+                if (error.status !== 401) toast(error.message, true);
+                if (error.status === 409) load(current, true);
+                else renderActions();
+            }
+        }
+
+        function askReason(kind) {
+            actions.textContent = "";
+            var id = kind + "-" + event._id;
+            var input = el("input", {
+                id: id,
+                type: "text",
+                maxlength: "200",
+                autocomplete: "off",
+                placeholder: kind === "decline" ? "For example: the day is already booked" : "For example: they changed their plans"
+            });
+            var form = el("form", { className: "staff-reset", novalidate: true }, [
+                el("p", {
+                    className: "confirm-text",
+                    text: kind === "decline"
+                        ? "Turn down " + event.name + "'s " + event.typeName.toLowerCase() + "? Call them to tell them."
+                        : "Cancel " + event.name + "'s " + event.typeName.toLowerCase() + " on " + eventDay(event.day) + "? The day becomes free again."
+                }),
+                el("div", { className: "room-field" }, [el("label", { for: id, text: "Why? (optional, kept in the record)" }), input]),
+                el("button", { type: "submit", className: "btn btn-primary btn-small", text: kind === "decline" ? "Turn down" : "Yes, cancel" }),
+                button("Keep it", "btn-ghost", function () {
+                    renderActions();
+                    var first = actions.querySelector("button");
+                    if (first) first.focus();
+                })
+            ]);
+            form.addEventListener("submit", function (e) {
+                e.preventDefault();
+                if (kind === "decline") send("decline", { reason: input.value.trim() }, event.ref + " turned down.");
+                else send("cancel", { reason: input.value.trim() }, event.ref + " cancelled. " + eventDay(event.day) + " is free again.");
+            });
+            actions.appendChild(form);
+            input.focus();
+        }
+
+        function renderActions() {
+            actions.textContent = "";
+            if (!can("bookings.manage")) return;
+
+            if (event.status === "waiting") {
+                var confirm = button("Confirm", "btn-primary", function () {
+                    send("confirm", null, event.ref + " confirmed. " + eventDay(event.day) + " is now booked.");
+                });
+                if (event.dayTaken) {
+                    confirm.disabled = true;
+                    confirm.setAttribute("title", "Another event is confirmed on this day");
+                }
+                actions.appendChild(confirm);
+                actions.appendChild(button("Turn down", "btn-ghost", function () { askReason("decline"); }));
+            }
+
+            if (event.status === "confirmed") {
+                if (event.paid) {
+                    actions.appendChild(button("Mark as not paid", "btn-ghost", function () {
+                        send("paid", { paid: false }, event.ref + " marked as not paid.");
+                    }));
+                } else {
+                    actions.appendChild(button("Mark as paid", "btn-ghost", function () {
+                        send("paid", { paid: true }, event.ref + " marked as paid.");
+                    }));
+                }
+                actions.appendChild(button("Cancel event", "btn-ghost btn-danger", function () { askReason("cancel"); }));
+            }
+        }
+
+        renderActions();
+        return card;
+    }
+
+    function setEventCount(show, count) {
+        var badgeNode = document.querySelector('#eventShow [data-show="' + show + '"] .seg-count');
+        if (!badgeNode) return;
+        badgeNode.textContent = count ? String(count) : "";
+        badgeNode.hidden = !count;
+    }
+
+    function syncEventControls() {
+        document.querySelectorAll("#eventShow button").forEach(function (b) {
+            b.setAttribute("aria-pressed", String(b.getAttribute("data-show") === events.show));
+        });
+    }
+
+    document.querySelectorAll("#eventShow button").forEach(function (b) {
+        b.addEventListener("click", function () {
+            events.show = b.getAttribute("data-show");
+            syncEventControls();
+            load("events", false);
+        });
+    });
+
+    function renderEventPrices() {
+        var box = $("eventPrices");
+        box.textContent = "";
+        events.types.forEach(function (type, index) {
+            if (index) box.appendChild(document.createTextNode(" · "));
+            box.appendChild(el("strong", { text: type.name }));
+            box.appendChild(document.createTextNode(" " + eventPriceText(type.price) + (type.open ? "" : " (website requests off)")));
+        });
+    }
+
+    async function loadEvents(quiet) {
+        var request = ++events.request;
+        var list = $("eventList");
+
+        if (!quiet) {
+            $("eventCount").textContent = "";
+            placeholder(list, "Loading events…");
+        }
+
+        var data = await api("GET", "/admin/events?show=" + events.show);
+        if (request !== events.request) return; // a newer list is on its way
+
+        events.types = data.types;
+        renderEventPrices();
+        setEventCount("waiting", data.counts.waiting);
+        setEventCount("upcoming", data.counts.upcoming);
+
+        var n = data.events.length;
+        $("eventCount").textContent = {
+            waiting: plural(n, "request waiting", "requests waiting") + (n ? ": confirm or turn them down after calling them" : ""),
+            upcoming: plural(n, "event coming up", "events coming up"),
+            past: plural(n, "past, turned down or cancelled event", "past, turned down or cancelled events")
+        }[events.show];
+
+        list.textContent = "";
+        if (!n) {
+            list.appendChild(el("p", {
+                className: "empty",
+                text: {
+                    waiting: "No requests waiting. New ones from the website appear here.",
+                    upcoming: "No events coming up yet.",
+                    past: "Nothing here yet."
+                }[events.show]
+            }));
+            return;
+        }
+
+        data.events.forEach(function (event) {
+            list.appendChild(eventCard(event, "h2"));
+        });
+    }
+
+    function goToEvents(show) {
+        events.show = show;
+        syncEventControls();
+        if (current === "events") load("events", false);
+        else window.location.hash = "#events";
+    }
+
+    /* A phone or walk-in booking, confirmed at once (big form) */
+    function openEventForm() {
+        var times = eventTimes();
+
+        var type = choiceChips("Which event?", EVENT_TYPES.map(function (t) {
+            return { value: t.key, label: t.name };
+        }), "");
+        var source = choiceChips("How did they book?", [
+            { value: "phone", label: "By phone" },
+            { value: "walk-in", label: "At the inn" }
+        ], "phone");
+
+        var day = el("input", { id: "eventFormDay", type: "date", min: kigaliToday(), max: addDays(kigaliToday(), 365) });
+        var dayNote = el("p", { className: "help", id: "eventFormDay-note", "aria-live": "polite" });
+
+        function timeSelect(id, chosen) {
+            var select = el("select", { id: id });
+            times.forEach(function (time) {
+                select.appendChild(el("option", { value: time, text: time }));
+            });
+            select.value = chosen;
+            return select;
+        }
+
+        var start = timeSelect("eventFormStart", "14:00");
+        var end = timeSelect("eventFormEnd", "20:00");
+        var timesTouched = false;
+        [start, end].forEach(function (select) {
+            select.addEventListener("change", function () { timesTouched = true; });
+        });
+        type.onChange(function () {
+            var usual = USUAL_EVENT_TIMES[type.value()];
+            if (usual && !timesTouched) {
+                start.value = usual[0];
+                end.value = usual[1];
+            }
+        });
+
+        var people = bigNumber("eventFormPeople", { unit: "people", min: 1 });
+        var name = el("input", { id: "eventFormName", type: "text", maxlength: "100", autocomplete: "off" });
+        var phone = el("input", { id: "eventFormPhone", type: "tel", maxlength: "30", autocomplete: "off", placeholder: "078X XXX XXX" });
+        var email = el("input", { id: "eventFormEmail", type: "text", inputmode: "email", maxlength: "254", autocomplete: "off" });
+        var organisation = el("input", { id: "eventFormOrg", type: "text", maxlength: "100", autocomplete: "off", placeholder: "School, club or company" });
+        var note = el("input", { id: "eventFormNote", type: "text", maxlength: "500", autocomplete: "off", placeholder: "For example: birthday, 60 swimmers" });
+
+        // say at once when the day is already taken
+        var taken = [];
+        api("GET", "/events").then(function (data) {
+            taken = data.takenDays || [];
+            showDay();
+        }).catch(function () { /* the server checks again when saving */ });
+
+        function showDay() {
+            dayNote.textContent = day.value && taken.indexOf(day.value) >= 0
+                ? eventDay(day.value) + " already has an event. One event per day."
+                : "";
+        }
+        day.addEventListener("change", showDay);
+
+        openSheet({
+            kicker: "Add event booking",
+            title: "Phone or walk-in booking",
+            sub: "Saved as confirmed: the day is taken at once. One event per day.",
+            wide: true,
+            fields: [
+                type.node,
+                el("div", { className: "sheet-pair" }, [
+                    el("div", { className: "sheet-field" }, [el("label", { for: "eventFormDay", text: "Day" }), day, dayNote]),
+                    el("div", { className: "sheet-pair" }, [
+                        sheetField("eventFormStart", "From", [start]),
+                        sheetField("eventFormEnd", "Until", [end])
+                    ])
+                ]),
+                sheetField("eventFormPeople", "How many people?", [people.node]),
+                el("div", { className: "sheet-pair" }, [
+                    sheetField("eventFormName", "Name of the person booking", [name]),
+                    sheetField("eventFormPhone", "Their phone number", [phone])
+                ]),
+                el("div", { className: "sheet-pair" }, [
+                    sheetField("eventFormEmail", "Email (optional)", [email]),
+                    sheetField("eventFormOrg", "School, club or company (optional)", [organisation])
+                ]),
+                sheetField("eventFormNote", "Note (optional)", [note]),
+                source.node
+            ],
+            submitText: "Save booking",
+            onSubmit: async function (ctx) {
+                if (!type.value()) return ctx.problem("Choose the event.", { focus: type.focus });
+                if (!day.value) return ctx.problem("Choose the day.", day);
+                if (taken.indexOf(day.value) >= 0) return ctx.problem(eventDay(day.value) + " already has an event. One event per day.", day);
+                if (end.value <= start.value) return ctx.problem("The end time must be after the start time.", end);
+                var count = people.value();
+                if (!Number.isInteger(count) || count < 1 || count > 1000) return ctx.problem("Enter how many people will come (1 to 1000).", people.input);
+                if (!name.value.trim()) return ctx.problem("Enter the name of the person booking.", name);
+                if ((phone.value.match(/\d/g) || []).length < 9) return ctx.problem("Enter their phone number (at least 9 digits).", phone);
+                if (email.value.trim() && !EMAIL_PATTERN.test(email.value.trim())) return ctx.problem("Check the email address, or leave it empty.", email);
+                if (!source.value()) return ctx.problem("Choose how they booked.", { focus: source.focus });
+
+                try {
+                    var data = await api("POST", "/admin/events", {
+                        type: type.value(),
+                        day: day.value,
+                        startTime: start.value,
+                        endTime: end.value,
+                        people: count,
+                        name: name.value.trim(),
+                        phone: phone.value.trim(),
+                        email: email.value.trim(),
+                        organisation: organisation.value.trim(),
+                        note: note.value.trim(),
+                        source: source.value()
+                    });
+                    toast(data.event.ref + " saved. " + eventDay(data.event.day) + " is booked for " + data.event.name + ".");
+                } catch (error) {
+                    if (error.status === 409) {
+                        if (taken.indexOf(day.value) < 0) taken.push(day.value);
+                        showDay();
+                        return ctx.problem(error.message, day);
+                    }
+                    throw error;
+                }
+
+                events.show = "upcoming";
+                syncEventControls();
+                await load("events", true);
+            }
+        });
+    }
+
+    /* The owner sets each event's price and whether the website takes requests */
+    function openEventPrices() {
+        var rows = events.types.map(function (type) {
+            var id = "eventPrice-" + type.key;
+            var price = el("input", { id: id, type: "text", inputmode: "numeric", autocomplete: "off", value: type.price ? String(type.price) : "" });
+            var open = el("input", { type: "checkbox", id: id + "-open" });
+            open.checked = type.open;
+            return {
+                type: type,
+                price: price,
+                open: open,
+                node: el("div", { className: "event-price-row" }, [
+                    el("p", { className: "event-price-name", text: type.name }),
+                    sheetField(id, "Price for the event", [
+                        el("div", { className: "input-with-unit" }, [price, el("span", { className: "input-unit", text: "RWF" })])
+                    ], "Shown on the website. Leave empty to say \"Ask us for the price\"."),
+                    el("label", { className: "switch", for: id + "-open" }, [
+                        open,
+                        el("span", { className: "switch-track", "aria-hidden": "true" }),
+                        el("span", { text: "Take requests on the website" })
+                    ])
+                ])
+            };
+        });
+
+        openSheet({
+            kicker: "Events",
+            title: "Prices",
+            sub: "One fixed price for each kind of event. A new price applies to new bookings.",
+            fields: rows.map(function (row) { return row.node; }),
+            submitText: "Save prices",
+            onSubmit: async function (ctx) {
+                var changes = [];
+
+                for (var i = 0; i < rows.length; i += 1) {
+                    var row = rows[i];
+                    var text = row.price.value.replace(/[\s,]/g, "");
+                    var price = text === "" ? null : Number(text);
+                    if (price !== null && (!Number.isInteger(price) || price < 1)) {
+                        return ctx.problem("Enter the " + row.type.name.toLowerCase() + " price as a whole number of RWF, or leave it empty.", row.price);
+                    }
+                    var body = {};
+                    if (price !== row.type.price) body.price = price;
+                    if (row.open.checked !== row.type.open) body.open = row.open.checked;
+                    if (Object.keys(body).length) changes.push({ key: row.type.key, body: body });
+                }
+
+                for (var j = 0; j < changes.length; j += 1) {
+                    await api("PATCH", "/admin/events/types/" + changes[j].key, changes[j].body);
+                }
+
+                toast(changes.length ? "Prices saved. The website shows them now." : "Nothing changed.");
+                await load("events", true);
+            }
+        });
+    }
+
+    $("addEventButton").addEventListener("click", openEventForm);
+    $("eventPricesButton").addEventListener("click", openEventPrices);
 
     /* ---------- Availability grid ---------- */
 
@@ -2145,9 +2630,10 @@
         return qty(value) + " " + (Number(value) === 1 ? oneUnit(unit) : unit);
     }
 
-    // "for one box", "for one litre", "for one kg"
+    // "for one box", "for one litre", "for one kg", "1 person"
     function oneUnit(unit) {
         var u = String(unit || "");
+        if (u === "people") return "person";
         if (/(x|ch|sh)es$/.test(u)) return u.slice(0, -2);
         return u.replace(/s$/, "");
     }

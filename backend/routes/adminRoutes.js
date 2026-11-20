@@ -5,7 +5,7 @@
    POST  /api/admin/login              { email, password } -> { token, user }
    GET   /api/admin/me                 who is signed in
    POST  /api/admin/me/password        { currentPassword, newPassword }
-   GET   /api/admin/summary            today's arrivals, departures, guests staying, waiting bookings
+   GET   /api/admin/summary            today's arrivals, departures, guests staying, waiting bookings, events
    GET   /api/admin/bookings           ?when=upcoming|past|all &status=all|pending|confirmed|cancelled &q=text
    PATCH /api/admin/bookings/:id       { bookingStatus?, paymentStatus? }
    GET   /api/admin/occupancy          ?from=YYYY-MM-DD &days=14  rooms booked per night
@@ -16,6 +16,7 @@
          /api/admin/purchases          what the owner bought; the manager checks it in (purchaseRoutes.js)
          /api/admin/requests           staff ask for supplies; the manager issues them (requestRoutes.js)
          /api/admin/audit              who did what (owner), see auditRoutes.js
+         /api/admin/events             house parties and swimming competitions (adminEventRoutes.js)
 
    What each role may do is checked on every request (utils/permissions.js).
    Every change is written to the audit log (utils/audit.js).
@@ -26,12 +27,14 @@ const mongoose = require("mongoose");
 
 const Room = require("../models/Room");
 const Booking = require("../models/Booking");
+const EventBooking = require("../models/EventBooking");
 const AdminUser = require("../models/AdminUser");
 const staffRoutes = require("./staffRoutes");
 const stockRoutes = require("./stockRoutes");
 const purchaseRoutes = require("./purchaseRoutes");
 const requestRoutes = require("./requestRoutes");
 const auditRoutes = require("./auditRoutes");
+const adminEventRoutes = require("./adminEventRoutes");
 const { audit } = require("../utils/audit");
 const {
   login,
@@ -69,6 +72,7 @@ router.use("/stock", stockRoutes);
 router.use("/purchases", purchaseRoutes);
 router.use("/requests", requestRoutes);
 router.use("/audit", requirePermission("audit.view"), auditRoutes);
+router.use("/events", adminEventRoutes);
 
 const seeBookings = requirePermission("bookings.view");
 const changeBookings = requirePermission("bookings.manage");
@@ -156,7 +160,7 @@ router.get("/summary", seeBookings, async (req, res) => {
     const tomorrow = addDays(today, 1);
     const active = { bookingStatus: { $ne: "cancelled" } };
 
-    const [arrivals, departures, staying, waiting, rooms] = await Promise.all([
+    const [arrivals, departures, staying, waiting, rooms, eventsToday, eventsWaiting] = await Promise.all([
       Booking.find({ ...active, checkIn: today }).populate("room", "name").sort({ guestName: 1 }).lean(),
       Booking.find({ ...active, checkOut: today }).populate("room", "name").sort({ guestName: 1 }).lean(),
       Booking.find({ ...active, checkIn: { $lte: today }, checkOut: { $gt: today } })
@@ -165,6 +169,8 @@ router.get("/summary", seeBookings, async (req, res) => {
         .lean(),
       Booking.countDocuments({ bookingStatus: "pending", checkOut: { $gt: today } }),
       Room.find().sort({ pricePerNight: 1 }).lean(),
+      EventBooking.find({ status: "confirmed", day: today }).lean(),
+      EventBooking.countDocuments({ status: "waiting", day: { $gte: today } }),
     ]);
 
     const tonight = await availabilityForRooms(rooms, today, tomorrow);
@@ -176,6 +182,19 @@ router.get("/summary", seeBookings, async (req, res) => {
       departures: departures.map(bookingForAdmin),
       staying: staying.map(bookingForAdmin),
       waitingForConfirmation: waiting,
+      eventsWaiting,
+      eventsToday: eventsToday.map((event) => ({
+        _id: event._id,
+        ref: event.ref,
+        typeName: event.typeName,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        people: event.people,
+        name: event.name,
+        phone: event.phone,
+        organisation: event.organisation || "",
+        paid: Boolean(event.paid),
+      })),
       roomsTonight: rooms.map((room) => {
         const count = tonight.get(String(room._id));
         return {

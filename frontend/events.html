@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Book a house party or a swimming competition at Zebra Dormus Inn in Huye, Rwanda.">
+    <meta name="theme-color" content="#FFFFFF">
+
+    <title>Book an event | Zebra Dormus Inn</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="192x192" href="images/logo/icon-192.png">
+    <link rel="apple-touch-icon" href="images/logo/apple-touch-icon.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Zebra Dormus Inn">
+    <meta property="og:title" content="House parties and swimming competitions | Zebra Dormus Inn">
+    <meta property="og:description" content="Book the garden for a house party or the pool for a swimming competition in Huye.">
+    <meta property="og:url" content="https://zebra-domus-inn-f5l5.onrender.com/events.html">
+    <meta property="og:image" content="https://zebra-domus-inn-f5l5.onrender.com/images/pool.jpg">
+</head>
+
+<body class="book-page events-page">
+<div class="page">
+
+<!-- HEADER: the logo, a way back and the language -->
+<header class="header checkout-header">
+    <a href="index.html" class="logo" aria-label="Zebra Dormus Inn home">
+        <span class="logo-badge">
+            <img src="images/logo/zebra-domus-logo-white.png" alt="Zebra Dormus Inn" width="90" height="38">
+        </span>
+    </a>
+
+    <div class="header-actions">
+        <a href="index.html#events" class="back-link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            <span data-ev="back">Back to the inn</span>
+        </a>
+        <div class="language-selector">
+            <label for="languageSelect" class="visually-hidden" data-i18n="language">Language</label>
+            <svg class="globe" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
+            <select id="languageSelect">
+                <option value="en">EN</option>
+                <option value="rw">RW</option>
+                <option value="fr">FR</option>
+            </select>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+    </div>
+</header>
+
+<main>
+    <!-- EVENT REQUEST: events.js fills in the events and prices, checks the day
+         and sends the request. The inn confirms it by phone. -->
+    <section class="booking checkout" id="eventBooking">
+        <h1 data-ev="title">Book an event</h1>
+        <p class="section-sub" data-ev="intro">A house party in the garden or a swimming competition at the pool. One event per day: send your request and the inn calls you to confirm.</p>
+
+        <form id="eventForm" class="booking-form" novalidate>
+
+            <!-- Which event: cards with a photo and the price -->
+            <fieldset class="form-block room-choice">
+                <legend data-ev="whichEvent">Which event?</legend>
+                <div class="room-options" id="eventOptions" role="radiogroup" aria-describedby="eventOptionsNote">
+                    <p class="room-option-meta" id="eventOptionsNote" data-ev="loading">Loading…</p>
+                </div>
+            </fieldset>
+
+            <!-- When, and how many people -->
+            <div class="form-block">
+                <h2 data-ev="when">When</h2>
+                <div class="search-card stay-card">
+                    <div class="search-field">
+                        <label for="eventDay" data-ev="day">Day</label>
+                        <span class="control">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                            <input type="date" id="eventDay" name="day" required data-date-display>
+                        </span>
+                    </div>
+
+                    <div class="date-grid">
+                        <div class="search-field">
+                            <label for="eventStart" data-ev="from">From</label>
+                            <span class="control">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                                <select id="eventStart" name="startTime" required></select>
+                                <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                            </span>
+                        </div>
+                        <div class="search-field">
+                            <label for="eventEnd" data-ev="until">Until</label>
+                            <span class="control">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                                <select id="eventEnd" name="endTime" required></select>
+                                <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="search-field">
+                        <label for="eventPeople" data-ev="people">Number of people</label>
+                        <span class="control">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>
+                            <input type="number" id="eventPeople" name="people" min="1" max="1000" step="1" inputmode="numeric" required placeholder="e.g. 40" data-ev-placeholder="peopleExample">
+                        </span>
+                    </div>
+                </div>
+                <p class="room-availability event-day-status" id="dayStatus" role="status" aria-live="polite" hidden></p>
+            </div>
+
+            <!-- Who is asking -->
+            <div class="form-block">
+                <h2 data-ev="yourDetails">Your details</h2>
+                <div class="card">
+                    <div class="form-field">
+                        <label for="eventName" data-i18n="fullName">Full name</label>
+                        <input type="text" id="eventName" name="name" placeholder="e.g. Jean Uwase" autocomplete="name" maxlength="100" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="eventPhone" data-i18n="phoneNumber">Phone number</label>
+                        <input type="tel" id="eventPhone" name="phone" placeholder="078X XXX XXX" autocomplete="tel" maxlength="30" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="eventEmail"><span data-i18n="emailAddress">Email address</span> <span class="field-optional" data-ev="optional">(optional)</span></label>
+                        <input type="email" id="eventEmail" name="email" placeholder="name@example.com" autocomplete="email" maxlength="254">
+                    </div>
+
+                    <div class="form-field">
+                        <label for="eventOrganisation"><span data-ev="organisation">School, club or company</span> <span class="field-optional" data-ev="optional">(optional)</span></label>
+                        <input type="text" id="eventOrganisation" name="organisation" autocomplete="organization" maxlength="100">
+                    </div>
+
+                    <div class="form-field">
+                        <label for="eventNote"><span data-ev="note">Anything we should know?</span> <span class="field-optional" data-ev="optional">(optional)</span></label>
+                        <textarea id="eventNote" name="note" rows="3" maxlength="500" placeholder="e.g. a birthday, music, food and drinks" data-ev-placeholder="noteExample"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- The summary and "Send request": under the form on a phone, on the right on a computer -->
+            <div class="booking-aside">
+                <div class="card summary" id="eventSummary" aria-live="polite">
+                    <p class="summary-empty" data-ev="summaryEmpty">Choose the event and the day to see the price.</p>
+                </div>
+
+                <div class="submit-area">
+                    <button type="submit" id="eventSubmit" class="btn btn-primary btn-block btn-large">
+                        <span class="button-label" data-ev="send">Send request</span>
+                    </button>
+
+                    <p id="eventMessage" class="event-message" role="status" aria-live="polite"></p>
+
+                    <p class="secure-line">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>
+                        <span data-ev="callConfirm">The inn calls you to confirm. You pay once it is confirmed.</span>
+                    </p>
+
+                    <p class="privacy-note">
+                        <span data-ev="privacyNote">By sending, you agree that we use your details to arrange your event.</span>
+                        <a href="privacy.html" data-i18n="privacyLink">Read our privacy notice</a>
+                    </p>
+                </div>
+            </div>
+        </form>
+
+        <!-- Shown after the request is sent -->
+        <div class="confirmation" id="eventConfirmed" hidden tabindex="-1">
+            <span class="confirm-icon" aria-hidden="true">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>
+            <h2 data-ev="received">Request received</h2>
+            <p class="confirm-lead" data-ev="receivedLead">Thank you. The inn will call you to confirm. Keep this reference.</p>
+            <span class="confirm-ref" id="eventRef"></span>
+            <dl class="confirm-details" id="eventDetails"></dl>
+            <button type="button" class="btn btn-outline btn-block" id="anotherEventButton" data-ev="another">Book another event</button>
+            <a href="index.html" class="btn btn-tint btn-block" data-ev="backHome">Back to Zebra Dormus</a>
+        </div>
+    </section>
+</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="imigongo" aria-hidden="true"></div>
+    <div class="footer-body">
+
+        <img
+            class="footer-logo"
+            src="images/logo/zebra-domus-logo-white.png"
+            alt="Zebra Dormus Inn"
+            width="152"
+            height="64"
+        >
+
+        <span class="footer-name">Zebra Dormus Inn</span>
+        <address class="footer-address">
+            [Street address], Huye<br>
+            <span data-i18n="province">Southern Province, Rwanda</span><br>
+            +250 7XX XXX XXX · [email address]
+        </address>
+        <nav class="footer-nav" aria-label="Footer">
+            <a href="index.html#rooms" data-i18n="footerRooms">Rooms</a>
+            <a href="book.html" data-i18n="footerBook">Book</a>
+            <a href="events.html" data-i18n="footerEvents" aria-current="page">Events</a>
+            <a href="index.html#about" data-i18n="footerAbout">About</a>
+            <a href="index.html#contact" data-i18n="footerContact">Contact</a>
+            <a href="index.html#policies" data-i18n="policies">Policies</a>
+            <a href="privacy.html" data-i18n="privacy">Privacy</a>
+        </nav>
+        <p class="footer-copy">
+            © <span id="currentYear"></span> Zebra Dormus Inn.
+            <span data-i18n="footerCopy">All rights reserved. Bookings go directly to the inn.</span>
+        </p>
+    </div>
+</footer>
+
+</div>
+
+<script src="translations.js"></script>
+<script src="api-config.js"></script>
+<script src="date-display.js"></script>
+<script src="back-to-top.js"></script>
+<script src="events.js"></script>
+</body>
+</html>

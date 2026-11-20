@@ -2,7 +2,7 @@
    ZEBRA DORMUS INN
    Audit log (owner only), mounted at /api/admin/audit
 
-   GET /   ?area=stock|purchases|requests|budget|bookings|rooms|users|sign-in
+   GET /   ?area=stock|purchases|requests|budget|bookings|events|rooms|users|sign-in
            &q=text &before=ISO date   newest first, 100 at a time
 ========================================= */
 

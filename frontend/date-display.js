@@ -50,6 +50,8 @@
             var input = document.getElementById(id);
             if (input) setup(input);
         });
+        // other date fields that ask for the same look (the event day on events.html)
+        document.querySelectorAll("input[type=date][data-date-display]").forEach(setup);
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

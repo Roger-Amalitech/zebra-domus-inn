@@ -2352,6 +2352,7 @@ html.sheet-open body {
 }
 
 .sheet-field input[type="text"],
+.sheet-field input[type="tel"],
 .sheet-field input[type="date"],
 .sheet-field select {
     width: 100%;
@@ -2740,5 +2741,109 @@ html.sheet-open body {
 @media (prefers-reduced-motion: reduce) {
     .sheet {
         animation: none;
+    }
+}
+
+/* =========================================
+   Events: house parties and swimming competitions
+========================================= */
+.event-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.event-prices {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.event-prices strong {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+#eventShow button {
+    white-space: nowrap;
+}
+
+.event-toolbar-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.event-note {
+    font-style: italic;
+}
+
+.event-clash {
+    margin-top: 6px;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    background: var(--ink);
+    color: var(--white);
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.event-price-row {
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: #FAFAFA;
+}
+
+.event-price-name {
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.event-today {
+    border-color: var(--ink);
+}
+
+/* seven sections on a phone: the bottom bar labels stay on one line */
+@media (max-width: 959px) {
+    .tabs .tab {
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 374px) {
+    .tabs .tab {
+        font-size: 10px;
+        letter-spacing: -0.02em;
+    }
+}
+
+/* seven sections in the top bar of a small computer: text only, closer together */
+@media (min-width: 960px) and (max-width: 1279px) {
+    .topbar {
+        gap: 12px;
+        padding: 0 16px;
+    }
+
+    .tabs {
+        gap: 0;
+        margin-left: 0;
+    }
+
+    .tab {
+        padding: 0 10px;
+    }
+
+    .tab svg {
+        display: none;
+    }
+
+    .account-name {
+        display: none;
     }
 }
