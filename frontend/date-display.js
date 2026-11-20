@@ -26,6 +26,7 @@
         var last = null;
         function place() { display.style.left = input.offsetLeft + "px"; }
         function render() {
+            place(); // a field that was hidden (a closed view) has moved once shown
             var key = input.value + "|" + currentLang();
             if (key === last) return;
             last = key;
@@ -53,6 +54,11 @@
         // other date fields that ask for the same look (the event day on events.html)
         document.querySelectorAll("input[type=date][data-date-display]").forEach(setup);
     }
+
+    // for date fields made later (the day in an event's details view)
+    window.ZDDateDisplay = function (input) {
+        if (input && !input.classList.contains("has-date-display")) setup(input);
+    };
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();

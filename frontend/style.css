@@ -3360,37 +3360,8 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
    - events.html reuses the booking page: event cards like the room
      cards, the day and times like "Your stay", the summary on the right
 ========================================= */
-.event-cards {
-    display: grid;
-    gap: 14px;
-    margin-top: 16px;
-}
-.event-card {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-card);
-    background: var(--white);
-    color: var(--ink);
-    text-decoration: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.event-card:hover { border-color: var(--ink); box-shadow: var(--shadow); color: var(--ink); }
-.event-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-.event-card img { width: 100%; height: 180px; object-fit: cover; }
-.event-card-body { display: flex; flex-direction: column; gap: 6px; padding: 16px; }
-.event-card-name { font-size: 18px; font-weight: 700; }
-.event-card-text { color: var(--muted); font-size: 14.5px; line-height: 1.5; }
-.event-card-price { font-size: 15px; font-weight: 700; }
-.event-card-price:empty { display: none; }
-.event-card-cta {
-    margin-top: 4px;
-    font-size: 14.5px;
-    font-weight: 600;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-}
+/* the event cards use the room cards' look (.room-card); two side by side */
+.event-grid .room-guests { color: var(--muted); }
 
 /* events.html (its section titles are h2, styled like the booking page's) */
 .events-page .room-option-meta { line-height: 1.45; }
@@ -3435,13 +3406,17 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 @media (min-width: 768px) {
     /* the day, the two times and the people in one row, each wide enough to read */
     .events-page .stay-card { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) minmax(0, 1fr); }
-    .event-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 20px; }
-    .event-card img { height: 220px; }
-    .event-card-body { padding: 20px; }
+    .event-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 1024px) {
-    .event-card img { height: 260px; }
+    .event-grid .room-image { height: 280px; }
 }
-@media (prefers-reduced-motion: reduce) {
-    .event-card { transition: none; }
+
+/* the day in an event's details view: free (a dot) or taken (black) */
+.event-sheet-status { margin: 0; font-size: 14px; font-weight: 600; }
+.event-sheet-status.is-taken {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--ink);
+    color: var(--white);
 }

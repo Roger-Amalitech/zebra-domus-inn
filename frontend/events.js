@@ -561,8 +561,11 @@
         var year = byId("currentYear");
         if (year) year.textContent = String(new Date().getFullYear());
 
-        var wanted = new URLSearchParams(window.location.search).get("type");
+        var params = new URLSearchParams(window.location.search);
+        var wanted = params.get("type");
         if (USUAL_TIMES[wanted]) state.chosen = wanted;
+        // the day chosen in the event's details on the home page
+        if (/^\d{4}-\d{2}-\d{2}$/.test(params.get("day") || "")) byId("eventDay").value = params.get("day");
 
         byId("eventForm").addEventListener("submit", send);
         byId("anotherEventButton").addEventListener("click", startAgain);
