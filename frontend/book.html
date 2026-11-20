@@ -63,7 +63,7 @@
 
             <!-- Your stay: dates and guests (date-range.js turns the two dates into one field) -->
             <div class="form-block">
-                <h3 data-book="yourStay">Your stay</h3>
+                <h2 data-book="yourStay">Your stay</h2>
                 <div class="search-card stay-card">
                     <div class="date-grid">
                         <div class="search-field">
@@ -110,7 +110,7 @@
 
             <!-- Your details -->
             <div class="form-block">
-                <h3 data-book="yourDetails">Your details</h3>
+                <h2 data-book="yourDetails">Your details</h2>
                 <div class="card">
                     <div class="form-field">
                         <label for="guestName" data-i18n="fullName">Full name</label>
@@ -182,6 +182,21 @@
                 </label>
 
                 <p class="pay-note" id="paymentNote">Your booking is saved as pending until your payment is confirmed.</p>
+
+                <div class="pay-accepted-inline">
+                    <p data-i18n="payAtInnCards">At the inn we accept cash and these cards</p>
+                    <ul class="pay-marks is-small" aria-label="Cards and cash accepted at the inn" data-i18n-aria-label="payMarksLabel">
+                        <li class="pay-mark">American Express</li>
+                        <li class="pay-mark">Visa</li>
+                        <li class="pay-mark">Mastercard</li>
+                        <li class="pay-mark">Diners Club</li>
+                        <li class="pay-mark">JCB</li>
+                        <li class="pay-mark">Maestro</li>
+                        <li class="pay-mark">Discover</li>
+                        <li class="pay-mark">UnionPay</li>
+                        <li class="pay-mark is-cash" data-i18n="cash">Cash</li>
+                    </ul>
+                </div>
             </fieldset>
 
             <!-- Summary and confirm button: under the form on a phone, a column on the right on a computer -->
@@ -219,7 +234,7 @@
             <span class="confirm-icon" aria-hidden="true">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
             </span>
-            <h3>Booking received</h3>
+            <h2>Booking received</h2>
             <p class="confirm-lead">Thank you. Keep this reference for your stay.</p>
             <span class="confirm-ref" id="confirmRef"></span>
             <dl class="confirm-details" id="confirmDetails"></dl>

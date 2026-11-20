@@ -3233,10 +3233,10 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 /* the event cards use the room cards' look (.room-card); two side by side */
 .event-grid .room-guests { color: var(--muted); }
 
-/* events.html (its section titles are h2, styled like the booking page's) */
+/* the booking and event pages: their section titles are h2 (headings in order), styled small */
 .events-page .room-option-meta { line-height: 1.45; }
-.events-page .form-block h2 { margin: 0 0 12px; padding: 0; font-size: 17px; }
-.events-page .confirmation h2 { font-size: 22px; }
+.book-page .form-block h2 { margin: 0 0 12px; padding: 0; font-size: 17px; }
+.book-page .confirmation h2 { font-size: 22px; }
 .field-optional { color: var(--muted); font-weight: 400; }
 .form-field textarea {
     width: 100%;
@@ -3553,4 +3553,73 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     .has-overlay-header .hero-image { height: calc(var(--hero-h) + var(--hero-extra)); }
     .hero-links { bottom: calc(var(--hero-extra) + 18px); }
     .perks { position: relative; z-index: 2; margin-top: calc(-1 * var(--hero-extra) + 28px); }
+}
+
+/* =========================================
+   WAYS TO PAY AT THE INN: the cards and cash accepted at reception,
+   as small white "cards" with the name (cash in black). On the home page
+   under the house rules, and on the booking page under the payment choice.
+========================================= */
+.pay-accepted {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 24px 20px;
+    border-radius: 14px;
+    background: var(--white);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+    text-align: center;
+}
+.pay-accepted h3 { margin: 0; font-size: 17px; }
+.pay-accepted p { margin: 0; max-width: 60ch; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.pay-marks {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+.pay-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 76px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 7px;
+    background: var(--white);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    color: var(--ink);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+.pay-mark.is-cash {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--white);
+}
+/* the booking page: a smaller row under "How would you like to pay?" */
+.pay-accepted-inline {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+}
+.pay-accepted-inline p { margin: 0; color: var(--muted); font-size: 13px; }
+.pay-marks.is-small { justify-content: flex-start; gap: 6px; margin: 0; }
+.pay-marks.is-small .pay-mark { min-width: 0; height: 30px; padding: 0 10px; font-size: 11.5px; }
+
+@media (min-width: 768px) {
+    .pay-accepted { margin-top: 20px; padding: 28px 32px; }
+}
+@media (min-width: 1024px) {
+    .pay-accepted { margin-top: 24px; }
 }
