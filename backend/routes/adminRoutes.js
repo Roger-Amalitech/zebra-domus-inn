@@ -15,7 +15,9 @@
    POST  /api/admin/me/two-step/backup-codes { code } -> { backupCodes }   new ones, the old ones stop working
    GET   /api/admin/summary            today's arrivals, departures, guests staying, waiting bookings, events
    GET   /api/admin/bookings           ?when=upcoming|past|all &status=all|pending|confirmed|cancelled &q=text
-   PATCH /api/admin/bookings/:id       { bookingStatus?, paymentStatus? }
+   PATCH /api/admin/bookings/:id       { bookingStatus?, paymentStatus?, paidWith?, paidAmount?, paidDay? }
+                                       marked paid: the money is recorded as money in (rooms);
+                                       marked not paid again: that money is taken back
    GET   /api/admin/occupancy          ?from=YYYY-MM-DD &days=14  rooms booked per night
    GET   /api/admin/rooms              every room type, open or closed
    PATCH /api/admin/rooms/:id          { pricePerNight?, totalRooms?, capacity?, available?, description? }
@@ -26,6 +28,7 @@
          /api/admin/audit              who did what (owner), see auditRoutes.js
          /api/admin/events             house parties and swimming competitions (adminEventRoutes.js)
          /api/admin/debts              customers who owe money, and their payments (debtRoutes.js)
+         /api/admin/business           sales, expenses, money in, balances, overview, report (businessRoutes.js)
 
    What each role may do is checked on every request (utils/permissions.js).
    Every change is written to the audit log (utils/audit.js).
@@ -45,6 +48,9 @@ const requestRoutes = require("./requestRoutes");
 const auditRoutes = require("./auditRoutes");
 const adminEventRoutes = require("./adminEventRoutes");
 const debtRoutes = require("./debtRoutes");
+const businessRoutes = require("./businessRoutes");
+const { METHODS, METHOD_NAMES, methodOfBooking, recordMoneyIn, voidMoneyIn } = require("../utils/money");
+const { money } = require("../utils/stockOps");
 const { audit } = require("../utils/audit");
 const {
   login,
@@ -98,6 +104,7 @@ router.use("/requests", requestRoutes);
 router.use("/audit", requirePermission("audit.view"), auditRoutes);
 router.use("/events", adminEventRoutes);
 router.use("/debts", debtRoutes);
+router.use("/business", businessRoutes);
 
 const seeBookings = requirePermission("bookings.view");
 const changeBookings = requirePermission("bookings.manage");
@@ -391,12 +398,49 @@ router.patch("/bookings/:id", changeBookings, async (req, res) => {
       }
     }
 
+    // marked paid: how much, how and when (by default the full price, the way they said they'd pay, today)
+    const becomesPaid = changes.paymentStatus === "paid" && booking.paymentStatus !== "paid";
+    const stopsBeingPaid = changes.paymentStatus && changes.paymentStatus !== "paid" && booking.paymentStatus === "paid";
+    let received = null;
+    if (becomesPaid) {
+      const method = body.paidWith === undefined || body.paidWith === "" ? methodOfBooking(booking.paymentMethod) : body.paidWith;
+      if (!METHODS.includes(method)) return res.status(400).json({ success: false, message: "Choose how they paid." });
+      const paidAmount = body.paidAmount === undefined || body.paidAmount === "" ? Math.round(booking.totalPrice || 0) : money(body.paidAmount);
+      if (!paidAmount || paidAmount < 1) return res.status(400).json({ success: false, message: "Write how much they paid, in RWF (a whole number)." });
+      const today = innToday();
+      const dayText = body.paidDay || today;
+      const paidDay = parseDay(dayText);
+      if (!paidDay || dayText > today) return res.status(400).json({ success: false, message: "The day they paid can't be in the future." });
+      received = { method, amount: paidAmount, day: paidDay };
+    }
+
     const said = [];
     if (changes.bookingStatus && changes.bookingStatus !== booking.bookingStatus) said.push(`status ${changes.bookingStatus}`);
-    if (changes.paymentStatus && changes.paymentStatus !== booking.paymentStatus) said.push(`payment ${changes.paymentStatus}`);
+    if (changes.paymentStatus && changes.paymentStatus !== booking.paymentStatus) {
+      said.push(received ? `paid RWF ${received.amount.toLocaleString("en-US")} by ${METHOD_NAMES[received.method]}` : `payment ${changes.paymentStatus}`);
+    }
 
     Object.assign(booking, changes);
     await booking.save();
+
+    if (received) {
+      await recordMoneyIn({
+        person: req.admin,
+        amount: received.amount,
+        day: received.day,
+        method: received.method,
+        source: "booking",
+        sourceId: booking._id,
+        sourceRef: booking.bookingReference,
+        income: "rooms",
+        description: `${booking.room ? booking.room.name : "Room"}, booking ${booking.bookingReference}`,
+        customerName: booking.guestName,
+      });
+    }
+    if (stopsBeingPaid) {
+      const taken = await voidMoneyIn({ source: "booking", sourceId: booking._id }, req.admin, "Marked as not paid");
+      if (taken.length) said.push(`money in ${taken.map((e) => e.ref).join(", ")} taken back`);
+    }
 
     if (said.length) {
       await audit(req.admin, "bookings", `Booking ${booking.bookingReference} (${booking.guestName}): ${said.join(", ")}`);

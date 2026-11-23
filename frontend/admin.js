@@ -12,13 +12,13 @@
 
     var API = window.ZD_API || "/api";
     var TOKEN_KEY = "zdAdminToken";
-    var VIEWS = ["today", "bookings", "events", "debts", "availability", "stock", "rooms", "users", "account"];
+    var VIEWS = ["today", "bookings", "events", "availability", "stock", "business", "rooms", "users", "account"];
     // what each section needs ("" = everyone, "a|b" = either)
     var VIEW_NEEDS = {
         today: "bookings.view",
         bookings: "bookings.view",
         events: "bookings.view",
-        debts: "debts.view",
+        business: "money.view|sales.record|expenses.record|debts.view",
         availability: "bookings.view",
         stock: "stock.view|requests.make",
         rooms: "rooms.manage",
@@ -1061,11 +1061,15 @@
     function viewFromHash() {
         var view = window.location.hash.replace("#", "");
         if (view === "staff") view = "users"; // its earlier name
+        if (view === "debts") { // Debts now lives in Business
+            view = "business";
+            biz.tab = "debts";
+        }
         if (VIEWS.indexOf(view) < 0 || !allowed(view)) return firstView();
         return view;
     }
 
-    var TITLES = { today: "Today", bookings: "Bookings", events: "Events", debts: "Debts", availability: "Availability", stock: "Stock", rooms: "Rooms", users: "Users", account: "My account" };
+    var TITLES = { today: "Today", bookings: "Bookings", events: "Events", business: "Business", availability: "Availability", stock: "Stock", rooms: "Rooms", users: "Users", account: "My account" };
 
     function show(view, first) {
         var changed = view !== current || first;
@@ -1104,7 +1108,7 @@
         today: loadToday,
         bookings: loadBookings,
         events: loadEvents,
-        debts: loadDebts,
+        business: loadBusiness,
         availability: loadAvailability,
         rooms: loadRooms,
         stock: loadStock,
@@ -1309,7 +1313,15 @@
                 }));
             } else {
                 actions.appendChild(button("Mark as paid", "btn-ghost", function () {
-                    change({ paymentStatus: "paid" }, "Marked as paid.");
+                    openPaidForm({
+                        title: booking.guestName + " paid",
+                        kicker: booking.bookingReference,
+                        amount: booking.totalPrice,
+                        method: METHOD_OF_BOOKING[booking.paymentMethod] || "cash",
+                        onSave: function (paid) {
+                            return change({ paymentStatus: "paid", paidAmount: paid.amount, paidWith: paid.method, paidDay: paid.day }, "Marked as paid: " + formatRwf(paid.amount) + " recorded as money in.");
+                        }
+                    });
                 }));
                 if (can("debts.manage")) {
                     actions.appendChild(button("Add to debts", "btn-ghost", function () {
@@ -1678,7 +1690,15 @@
                     }));
                 } else {
                     actions.appendChild(button("Mark as paid", "btn-ghost", function () {
-                        send("paid", { paid: true }, event.ref + " marked as paid.");
+                        openPaidForm({
+                            title: event.name + " paid",
+                            kicker: event.ref + " · " + event.typeName,
+                            amount: event.price,
+                            method: "cash",
+                            onSave: function (paid) {
+                                return send("paid", { paid: true, paidAmount: paid.amount, paidWith: paid.method, paidDay: paid.day }, event.ref + " marked as paid: " + formatRwf(paid.amount) + " recorded as money in.");
+                            }
+                        });
                     }));
                     if (can("debts.manage")) {
                         actions.appendChild(button("Add to debts", "btn-ghost", function () {
@@ -3297,7 +3317,7 @@
             document.querySelectorAll("#debtShow [data-show]").forEach(function (other) {
                 other.setAttribute("aria-pressed", String(other === b));
             });
-            load("debts", false);
+            load("business", false);
         });
     });
 
@@ -3307,7 +3327,7 @@
         clearTimeout(debtTimer);
         debtTimer = setTimeout(function () {
             debts.q = box.value.trim();
-            load("debts", false);
+            load("business", false);
         }, 350);
     });
 
@@ -3315,7 +3335,7 @@
 
     async function afterDebtChange(message) {
         toast(message);
-        if (current === "debts") await load("debts", true);
+        if (current === "business") await load("business", true);
         else if (current === "bookings" || current === "events" || current === "today") await load(current, true);
     }
 
@@ -3526,6 +3546,977 @@
             buttonNode.disabled = false;
         }
     });
+
+    /* ---------- Business: overview, sales, expenses, money in, debts and reports ----------
+       The owner sees everything; the manager records sales, expenses and debts.
+       Money in is written by the server when a booking or event is marked paid, a sale is paid
+       or a debt payment comes in; "Other money in" is for anything else. */
+
+    var BIZ_TABS = ["overview", "sales", "expenses", "money", "debts", "report"];
+    var BIZ_NEEDS = {
+        overview: "money.view",
+        sales: "sales.record|money.view",
+        expenses: "expenses.record|money.view",
+        money: "money.view",
+        debts: "debts.view",
+        report: "money.view"
+    };
+    var biz = { tab: "", periods: {}, request: 0, report: null };
+    var METHOD_OF_BOOKING = { "MTN Mobile Money": "momo", "Airtel Money": "airtel", "Visa/Mastercard": "card", "Pay at the Motel": "cash" };
+    var ACCOUNT_NAMES = { cash: "Cash", momo: "MTN MoMo", airtel: "Airtel Money", bank: "Bank" };
+    var ACCOUNT_LIST = ["cash", "momo", "airtel", "bank"];
+    var SOURCE_NAMES = { booking: "Room booking", event: "Event", sale: "Sale", debt: "Debt payment", other: "Other money in" };
+    var EXPENSE_CATEGORIES = ["Salaries and wages", "Electricity and water", "Internet and phone", "Repairs and maintenance",
+        "Transport and fuel", "Taxes and fees", "Marketing", "Bank and MoMo charges", "Rent", "Other"];
+    var SALE_METHODS = PAY_METHODS.concat([{ value: "credit", label: "On credit" }]);
+    var SALE_METHOD_NAMES = { cash: "Cash", momo: "MTN MoMo", airtel: "Airtel Money", card: "Card", bank: "Bank", credit: "On credit" };
+
+    function bizTabAllowed(tab) { return Boolean(BIZ_NEEDS[tab]) && canAny(BIZ_NEEDS[tab]); }
+
+    function defaultBizTab() {
+        for (var i = 0; i < BIZ_TABS.length; i += 1) if (bizTabAllowed(BIZ_TABS[i])) return BIZ_TABS[i];
+        return "debts";
+    }
+
+    function showBizTab(tab) {
+        if (!bizTabAllowed(tab)) tab = defaultBizTab();
+        biz.tab = tab;
+        document.querySelectorAll("[data-biz-tab]").forEach(function (b) {
+            var on = b.getAttribute("data-biz-tab") === tab;
+            b.setAttribute("aria-pressed", String(on));
+            if (on && b.parentNode.scrollWidth > b.parentNode.clientWidth) b.parentNode.scrollLeft = Math.max(0, b.offsetLeft - 24);
+        });
+        BIZ_TABS.forEach(function (name) { $("biz-" + name).hidden = name !== tab; });
+        $("businessIntro").textContent = can("money.view")
+            ? "Sales, expenses, money in and out, debts and reports."
+            : "Record sales, expenses and customers who owe money.";
+    }
+
+    document.querySelectorAll("[data-biz-tab]").forEach(function (b) {
+        b.addEventListener("click", function () {
+            showBizTab(b.getAttribute("data-biz-tab"));
+            load("business", false);
+        });
+    });
+
+    /* the period of a panel: quick choices or any two dates */
+    function bizPeriod(prefix) {
+        if (!biz.periods[prefix]) setBizPeriod(prefix, "month");
+        return biz.periods[prefix];
+    }
+
+    function setBizPeriod(prefix, kind, from, to) {
+        var today = kigaliToday();
+        var first = today.slice(0, 8) + "01";
+        var p = { kind: kind, from: first, to: today };
+        if (kind === "today") p.from = today;
+        else if (kind === "week") p.from = addDays(today, -6);
+        else if (kind === "last-month") {
+            var lastDay = addDays(first, -1);
+            p.from = lastDay.slice(0, 8) + "01";
+            p.to = lastDay;
+        } else if (kind === "dates") {
+            p.from = from;
+            p.to = to;
+        }
+        biz.periods[prefix] = p;
+        var box = document.querySelector('[data-period-for="' + prefix + '"]');
+        if (box) {
+            box.querySelector("[data-biz-from]").value = p.from;
+            box.querySelector("[data-biz-to]").value = p.to;
+            box.querySelectorAll("[data-biz-period]").forEach(function (b) {
+                b.setAttribute("aria-pressed", String(b.getAttribute("data-biz-period") === kind));
+            });
+        }
+        return p;
+    }
+
+    function periodQuery(prefix) {
+        var p = bizPeriod(prefix);
+        return "from=" + p.from + "&to=" + p.to;
+    }
+
+    function periodWords(p) {
+        return p.from === p.to ? longDay(p.from) : rangeText(p.from, p.to);
+    }
+
+    document.querySelectorAll(".biz-period").forEach(function (box) {
+        var prefix = box.getAttribute("data-period-for");
+        box.querySelectorAll("[data-biz-period]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                setBizPeriod(prefix, b.getAttribute("data-biz-period"));
+                load("business", false);
+            });
+        });
+        box.querySelectorAll("input[type=date]").forEach(function (input) {
+            input.addEventListener("change", function () {
+                var from = box.querySelector("[data-biz-from]").value;
+                var to = box.querySelector("[data-biz-to]").value;
+                if (!from || !to) return;
+                if (to < from) {
+                    toast("The end date can't be before the start date.", true);
+                    return;
+                }
+                setBizPeriod(prefix, "dates", from, to);
+                load("business", false);
+            });
+        });
+    });
+
+    async function loadBusiness(quiet) {
+        if (!biz.tab || !bizTabAllowed(biz.tab)) biz.tab = defaultBizTab();
+        showBizTab(biz.tab);
+        if (biz.tab === "overview") return loadOverview(quiet);
+        if (biz.tab === "sales") return loadSales(quiet);
+        if (biz.tab === "expenses") return loadExpenses(quiet);
+        if (biz.tab === "money") return loadMoneyIn(quiet);
+        if (biz.tab === "debts") return loadDebts(quiet);
+        return loadBizReport(quiet);
+    }
+
+    async function afterBizChange(message) {
+        toast(message);
+        if (current === "business") await load("business", true);
+    }
+
+    function signedMoney(amount) {
+        return (amount < 0 ? "−" : "") + formatRwf(Math.abs(Math.round(amount)));
+    }
+
+    function profitStat(amount, label, note) {
+        var stat = moneyStat(amount, amount < 0 ? label.replace("Profit", "Loss") : label, note);
+        stat.classList.add(amount < 0 ? "is-loss" : "is-profit");
+        if (amount < 0) stat.classList.add("is-alert");
+        return stat;
+    }
+
+    function cardTitle(text) { return el("h2", { className: "booking-name", text: text }); }
+
+    /* ----- Overview ----- */
+
+    $("quickSale").addEventListener("click", function () { openSaleForm(); });
+    $("quickExpense").addEventListener("click", function () { openExpenseForm(); });
+    $("quickReport").addEventListener("click", function () {
+        showBizTab("report");
+        load("business", false);
+    });
+    $("quickPurchase").addEventListener("click", async function () {
+        try {
+            if (!stock.items || !stock.items.length) stock.items = (await api("GET", "/admin/stock/items")).items;
+            openPurchaseForm();
+        } catch (error) {
+            showLoadError(error);
+        }
+    });
+
+    async function loadOverview(quiet) {
+        var box = $("bizOverview");
+        if (!quiet) placeholder(box, "Adding up today and this month…");
+        var request = ++biz.request;
+        var data = await api("GET", "/admin/business/overview");
+        if (request !== biz.request) return;
+        box.textContent = "";
+
+        var t = data.todayFigures;
+        box.appendChild(title("Today"));
+        box.appendChild(el("div", { className: "stats money-stats biz-stats" }, [
+            moneyStat(t.moneyIn, "Money in", "Paid today"),
+            moneyStat(t.moneyOut, "Money out", "Expenses and purchases"),
+            moneyStat(t.sales.total, "Sales", plural(t.sales.count, "sale", "sales") + (t.sales.onCredit ? ", " + formatRwf(t.sales.onCredit) + " on credit" : ""))
+        ]));
+
+        var m = data.month;
+        box.appendChild(title("This month"));
+        box.appendChild(el("div", { className: "stats money-stats biz-stats is-four" }, [
+            moneyStat(m.moneyIn, "Money in", "Since " + longDay(m.from)),
+            moneyStat(m.moneyOut, "Money out", "Expenses and purchases"),
+            profitStat(m.profit, "Profit", "Income " + formatRwf(m.income.total) + " less costs " + formatRwf(m.costs.total)),
+            moneyStat(m.sales.total, "Sales", plural(m.sales.count, "sale", "sales"))
+        ]));
+
+        box.appendChild(title("Money in each account"));
+        var accounts = [moneyStat(data.balances.total, "All accounts", data.balances.since ? "Since " + longDay(data.balances.since) : "No starting balances yet")]
+            .concat(data.balances.accounts.map(function (a) {
+                return moneyStat(a.balance, ACCOUNT_NAMES[a.account], "In " + formatRwf(a.moneyIn) + " · out " + formatRwf(a.moneyOut));
+            }));
+        box.appendChild(el("div", { className: "stats money-stats biz-stats is-five" }, accounts));
+        if (!data.openingSet) {
+            box.appendChild(el("div", { className: "biz-callout" }, [
+                el("p", { text: "Set what was in cash, MoMo, Airtel Money and the bank on the day you start, so the balances show what you really have." }),
+                button("Set starting balances", "btn-primary", openBalancesForm)
+            ]));
+        }
+
+        box.appendChild(title("Right now"));
+        var owed = moneyStat(data.debts.owed, "Customers owe", data.debts.count ? plural(data.debts.customers, "customer", "customers") + " · " + plural(data.debts.count, "debt", "debts") : "Nobody owes the inn money");
+        owed.classList.add("is-link");
+        owed.setAttribute("role", "button");
+        owed.tabIndex = 0;
+        function goDebts() { showBizTab("debts"); load("business", false); }
+        owed.addEventListener("click", goDebts);
+        owed.addEventListener("keydown", function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); goDebts(); } });
+        box.appendChild(el("div", { className: "stats money-stats biz-stats is-two" }, [
+            owed,
+            moneyStat(data.stockValue, "Stock in the store", "At the last price paid")
+        ]));
+
+        box.appendChild(title("Latest money in and out"));
+        if (!data.recent.length) {
+            box.appendChild(emptyNote("Nothing yet. Sales, expenses, purchases and payments appear here."));
+        } else {
+            box.appendChild(el("ul", { className: "money-feed" }, data.recent.map(function (r) {
+                var sign = r.direction === "in" ? "+" : r.direction === "out" ? "−" : "";
+                return el("li", { className: "money-feed-row is-" + r.direction }, [
+                    el("span", { className: "money-feed-day", text: formatDay(r.day, { day: "numeric", month: "short" }) }),
+                    el("span", { className: "money-feed-what" }, [
+                        el("strong", { text: r.what }),
+                        el("span", { text: r.ref + " · " + (SALE_METHOD_NAMES[r.how] || r.how) })
+                    ]),
+                    el("span", { className: "money-feed-amount", text: sign + formatRwf(r.amount) + (r.direction === "credit" ? " owed" : "") })
+                ]);
+            })));
+        }
+    }
+
+    /* ----- Sales ----- */
+
+    $("addSaleButton").addEventListener("click", function () { openSaleForm(); });
+
+    function saleCard(sale) {
+        var done = sale.status === "done";
+        var lines = sale.lines.map(function (l) {
+            return qty(l.quantity) + (l.unit ? " " + l.unit : "") + " × " + l.itemName + " at " + formatRwf(l.price);
+        }).join(" · ");
+        var badgeNode = el("span", {
+            className: !done ? "badge badge-muted" : sale.paidWith === "credit" ? "badge badge-dashed" : "badge badge-solid",
+            text: !done ? "Cancelled" : SALE_METHOD_NAMES[sale.paidWith]
+        });
+        var details = [
+            el("p", { className: "debt-amount" }, [el("strong", { text: formatRwf(sale.total) })]),
+            el("p", { className: "booking-room", text: lines }),
+            el("p", { className: "booking-dates", text: formatDay(sale.day, { weekday: "short", day: "numeric", month: "short" }) + " · sold by " + (sale.soldByName || "someone") }),
+            sale.customerName ? el("p", { className: "booking-meta", text: (sale.paidWith === "credit" ? "On credit to " : "Customer: ") + sale.customerName + (sale.phone ? " · " + sale.phone : "") }) : null,
+            sale.cost !== undefined && done ? el("p", { className: "booking-meta", text: "Cost " + formatRwf(sale.cost) + " · profit " + signedMoney(sale.profit) }) : null,
+            sale.note ? el("p", { className: "booking-meta", text: "Note: " + sale.note }) : null,
+            !done ? el("p", { className: "booking-meta", text: "Cancelled by " + sale.cancelledByName + ": " + sale.reason }) : null
+        ];
+        var actions = el("div", { className: "booking-actions" });
+        if (done && can("sales.cancel")) {
+            actions.appendChild(button("Cancel sale", "btn-ghost btn-danger", function () {
+                openReasonForm({
+                    kicker: sale.ref,
+                    title: "Cancel this sale?",
+                    sub: "The items go back into the store, and the " + (sale.paidWith === "credit" ? "debt is cancelled." : formatRwf(sale.total) + " comes off the money in."),
+                    label: "Why cancel it?",
+                    placeholder: "For example: rung up twice",
+                    submitText: "Cancel sale",
+                    onSave: async function (reason) {
+                        await api("POST", "/admin/business/sales/" + sale._id + "/cancel", { reason: reason });
+                        await afterBizChange(sale.ref + " cancelled. The items are back in the store.");
+                    }
+                });
+            }));
+        }
+        return el("article", { className: "booking biz-card" + (done ? "" : " is-closed") }, [
+            el("div", { className: "booking-main" }, [
+                el("div", { className: "booking-top" }, [cardTitle(sale.ref), el("div", { className: "badges" }, [badgeNode])]),
+                el("div", { className: "booking-details" }, details)
+            ]),
+            actions
+        ]);
+    }
+
+    async function loadSales(quiet) {
+        var list = $("salesList");
+        if (!quiet) placeholder(list, "Loading sales…");
+        var request = ++biz.request;
+        var data = await api("GET", "/admin/business/sales?" + periodQuery("sales"));
+        if (request !== biz.request) return;
+        var t = data.totals;
+
+        var box = $("salesSummary");
+        box.textContent = "";
+        var stats = [
+            moneyStat(t.total, "Sales", plural(t.count, "sale", "sales") + " · " + periodWords(bizPeriod("sales"))),
+            moneyStat(t.onCredit, "On credit", "Still to be paid through Debts")
+        ];
+        if (t.profit !== undefined) stats.push(profitStat(t.profit, "Profit on sales", "Sales less what the items cost"));
+        box.appendChild(el("div", { className: "stats money-stats biz-stats" }, stats));
+        if (data.top.length) {
+            box.appendChild(dataTable("What sold most", [{ head: "Item", left: true }, { head: "Sold" }, { head: "Money" }],
+                data.top.map(function (r) { return [r.itemName, qty(r.quantity) + (r.unit ? " " + r.unit : ""), formatRwf(r.total)]; }), null, "stack"));
+        }
+
+        $("salesCount").textContent = plural(data.sales.length, "sale", "sales") + " in " + periodWords(bizPeriod("sales"));
+        list.textContent = "";
+        if (!data.sales.length) {
+            list.appendChild(el("p", { className: "empty", text: "No sales in this period." }));
+            return;
+        }
+        data.sales.forEach(function (sale) { list.appendChild(saleCard(sale)); });
+    }
+
+    /* A new sale: items from the store (the price comes from the item) and meals or services */
+    async function openSaleForm() {
+        var items;
+        try {
+            items = (await api("GET", "/admin/business/sales/items")).items;
+        } catch (error) {
+            toast(error.message, true);
+            return;
+        }
+        var today = kigaliToday();
+        var MEAL = "__meal";
+        var linesBox = el("div", { className: "sale-lines" });
+        var totalLine = el("p", { className: "purchase-total", "aria-live": "polite" });
+        var count = 0;
+
+        function itemOf(id) { return items.filter(function (i) { return i._id === id; })[0] || null; }
+
+        function addLine() {
+            count += 1;
+            var id = "saleLine" + count;
+            var select = el("select", { id: id + "-item", className: "sale-item" }, [el("option", { value: "", text: "Choose…" })]
+                .concat(items.filter(function (i) { return i.quantity > 0; }).map(function (i) {
+                    return el("option", { value: i._id, text: i.name + " (" + qty(i.quantity) + " " + i.unit + " left)" + (i.salePrice ? " · " + formatRwf(i.salePrice) : "") });
+                }))
+                .concat([el("option", { value: MEAL, text: "A meal or service (not from the store)" })]));
+            var name = el("input", { id: id + "-name", type: "text", maxlength: "80", autocomplete: "off", placeholder: "For example: lunch, laundry" });
+            var nameField = sheetField(id + "-name", "What was sold", [name]);
+            nameField.hidden = true;
+            var quantity = el("input", { id: id + "-qty", type: "text", inputmode: "decimal", autocomplete: "off", value: "1" });
+            var unit = el("span", { className: "input-unit", text: "" });
+            var price = el("input", { id: id + "-price", type: "text", inputmode: "numeric", autocomplete: "off" });
+            var lineTotal = el("p", { className: "sale-line-total", "aria-live": "polite" });
+            var row = el("div", { className: "sale-line" }, [
+                sheetField(id + "-item", "Item " + count, [select]),
+                nameField,
+                el("div", { className: "sheet-pair sale-line-numbers" }, [
+                    sheetField(id + "-qty", "How many", [el("div", { className: "input-with-unit" }, [quantity, unit])]),
+                    sheetField(id + "-price", "Price for one", [el("div", { className: "input-with-unit" }, [price, el("span", { className: "input-unit", text: "RWF" })])])
+                ]),
+                lineTotal
+            ]);
+            if (count > 1) {
+                row.appendChild(el("button", { type: "button", className: "btn btn-ghost btn-small sale-remove", text: "Remove", "aria-label": "Remove item " + count, onclick: function () { row.remove(); showTotal(); } }));
+            }
+            select.addEventListener("change", function () {
+                var item = itemOf(select.value);
+                nameField.hidden = select.value !== MEAL;
+                unit.textContent = item ? item.unit : "";
+                if (item && item.salePrice) price.value = String(item.salePrice);
+                if (select.value === MEAL) name.focus();
+                showTotal();
+            });
+            [quantity, price, name].forEach(function (input) { input.addEventListener("input", showTotal); });
+            linesBox.appendChild(row);
+            return select;
+        }
+
+        function readLines() {
+            return Array.prototype.map.call(linesBox.querySelectorAll(".sale-line"), function (row) {
+                var select = row.querySelector(".sale-item");
+                var inputs = row.querySelectorAll("input");
+                return {
+                    row: row,
+                    select: select,
+                    item: itemOf(select.value),
+                    meal: select.value === MEAL,
+                    nameInput: inputs[0],
+                    qtyInput: inputs[1],
+                    priceInput: inputs[2],
+                    quantity: readNumber(inputs[1].value),
+                    price: rwfTyped(inputs[2].value)
+                };
+            });
+        }
+
+        function showTotal() {
+            var total = 0;
+            readLines().forEach(function (l) {
+                var ok = (l.item || l.meal) && l.quantity > 0 && l.price > 0;
+                l.row.querySelector(".sale-line-total").textContent = ok ? "= " + formatRwf(Math.round(l.quantity * l.price)) : "";
+                if (ok) total += l.quantity * l.price;
+            });
+            totalLine.textContent = "Total: " + formatRwf(Math.round(total));
+        }
+
+        var paid = choiceChips("How did they pay?", SALE_METHODS, "cash");
+        var customer = el("input", { id: "saleCustomer", type: "text", maxlength: "80", autocomplete: "off" });
+        var phone = el("input", { id: "salePhone", type: "tel", maxlength: "30", autocomplete: "off", placeholder: "078X XXX XXX" });
+        var due = el("input", { id: "saleDue", type: "date", min: today });
+        var day = el("input", { id: "saleDay", type: "date", max: today, value: today });
+        var note = el("input", { id: "saleNote", type: "text", maxlength: "200", autocomplete: "off", placeholder: "For example: room 4" });
+        var customerField = sheetField("saleCustomer", "Customer (optional)", [customer]);
+        var creditBox = el("div", { className: "sheet-pair" }, [
+            sheetField("salePhone", "Their phone number", [phone]),
+            sheetField("saleDue", "They will pay by (optional)", [due])
+        ]);
+
+        function showCredit() {
+            var credit = paid.value() === "credit";
+            creditBox.hidden = !credit;
+            customerField.querySelector("label").textContent = credit ? "Customer's name (they owe it)" : "Customer (optional)";
+        }
+        paid.onChange(showCredit);
+
+        addLine().setAttribute("data-autofocus", "true");
+        showTotal();
+        showCredit();
+
+        openSheet({
+            kicker: "New sale",
+            title: "What was sold?",
+            sub: "Items from the store go out of the stock. Paid now: the money is recorded. On credit: the customer's debt is opened.",
+            wide: true,
+            fields: [
+                linesBox,
+                el("button", { type: "button", className: "btn btn-ghost add-line-big", text: "+ Add another item", onclick: function () { addLine().focus(); } }),
+                totalLine,
+                paid.node,
+                customerField,
+                creditBox,
+                el("div", { className: "sheet-pair" }, [
+                    sheetField("saleDay", "Day", [day]),
+                    sheetField("saleNote", "Note (optional)", [note])
+                ])
+            ],
+            submitText: "Save sale",
+            onSubmit: async function (ctx) {
+                var body = { day: day.value, paidWith: paid.value(), customerName: customer.value.trim(), phone: phone.value.trim(), note: note.value.trim(), lines: [] };
+                var lines = readLines();
+                for (var i = 0; i < lines.length; i += 1) {
+                    var l = lines[i];
+                    if (!l.select.value) {
+                        if (lines.length > 1 && !l.qtyInput.value.trim() && !l.priceInput.value.trim()) continue;
+                        return ctx.problem("Choose what was sold.", l.select);
+                    }
+                    if (l.meal && l.nameInput.value.trim().length < 2) return ctx.problem("Write what was sold (for example: lunch).", l.nameInput);
+                    if (!(l.quantity > 0)) return ctx.problem("Write how many.", l.qtyInput);
+                    if (l.item && isWholeUnit(l.item.unit) && !Number.isInteger(l.quantity)) return ctx.problem(l.item.name + " is counted in " + l.item.unit + ": use a whole number.", l.qtyInput);
+                    if (l.item && l.quantity > l.item.quantity) return ctx.problem("Only " + qty(l.item.quantity) + " " + l.item.unit + " of " + l.item.name + " in the store.", l.qtyInput);
+                    if (!(l.price >= 1)) return ctx.problem("Write the price for one (whole RWF).", l.priceInput);
+                    body.lines.push(l.meal ? { name: l.nameInput.value.trim(), quantity: l.quantity, price: l.price } : { itemId: l.item._id, quantity: l.quantity, price: l.price });
+                }
+                if (!body.lines.length) return ctx.problem("Add at least one thing sold.", lines[0].select);
+                if (!body.paidWith) return ctx.problem("Choose how they paid.", { focus: paid.focus });
+                if (body.paidWith === "credit") {
+                    if (body.customerName.length < 2) return ctx.problem("On credit: write the customer's name.", customer);
+                    if (due.value) body.dueDay = due.value;
+                }
+                if (body.phone && (body.phone.match(/\d/g) || []).length < 9) return ctx.problem("Check the phone number, or leave it empty.", phone);
+                if (!day.value || day.value > today) return ctx.problem("Choose the day of the sale (today or before).", day);
+                var data = await api("POST", "/admin/business/sales", body);
+                await afterBizChange(data.sale.ref + " saved: " + formatRwf(data.sale.total) +
+                    (data.sale.paidWith === "credit" ? " on credit to " + data.sale.customerName + " (added to Debts)." : " (" + SALE_METHOD_NAMES[data.sale.paidWith] + ")."));
+                if (current === "stock") await load("stock", true);
+            }
+        });
+    }
+
+    /* ----- Expenses ----- */
+
+    $("addExpenseButton").addEventListener("click", function () { openExpenseForm(); });
+
+    function expenseCard(x) {
+        var done = x.status === "done";
+        var actions = el("div", { className: "booking-actions" });
+        if (done && can("expenses.cancel")) {
+            actions.appendChild(button("Cancel expense", "btn-ghost btn-danger", function () {
+                openReasonForm({
+                    kicker: x.ref,
+                    title: "Cancel this expense?",
+                    sub: formatRwf(x.amount) + " for " + x.category.toLowerCase() + " will no longer count.",
+                    label: "Why cancel it?",
+                    placeholder: "For example: recorded twice",
+                    submitText: "Cancel expense",
+                    onSave: async function (reason) {
+                        await api("POST", "/admin/business/expenses/" + x._id + "/cancel", { reason: reason });
+                        await afterBizChange(x.ref + " cancelled.");
+                    }
+                });
+            }));
+        }
+        return el("article", { className: "booking biz-card" + (done ? "" : " is-closed") }, [
+            el("div", { className: "booking-main" }, [
+                el("div", { className: "booking-top" }, [cardTitle(x.category), el("div", { className: "badges" }, [
+                    el("span", { className: done ? "badge" : "badge badge-muted", text: done ? SALE_METHOD_NAMES[x.paidWith] : "Cancelled" })
+                ])]),
+                el("div", { className: "booking-details" }, [
+                    el("p", { className: "debt-amount" }, [el("strong", { text: formatRwf(x.amount) }), document.createTextNode(x.paidTo ? " to " + x.paidTo : "")]),
+                    el("p", { className: "booking-dates", text: formatDay(x.day, { weekday: "short", day: "numeric", month: "short" }) + " · " + x.ref + " · recorded by " + (x.createdByName || "someone") }),
+                    x.note ? el("p", { className: "booking-meta", text: "Note: " + x.note }) : null,
+                    !done ? el("p", { className: "booking-meta", text: "Cancelled by " + x.cancelledByName + ": " + x.reason }) : null
+                ])
+            ]),
+            actions
+        ]);
+    }
+
+    async function loadExpenses(quiet) {
+        var list = $("expensesList");
+        if (!quiet) placeholder(list, "Loading expenses…");
+        var request = ++biz.request;
+        var data = await api("GET", "/admin/business/expenses?" + periodQuery("expenses"));
+        if (request !== biz.request) return;
+        var t = data.totals;
+        var box = $("expensesSummary");
+        box.textContent = "";
+        box.appendChild(el("div", { className: "stats money-stats biz-stats" }, [
+            moneyStat(t.total, "Expenses", plural(t.count, "expense", "expenses") + " · " + periodWords(bizPeriod("expenses")))
+        ].concat(ACCOUNT_LIST.filter(function (a) { return t.byAccount[a]; }).slice(0, 2).map(function (a) {
+            return moneyStat(t.byAccount[a], "Paid from " + ACCOUNT_NAMES[a], "");
+        }))));
+        var cats = Object.keys(t.byCategory).sort(function (a, b) { return t.byCategory[b] - t.byCategory[a]; });
+        if (cats.length) {
+            box.appendChild(dataTable("Expenses by what they were for", [{ head: "What for", left: true }, { head: "Money" }, { head: "Share" }],
+                cats.map(function (c) { return [c, formatRwf(t.byCategory[c]), Math.round(t.byCategory[c] / t.total * 100) + "%"]; }),
+                ["Total", formatRwf(t.total), "100%"], "stack"));
+        }
+        $("expensesCount").textContent = plural(data.expenses.length, "expense", "expenses") + " in " + periodWords(bizPeriod("expenses"));
+        list.textContent = "";
+        if (!data.expenses.length) {
+            list.appendChild(el("p", { className: "empty", text: "No expenses in this period." }));
+            return;
+        }
+        data.expenses.forEach(function (x) { list.appendChild(expenseCard(x)); });
+    }
+
+    function openExpenseForm() {
+        var today = kigaliToday();
+        var category = el("select", { id: "expenseCategory", "data-autofocus": "true" }, [el("option", { value: "", text: "Choose…" })].concat(
+            EXPENSE_CATEGORIES.map(function (c) { return el("option", { value: c, text: c }); })));
+        var amountBox = moneyInput("expenseAmount", "");
+        var amount = amountBox.querySelector("input");
+        var paid = choiceChips("How was it paid?", PAY_METHODS, "cash");
+        var paidTo = el("input", { id: "expensePaidTo", type: "text", maxlength: "80", autocomplete: "off", placeholder: "For example: REG, the plumber" });
+        var day = el("input", { id: "expenseDay", type: "date", max: today, value: today });
+        var note = el("input", { id: "expenseNote", type: "text", maxlength: "300", autocomplete: "off", placeholder: "For example: November bill" });
+        openSheet({
+            kicker: "Add expense",
+            title: "Money paid out",
+            sub: "For running the inn: bills, salaries, repairs… Stock bought for the store is a purchase instead.",
+            wide: true,
+            fields: [
+                el("div", { className: "sheet-pair" }, [
+                    sheetField("expenseCategory", "What was it for?", [category]),
+                    sheetField("expenseAmount", "How much", [amountBox])
+                ]),
+                paid.node,
+                el("div", { className: "sheet-pair" }, [
+                    sheetField("expensePaidTo", "Paid to (optional)", [paidTo]),
+                    sheetField("expenseDay", "Day", [day])
+                ]),
+                sheetField("expenseNote", "Note (optional)", [note])
+            ],
+            submitText: "Save expense",
+            onSubmit: async function (ctx) {
+                if (!category.value) return ctx.problem("Choose what the money was for.", category);
+                var value = rwfTyped(amount.value);
+                if (!(value >= 1)) return ctx.problem("Write how much was paid, in RWF (a whole number).", amount);
+                if (!paid.value()) return ctx.problem("Choose how it was paid.", { focus: paid.focus });
+                if (category.value === "Other" && !paidTo.value.trim() && !note.value.trim()) return ctx.problem("For \"Other\", write who was paid or a note.", paidTo);
+                if (!day.value || day.value > today) return ctx.problem("Choose the day (today or before).", day);
+                var data = await api("POST", "/admin/business/expenses", { category: category.value, amount: value, paidWith: paid.value(), paidTo: paidTo.value.trim(), day: day.value, note: note.value.trim() });
+                await afterBizChange(data.expense.ref + " saved: " + formatRwf(data.expense.amount) + " for " + data.expense.category.toLowerCase() + ".");
+            }
+        });
+    }
+
+    /* ----- Money in ----- */
+
+    $("addMoneyButton").addEventListener("click", function () { openMoneyInForm(); });
+    $("balancesButton").addEventListener("click", function () { openBalancesForm(); });
+
+    function moneyRow(m) {
+        var active = m.status === "active";
+        var from = SOURCE_NAMES[m.source] + (m.sourceRef ? " " + m.sourceRef : "");
+        var actions = el("div", { className: "booking-actions" });
+        if (active && m.source === "other") {
+            actions.appendChild(button("Cancel", "btn-ghost btn-danger", function () {
+                openReasonForm({
+                    kicker: m.ref,
+                    title: "Cancel this money in?",
+                    sub: formatRwf(m.amount) + " for " + m.description + " will no longer count.",
+                    label: "Why cancel it?",
+                    placeholder: "For example: recorded twice",
+                    submitText: "Cancel money in",
+                    onSave: async function (reason) {
+                        await api("POST", "/admin/business/money-in/" + m._id + "/cancel", { reason: reason });
+                        await afterBizChange(m.ref + " cancelled.");
+                    }
+                });
+            }));
+        }
+        return el("article", { className: "booking biz-card" + (active ? "" : " is-closed") }, [
+            el("div", { className: "booking-main" }, [
+                el("div", { className: "booking-top" }, [cardTitle(formatRwf(m.amount)), el("div", { className: "badges" }, [
+                    el("span", { className: active ? "badge" : "badge badge-muted", text: active ? ACCOUNT_NAMES[m.account] : "Taken back" })
+                ])]),
+                el("div", { className: "booking-details" }, [
+                    el("p", { className: "booking-room", text: m.description || from }),
+                    el("p", { className: "booking-dates", text: formatDay(m.day, { weekday: "short", day: "numeric", month: "short" }) + " · " + from + (m.customerName ? " · " + m.customerName : "") }),
+                    el("p", { className: "booking-ref", text: m.ref + " · " + SALE_METHOD_NAMES[m.paidWith] + " · recorded by " + (m.createdByName || "someone") }),
+                    m.note ? el("p", { className: "booking-meta", text: "Note: " + m.note }) : null,
+                    !active ? el("p", { className: "booking-meta", text: "Taken back" + (m.voidedByName ? " by " + m.voidedByName : "") + ": " + m.voidReason }) : null
+                ])
+            ]),
+            actions
+        ]);
+    }
+
+    async function loadMoneyIn(quiet) {
+        var list = $("moneyList");
+        if (!quiet) placeholder(list, "Loading money in…");
+        var request = ++biz.request;
+        var data = await api("GET", "/admin/business/money-in?" + periodQuery("money"));
+        if (request !== biz.request) return;
+        var t = data.totals;
+        var box = $("moneySummary");
+        box.textContent = "";
+        box.appendChild(el("div", { className: "stats money-stats biz-stats is-five" }, [
+            moneyStat(t.total, "Money in", plural(t.count, "payment", "payments") + " · " + periodWords(bizPeriod("money")))
+        ].concat(ACCOUNT_LIST.map(function (a) { return moneyStat(t.byAccount[a], ACCOUNT_NAMES[a], "Received"); }))));
+        var sources = Object.keys(t.bySource);
+        if (sources.length) {
+            box.appendChild(dataTable("Where the money came from", [{ head: "From", left: true }, { head: "Money" }],
+                sources.sort(function (a, b) { return t.bySource[b] - t.bySource[a]; }).map(function (k) { return [SOURCE_NAMES[k] || k, formatRwf(t.bySource[k])]; }),
+                ["Total", formatRwf(t.total)], "stack"));
+        }
+        $("moneyCount").textContent = plural(data.entries.length, "payment", "payments") + " in " + periodWords(bizPeriod("money"));
+        list.textContent = "";
+        if (!data.entries.length) {
+            list.appendChild(el("p", { className: "empty", text: "No money came in during this period." }));
+            return;
+        }
+        data.entries.forEach(function (m) { list.appendChild(moneyRow(m)); });
+    }
+
+    function openMoneyInForm() {
+        var today = kigaliToday();
+        var amountBox = moneyInput("moneyAmount", "");
+        var amount = amountBox.querySelector("input");
+        amount.setAttribute("data-autofocus", "true");
+        var paid = choiceChips("How was it paid?", PAY_METHODS, "cash");
+        var what = el("input", { id: "moneyWhat", type: "text", maxlength: "200", autocomplete: "off", placeholder: "For example: laundry for a guest, hall rent" });
+        var who = el("input", { id: "moneyWho", type: "text", maxlength: "80", autocomplete: "off" });
+        var day = el("input", { id: "moneyDay", type: "date", max: today, value: today });
+        openSheet({
+            kicker: "Other money in",
+            title: "Money received",
+            sub: "Bookings, events, sales and debt payments are recorded by themselves. Use this for anything else.",
+            wide: true,
+            fields: [
+                el("div", { className: "sheet-pair" }, [
+                    sheetField("moneyAmount", "How much", [amountBox]),
+                    sheetField("moneyDay", "Day", [day])
+                ]),
+                sheetField("moneyWhat", "What for", [what]),
+                paid.node,
+                sheetField("moneyWho", "From (optional)", [who])
+            ],
+            submitText: "Save money in",
+            onSubmit: async function (ctx) {
+                var value = rwfTyped(amount.value);
+                if (!(value >= 1)) return ctx.problem("Write how much came in, in RWF (a whole number).", amount);
+                if (what.value.trim().length < 3) return ctx.problem("Write what the money is for.", what);
+                if (!paid.value()) return ctx.problem("Choose how it was paid.", { focus: paid.focus });
+                if (!day.value || day.value > today) return ctx.problem("Choose the day (today or before).", day);
+                var data = await api("POST", "/admin/business/money-in", { amount: value, paidWith: paid.value(), description: what.value.trim(), customerName: who.value.trim(), day: day.value });
+                await afterBizChange(data.entry.ref + " saved: " + formatRwf(data.entry.amount) + ".");
+            }
+        });
+    }
+
+    async function openBalancesForm() {
+        var data;
+        try {
+            data = await api("GET", "/admin/business/balances");
+        } catch (error) {
+            toast(error.message, true);
+            return;
+        }
+        var today = kigaliToday();
+        var o = data.opening;
+        var day = el("input", { id: "openingDay", type: "date", max: today, value: o ? o.day : today.slice(0, 8) + "01" });
+        var boxes = ACCOUNT_LIST.map(function (a) {
+            var box = moneyInput("opening-" + a, o ? o[a] : "");
+            return { account: a, box: box, input: box.querySelector("input") };
+        });
+        boxes[0].input.setAttribute("data-autofocus", "true");
+        var fields = [sheetField("openingDay", "On the day", [day], "Money in and out from this day on is added to these.")];
+        for (var i = 0; i < boxes.length; i += 2) {
+            fields.push(el("div", { className: "sheet-pair" }, boxes.slice(i, i + 2).map(function (b) {
+                return sheetField("opening-" + b.account, ACCOUNT_NAMES[b.account], [b.box]);
+            })));
+        }
+        if (o) fields.push(el("p", { className: "sheet-note", text: "Set by " + o.setByName + " for " + longDay(o.day) + ". Saving again replaces them; the old ones stay in the audit." }));
+        openSheet({
+            kicker: "Money in each account",
+            title: "Starting balances",
+            sub: "What was in cash, MoMo, Airtel Money and the bank on the day you start keeping the money here.",
+            wide: true,
+            fields: fields,
+            submitText: "Save balances",
+            onSubmit: async function (ctx) {
+                if (!day.value || day.value > today) return ctx.problem("Choose the day (today or before).", day);
+                var body = { day: day.value };
+                for (var j = 0; j < boxes.length; j += 1) {
+                    var raw = boxes[j].input.value.trim();
+                    var value = raw === "" ? 0 : rwfTyped(raw);
+                    if (!(value >= 0)) return ctx.problem("Write a whole number of RWF (0 if empty).", boxes[j].input);
+                    body[boxes[j].account] = value;
+                }
+                var saved = await api("PUT", "/admin/business/balances", body);
+                await afterBizChange("Starting balances saved. All accounts now: " + formatRwf(saved.now.total) + ".");
+            }
+        });
+    }
+
+    /* ----- Shared small forms ----- */
+
+    function openReasonForm(options) {
+        var reason = el("input", { id: "bizReason", type: "text", maxlength: "200", autocomplete: "off", "data-autofocus": "true", placeholder: options.placeholder || "" });
+        openSheet({
+            kicker: options.kicker,
+            title: options.title,
+            sub: options.sub,
+            fields: [sheetField("bizReason", options.label || "Why?", [reason])],
+            submitText: options.submitText || "Save",
+            onSubmit: async function (ctx) {
+                if (reason.value.trim().length < 3) return ctx.problem("Write a short reason.", reason);
+                await options.onSave(reason.value.trim());
+            }
+        });
+    }
+
+    /* "Mark as paid" on a booking or an event: how much, how, and when (recorded as money in) */
+    function openPaidForm(options) {
+        var today = kigaliToday();
+        var amountBox = moneyInput("paidAmount", options.amount || "");
+        var amount = amountBox.querySelector("input");
+        amount.setAttribute("data-autofocus", "true");
+        var method = choiceChips("How did they pay?", PAY_METHODS, options.method || "cash");
+        var day = el("input", { id: "paidDay", type: "date", max: today, value: today });
+        openSheet({
+            kicker: options.kicker,
+            title: options.title,
+            sub: "Recorded as money in, in the account it was paid to.",
+            fields: [
+                el("div", { className: "sheet-pair" }, [
+                    sheetField("paidAmount", "How much they paid", [amountBox]),
+                    sheetField("paidDay", "Day", [day])
+                ]),
+                method.node
+            ],
+            submitText: "Mark as paid",
+            onSubmit: async function (ctx) {
+                var value = rwfTyped(amount.value);
+                if (!(value >= 1)) return ctx.problem("Write how much they paid, in RWF (a whole number).", amount);
+                if (!method.value()) return ctx.problem("Choose how they paid.", { focus: method.focus });
+                if (!day.value || day.value > today) return ctx.problem("Choose the day they paid (today or before).", day);
+                closeSheet();
+                await options.onSave({ amount: value, method: method.value(), day: day.value });
+            }
+        });
+    }
+
+    /* ----- Reports: profit or loss, money in and out, balances ----- */
+
+    $("bizPrint").addEventListener("click", function () {
+        if (!buildBizPrint()) return;
+        window.print();
+        setTimeout(function () {
+            var page = $("printReport");
+            if (page) page.remove();
+        }, 500);
+    });
+
+    $("bizDownload").addEventListener("click", function () {
+        if (!biz.report) return;
+        window.ZDXlsx.download("zebra-domus-business-report-" + biz.report.from + "-to-" + biz.report.to + ".xlsx", bizExcel(biz.report));
+    });
+
+    function costLines(r) {
+        var c = r.costs;
+        return [
+            ["Cost of the items sold", c.sold],
+            ["Stock used by the departments", c.used],
+            ["Stock written off and missing at counts", c.writtenOff + c.countDifferences],
+            ["Expenses", c.expenses],
+            ["Credit sales forgiven", c.forgiven]
+        ];
+    }
+
+    function incomeLines(r) {
+        return [["Rooms", r.income.rooms], ["Events", r.income.events], ["Sales", r.income.sales], ["Other money in", r.income.other]];
+    }
+
+    async function loadBizReport(quiet) {
+        var box = $("bizReport");
+        if (!quiet) placeholder(box, "Adding up the period…");
+        var request = ++biz.request;
+        var r = await api("GET", "/admin/business/report?" + periodQuery("report"));
+        if (request !== biz.request) return;
+        biz.report = r;
+        box.textContent = "";
+
+        box.appendChild(el("h2", { className: "section-title" }, [
+            document.createTextNode("Profit or loss"),
+            el("span", { className: "audit-range", text: periodWords(r) })
+        ]));
+        box.appendChild(el("div", { className: "stats money-stats biz-stats" }, [
+            moneyStat(r.income.total, "Income", "Rooms, events, sales and other"),
+            moneyStat(r.costs.total, "Costs", "Stock used or sold, expenses"),
+            profitStat(r.profit, "Profit", r.income.total ? Math.round(r.profit / r.income.total * 100) + "% of income" : "No income yet")
+        ]));
+
+        var rows = [[{ text: "Income", className: "is-strong" }, ""]]
+            .concat(incomeLines(r).map(function (l) { return ["   " + l[0], num(l[1])]; }))
+            .concat([[{ text: "= Total income", className: "is-strong" }, { text: num(r.income.total), className: "is-strong" }], [{ text: "Costs", className: "is-strong" }, ""]])
+            .concat(costLines(r).map(function (l) { return ["   " + l[0], num(l[1])]; }))
+            .concat([[{ text: "= Total costs", className: "is-strong" }, { text: num(r.costs.total), className: "is-strong" }]]);
+        box.appendChild(dataTable("Profit and loss", [{ head: "Income and costs", left: true }, { head: "RWF" }], rows,
+            [r.profit < 0 ? "= Loss" : "= Profit", signedMoney(r.profit).replace("RWF ", "")], "statement"));
+        box.appendChild(note("Income counts rooms and events when they are paid, and sales when they are made (on credit too). " +
+            "Purchases are not a cost when bought: the stock is still the inn's until it is used or sold. Values use each item's price paid."));
+
+        var b = r.before;
+        box.appendChild(dataTable("Compared with the period before (" + rangeText(b.from, b.to) + ")",
+            [{ head: "Measure", left: true }, { head: "This period" }, { head: "Period before" }, { head: "Change" }], [
+                ["Income", formatRwf(r.income.total), formatRwf(b.income), changeText(r.income.total, b.income)],
+                ["Costs", formatRwf(r.costs.total), formatRwf(b.costs), changeText(r.costs.total, b.costs)],
+                [r.profit < 0 ? "Loss" : "Profit", signedMoney(r.profit), signedMoney(b.profit), b.profit > 0 && r.profit >= 0 ? changeText(r.profit, b.profit) : "—"],
+                ["Money in", formatRwf(r.moneyIn.total), formatRwf(b.moneyIn), changeText(r.moneyIn.total, b.moneyIn)],
+                ["Money out", formatRwf(r.moneyOut.total), formatRwf(b.moneyOut), changeText(r.moneyOut.total, b.moneyOut)]
+            ], null, "compare stack"));
+
+        var cats = Object.keys(r.expensesByCategory).sort(function (x, y) { return r.expensesByCategory[y] - r.expensesByCategory[x]; });
+        box.appendChild(title("Expenses"));
+        if (cats.length) {
+            box.appendChild(dataTable("Expenses by what they were for", [{ head: "What for", left: true }, { head: "Money" }],
+                cats.map(function (c) { return [c, formatRwf(r.expensesByCategory[c])]; }), ["Total", formatRwf(r.costs.expenses)], "stack"));
+        } else {
+            box.appendChild(emptyNote("No expenses in this period."));
+        }
+
+        box.appendChild(title("Money in and out"));
+        box.appendChild(dataTable("Money in and out, by account", [{ head: "Account", left: true }, { head: "Money in" }, { head: "Money out" }, { head: "Difference" }],
+            ACCOUNT_LIST.map(function (a) {
+                return [ACCOUNT_NAMES[a], formatRwf(r.moneyIn.byAccount[a]), formatRwf(r.moneyOut.byAccount[a]), signedMoney(r.moneyIn.byAccount[a] - r.moneyOut.byAccount[a])];
+            }), ["Total", formatRwf(r.moneyIn.total), formatRwf(r.moneyOut.total), signedMoney(r.moneyIn.total - r.moneyOut.total)], "stack"));
+        box.appendChild(note("Money out is expenses " + formatRwf(r.moneyOut.expenses) + " and purchases " + formatRwf(r.moneyOut.purchases) + ". Card payments land in the bank."));
+
+        var bal = r.balances;
+        box.appendChild(dataTable("Balances at the end of " + longDay(r.to), [{ head: "Account", left: true }, { head: bal.since ? "Start (" + longDay(bal.since) + ")" : "Start" }, { head: "Money in" }, { head: "Money out" }, { head: "Balance" }],
+            bal.accounts.map(function (a) { return [ACCOUNT_NAMES[a.account], formatRwf(a.start), formatRwf(a.moneyIn), formatRwf(a.moneyOut), { text: signedMoney(a.balance), className: a.balance < 0 ? "is-strong" : null }]; }),
+            ["All accounts", formatRwf(sumOf(bal.accounts, "start")), formatRwf(sumOf(bal.accounts, "moneyIn")), formatRwf(sumOf(bal.accounts, "moneyOut")), signedMoney(bal.total)], "stack"));
+        if (!r.openingSet) box.appendChild(note("No starting balances yet: the balances start from 0. Set them under Money in, Starting balances."));
+
+        box.appendChild(title("Right now"));
+        box.appendChild(el("div", { className: "stats money-stats biz-stats is-two" }, [
+            moneyStat(r.debts.owed, "Customers owe", r.debts.count ? plural(r.debts.customers, "customer", "customers") : "Nobody"),
+            moneyStat(r.stockValue, "Stock in the store", "At the last price paid")
+        ]));
+    }
+
+    function sumOf(list, key) {
+        return list.reduce(function (t, x) { return t + (x[key] || 0); }, 0);
+    }
+
+    function buildBizPrint() {
+        var r = biz.report;
+        var old = $("printReport");
+        if (old) old.remove();
+        if (!r) return null;
+        var copy = $("bizReport").cloneNode(true);
+        copy.querySelectorAll("[id]").forEach(function (n) { n.removeAttribute("id"); });
+        copy.querySelectorAll("[tabindex]").forEach(function (n) { n.removeAttribute("tabindex"); });
+        copy.className = "pr-body";
+        var head = el("header", { className: "pr-head" }, [
+            el("div", { className: "pr-logo" }, [el("img", { src: "images/logo/zebra-domus-logo-white.png", alt: "Zebra Domus Inn" })]),
+            el("div", { className: "pr-title" }, [el("h1", { text: "Business report" }), el("p", { text: "Zebra Domus Inn · Huye, Rwanda" })]),
+            el("dl", { className: "pr-meta" }, [
+                el("dt", { text: "Period" }), el("dd", { text: rangeText(r.from, r.to) }),
+                el("dt", { text: "Printed by" }), el("dd", { text: user.name + " (" + (ROLE_NAMES[user.role] || user.role) + ")" }),
+                el("dt", { text: "Printed on" }), el("dd", { text: printedOn() })
+            ])
+        ]);
+        var sign = el("footer", { className: "pr-sign" }, [signBox("Prepared by"), signBox("Checked and approved by")]);
+        var page = el("div", { id: "printReport", className: "is-business" }, [head, copy, sign]);
+        document.body.appendChild(page);
+        return page;
+    }
+
+    /* Excel: profit and loss (with formulas), money and balances, expenses */
+    function bizExcel(r) {
+        var H = function (t) { return { v: t, s: "head" }; };
+        var M = function (n) { return { v: Math.round(n || 0), s: "money" }; };
+        var footer = "Zebra Domus Inn · Business report · " + rangeText(r.from, r.to);
+        var p = [
+            [{ v: "Zebra Domus Inn · Profit and loss", s: "title" }],
+            [{ v: rangeText(r.from, r.to), s: "subtitle" }],
+            [],
+            [H("Income"), H("RWF")]
+        ];
+        var incFirst = p.length + 1;
+        incomeLines(r).forEach(function (l) { p.push([l[0], M(l[1])]); });
+        var incLast = p.length;
+        p.push([{ v: "Total income", s: "total" }, { v: r.income.total, s: "moneyTotal", f: "SUM(B" + incFirst + ":B" + incLast + ")" }]);
+        var incRow = p.length;
+        p.push([]);
+        p.push([H("Costs"), H("RWF")]);
+        var costFirst = p.length + 1;
+        costLines(r).forEach(function (l) { p.push([l[0], M(l[1])]); });
+        var costLast = p.length;
+        p.push([{ v: "Total costs", s: "total" }, { v: r.costs.total, s: "moneyTotal", f: "SUM(B" + costFirst + ":B" + costLast + ")" }]);
+        var costRow = p.length;
+        p.push([]);
+        p.push([{ v: r.profit < 0 ? "Loss" : "Profit", s: "total" }, { v: r.profit, s: "moneyTotal", f: "B" + incRow + "-B" + costRow }]);
+        p.push([]);
+        p.push([{ v: "Rooms and events count when paid; sales when made (on credit too). Purchases are not a cost until the stock is used or sold.", s: "note" }]);
+
+        var m = [[{ v: "Money in and out, by account", s: "title" }], [{ v: rangeText(r.from, r.to), s: "subtitle" }], [], [H("Account"), H("Money in"), H("Money out"), H("Difference")]];
+        var mFirst = m.length + 1;
+        ACCOUNT_LIST.forEach(function (a) {
+            var row = m.length + 1;
+            m.push([ACCOUNT_NAMES[a], M(r.moneyIn.byAccount[a]), M(r.moneyOut.byAccount[a]), { v: r.moneyIn.byAccount[a] - r.moneyOut.byAccount[a], s: "money", f: "B" + row + "-C" + row }]);
+        });
+        var mLast = m.length;
+        m.push([{ v: "Total", s: "total" }].concat(["B", "C", "D"].map(function (c, i) {
+            var v = [r.moneyIn.total, r.moneyOut.total, r.moneyIn.total - r.moneyOut.total][i];
+            return { v: v, s: "moneyTotal", f: "SUM(" + c + mFirst + ":" + c + mLast + ")" };
+        })));
+        m.push([]);
+        m.push([{ v: "Balances at the end of " + longDay(r.to), s: "subtitle" }]);
+        m.push([H("Account"), H("Start"), H("Money in"), H("Money out"), H("Balance")]);
+        var bFirst = m.length + 1;
+        r.balances.accounts.forEach(function (a) {
+            var row = m.length + 1;
+            m.push([ACCOUNT_NAMES[a.account], M(a.start), M(a.moneyIn), M(a.moneyOut), { v: a.balance, s: "money", f: "B" + row + "+C" + row + "-D" + row }]);
+        });
+        var bLast = m.length;
+        m.push([{ v: "All accounts", s: "total" }].concat(["B", "C", "D", "E"].map(function (c, i) {
+            var v = [sumOf(r.balances.accounts, "start"), sumOf(r.balances.accounts, "moneyIn"), sumOf(r.balances.accounts, "moneyOut"), r.balances.total][i];
+            return { v: v, s: "moneyTotal", f: "SUM(" + c + bFirst + ":" + c + bLast + ")" };
+        })));
+        m.push([]);
+        m.push(["Customers owe", M(r.debts.owed)]);
+        m.push(["Stock in the store", M(r.stockValue)]);
+
+        var x = [[{ v: "Expenses by what they were for", s: "title" }], [{ v: rangeText(r.from, r.to), s: "subtitle" }], [], [H("What for"), H("RWF")]];
+        var cats = Object.keys(r.expensesByCategory);
+        var xFirst = x.length + 1;
+        cats.forEach(function (c) { x.push([c, M(r.expensesByCategory[c])]); });
+        if (cats.length) x.push([{ v: "Total", s: "total" }, { v: r.costs.expenses, s: "moneyTotal", f: "SUM(B" + xFirst + ":B" + (x.length) + ")" }]);
+        else x.push([{ v: "No expenses in this period.", s: "note" }]);
+
+        return [
+            { name: "Profit and loss", cols: [48, 18], rows: p, footer: footer },
+            { name: "Money and balances", cols: [22, 16, 16, 16, 16], rows: m, footer: footer },
+            { name: "Expenses", cols: [32, 18], rows: x, footer: footer }
+        ];
+    }
 
     /* ---------- Units ---------- */
 
@@ -4117,6 +5108,7 @@
         var start = el("input", { id: "itemStart", type: "text", inputmode: "decimal", value: "0", autocomplete: "off" });
         var low = el("input", { id: "itemLow", type: "text", inputmode: "decimal", value: "0", autocomplete: "off" });
         var cost = el("input", { id: "itemCost", type: "text", inputmode: "numeric", value: "0", autocomplete: "off" });
+        var salePrice = el("input", { id: "itemSalePrice", type: "text", inputmode: "numeric", value: "", autocomplete: "off", placeholder: "Not sold" });
         var notes = el("input", { id: "itemNotes", type: "text", maxlength: "300", autocomplete: "off" });
 
         var startUnit = el("span", { className: "input-unit" });
@@ -4143,6 +5135,7 @@
             name.value = item.name;
             low.value = qty(item.lowStockAt).replace(/,/g, "");
             cost.value = String(item.unitCost || 0);
+            salePrice.value = item.salePrice === null || item.salePrice === undefined ? "" : String(item.salePrice);
             notes.value = item.notes || "";
         }
 
@@ -4157,6 +5150,10 @@
         }
         amounts.push(sheetField("itemLow", "Warn me when there are", [el("div", { className: "input-with-unit" }, [low, lowUnit])], "…or fewer left. 0 = never warn."));
         if (showPrice) amounts.push(sheetField("itemCost", "Price", [el("div", { className: "input-with-unit" }, [cost, costUnit])]));
+        if (showPrice) {
+            amounts.push(sheetField("itemSalePrice", "Selling price (optional)", [el("div", { className: "input-with-unit" }, [salePrice, el("span", { className: "input-unit", text: "RWF" })])],
+                "For things sold to guests, like drinks. Leave empty if it isn't sold."));
+        }
 
         var group = el("section", { className: "sheet-group", "aria-labelledby": "itemAmountsTitle" }, [
             el("h3", { className: "sheet-group-title", id: "itemAmountsTitle", text: showPrice ? "Counting and price" : "Counting" })
@@ -4253,6 +5250,9 @@
                     var price = cost.value.trim() === "" ? 0 : readNumber(cost.value);
                     if (isNaN(price) || !Number.isInteger(price)) return ctx.problem("The price is a whole number of RWF.", cost);
                     body.unitCost = price;
+                    var selling = salePrice.value.trim() === "" ? "" : readNumber(salePrice.value);
+                    if (selling !== "" && (isNaN(selling) || !Number.isInteger(selling) || selling < 1)) return ctx.problem("The selling price is a whole number of RWF (or leave it empty).", salePrice);
+                    body.salePrice = selling;
                 }
 
                 if (showStart) {
@@ -4907,7 +5907,8 @@
             ]);
         }
 
-        var note = el("input", { id: "purchaseNote", type: "text", maxlength: "300", autocomplete: "off", placeholder: "For example: paid with mobile money" });
+        var note = el("input", { id: "purchaseNote", type: "text", maxlength: "300", autocomplete: "off", placeholder: "For example: delivered on Friday" });
+        var paidWith = choiceChips("How was the supplier paid?", PAY_METHODS, "cash");
 
         var opened = openSheet({
             kicker: "Record a purchase",
@@ -4925,6 +5926,7 @@
                 el("button", { type: "button", className: "btn btn-ghost add-line-big", text: "+ Add another item", onclick: function () { addLine().focus(); } }),
                 totalLine,
                 budgetBox,
+                paidWith.node,
                 sheetField("purchaseNote", "Note (optional)", [note]),
                 inStoreField
             ],
@@ -4932,7 +5934,8 @@
             onSubmit: async function (ctx) {
                 if (!supplier.value.trim()) return ctx.problem("Enter where it was bought.", supplier);
 
-                var body = { supplier: supplier.value.trim(), day: day.value, note: note.value.trim(), lines: [] };
+                if (!paidWith.value()) return ctx.problem("Choose how the supplier was paid.", { focus: paidWith.focus });
+                var body = { supplier: supplier.value.trim(), day: day.value, note: note.value.trim(), paidWith: paidWith.value(), lines: [] };
                 var lines = readLines();
 
                 for (var i = 0; i < lines.length; i += 1) {
@@ -5116,6 +6119,7 @@
         var unit = item ? item.unit : "";
         var what;
         if (move.type === "count") what = "Counted: " + amountText(move.quantity, unit) + " (" + signed(move.change) + ")";
+        else if (move.type === "out" && move.department === "Sold") what = move.change > 0 ? "Back from a cancelled sale: " + amountText(move.quantity, unit) : "Sold " + amountText(move.quantity, unit);
         else if (move.type === "out") what = "Issued " + amountText(move.quantity, unit) + (move.department ? " to " + move.department : "");
         else if (move.type === "loss") what = "Written off " + amountText(move.quantity, unit) + " · " + (lossReasons()[move.reason] || "other").toLowerCase();
         else what = "Received " + amountText(move.quantity, unit);
@@ -5357,7 +6361,7 @@
         box.appendChild(title("Summary"));
         box.appendChild(el("div", { className: "stats money-stats" }, [
             moneyStat(bought, "Paid to suppliers", "Purchases recorded"),
-            moneyStat(t.used, "Stock used", "Issued to departments"),
+            moneyStat(t.used, "Stock used", "Issued to departments or sold"),
             moneyStat(t.writtenOff, "Written off", "Expired, damaged or lost"),
             moneyStat(t.corrections, "Count differences", t.corrections < 0 ? "Missing at counts" : t.corrections > 0 ? "Found at counts" : "Counts matched the record", true),
             moneyStat(t.remaining, "Value in store", "At the end of the period"),
@@ -5373,7 +6377,7 @@
         box.appendChild(dataTable("How the store value adds up", [{ head: "Stock value", left: true }, { head: "RWF" }], [
             ["Value in store at the start (" + longDay(data.from) + ")", num(start)],
             ["+ Received into the store", num(lines[0])],
-            ["− Used (issued to departments)", num(lines[1])],
+            ["− Used (issued to departments or sold)", num(lines[1])],
             ["− Expired, damaged or lost", num(lines[2])],
             [(lines[3] < 0 ? "− " : "+ ") + "Count differences", num(Math.abs(lines[3]))]
         ], ["= Value in store at the end (" + longDay(data.to) + ")", num(t.remaining)], "statement"));
@@ -5664,7 +6668,7 @@
         box.appendChild(title("Where the stock went"));
 
         var deptTotal = data.departments.reduce(function (sum, row) { return sum + row.value; }, 0);
-        box.appendChild(moneyTable("Issued to departments", ["Department", "Times issued", "Value"],
+        box.appendChild(moneyTable("Issued to departments, and sold", ["Department", "Times issued", "Value"],
             data.departments.filter(function (d) { return d.issues; }).map(function (d) { return [d.department, String(d.issues), rwf(d.value)]; }),
             ["Total", String(data.departments.reduce(function (sum, d) { return sum + d.issues; }, 0)), rwf(deptTotal)]));
 
@@ -6060,7 +7064,7 @@
             var r0 = s.length + 1;
             s.push(["Value in store at the start (" + longDay(data.from) + ")", M(start)]);
             s.push(["+ Received into the store", M(lines[0])]);
-            s.push(["− Used (issued to departments)", M(lines[1])]);
+            s.push(["− Used (issued to departments or sold)", M(lines[1])]);
             s.push(["− Expired, damaged or lost", M(lines[2])]);
             s.push(["± Count differences", M(lines[3])]);
             s.push([{ v: "= Value in store at the end (" + longDay(data.to) + ")", s: "total" },
@@ -6235,7 +7239,7 @@
 
         /* Where the stock went */
         var use = [];
-        use.push([{ v: "Issued to departments", s: "subtitle" }], [H("Department"), H("Times issued"), H("Value")]);
+        use.push([{ v: "Issued to departments, and sold", s: "subtitle" }], [H("Department"), H("Times issued"), H("Value")]);
         var depFirst = use.length + 1;
         var deps = data.departments.filter(function (d) { return d.issues; });
         deps.forEach(function (d) { use.push([d.department, { v: d.issues }, M(d.value)]); });
@@ -6311,7 +7315,10 @@
         purchases: "Purchases",
         requests: "Requests",
         budget: "Budget",
-        debts: "Debts"
+        debts: "Debts",
+        sales: "Sales",
+        expenses: "Expenses",
+        money: "Money"
     };
 
     stock.auditPeriod = "month";
@@ -6395,7 +7402,7 @@
             var purchases = (report.suppliers || []).reduce(function (n, s) { return n + s.purchases; }, 0);
             box.appendChild(el("div", { className: "stats money-stats audit-money" }, [
                 moneyStat(boughtTotal(report), "Paid to suppliers", plural(purchases, "purchase", "purchases")),
-                moneyStat(t.used, "Stock used", "Issued to departments"),
+                moneyStat(t.used, "Stock used", "Issued to departments or sold"),
                 moneyStat(t.writtenOff, "Written off", "Expired, damaged or lost"),
                 moneyStat(t.corrections, "Count differences", t.corrections < 0 ? "Missing at counts" : t.corrections > 0 ? "Found at counts" : "Counts matched the record", true)
             ]));

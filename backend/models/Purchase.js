@@ -26,6 +26,8 @@ const purchaseSchema = new mongoose.Schema(
     note: { type: String, trim: true, maxlength: 300, default: "" },
     lines: { type: [purchaseLineSchema], default: [] },
     total: { type: Number, min: 0, default: 0 },
+    // how the supplier was paid ("" on purchases recorded before this was asked: counted as cash)
+    paidWith: { type: String, enum: ["cash", "momo", "airtel", "card", "bank", ""], default: "" },
     // waiting: bought, not yet in the store; received: checked in; cancelled
     status: { type: String, enum: ["waiting", "received", "cancelled"], default: "waiting" },
 

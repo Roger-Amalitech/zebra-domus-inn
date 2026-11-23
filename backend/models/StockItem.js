@@ -56,6 +56,12 @@ const stockItemSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    // what one is sold for, in RWF (empty: not sold, or the price is typed at each sale)
+    salePrice: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
     notes: {
       type: String,
       trim: true,

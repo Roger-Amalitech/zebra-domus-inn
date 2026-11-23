@@ -68,10 +68,6 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5a5.5 5.5 0 0 0-5.5 5.5c0 3.6 3.4 7.2 5.5 8.5 2.1-1.3 5.5-4.9 5.5-8.5A5.5 5.5 0 0 0 12 2.5z"/><path d="M11 16.5l-1 1.5h4l-1-1.5"/><path d="M12 18c0 1.5-1.5 2-1.5 3.5"/></svg>
                 <span>Events</span>
             </a>
-            <a href="#debts" class="tab" data-view="debts" data-perm="debts.view" hidden>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H5a2 2 0 0 1-2-2"/><circle cx="16.5" cy="13.5" r="1.3"/></svg>
-                <span>Debts</span>
-            </a>
             <a href="#availability" class="tab" data-view="availability" data-perm="bookings.view" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 <span>Availability</span>
@@ -79,6 +75,10 @@
             <a href="#stock" class="tab" data-view="stock" data-perm="stock.view|requests.make">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>
                 <span>Stock</span>
+            </a>
+            <a href="#business" class="tab" data-view="business" data-perm="money.view|sales.record|expenses.record|debts.view" hidden>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18"/><path d="M6 16v-5"/><path d="M11 16V8"/><path d="M16 16v-3"/><path d="M5 9l5-4 4 3 5-4"/></svg>
+                <span>Business</span>
             </a>
             <a href="#rooms" class="tab" data-view="rooms" data-perm="rooms.manage" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18V7"/><path d="M3 14h18v4"/><path d="M21 18v-4a3 3 0 0 0-3-3h-7v3"/><circle cx="7" cy="11" r="2"/></svg>
@@ -193,13 +193,140 @@
             <div class="list" id="eventList"></div>
         </section>
 
-        <!-- DEBTS: customers who owe the inn money, and what they paid back -->
-        <section class="view" id="view-debts" aria-labelledby="debtsHeading" hidden>
+        <!-- BUSINESS: sales, expenses, money in and out, debts and reports (Overview, Money in
+             and Reports are the owner's; the manager records sales, expenses and debts) -->
+        <section class="view" id="view-business" aria-labelledby="businessHeading" hidden>
             <div class="view-head">
-                <h1 id="debtsHeading">Debts</h1>
-                <p class="muted">Customers who owe the inn money, and what they have paid back.</p>
+                <h1 id="businessHeading">Business</h1>
+                <p class="muted" id="businessIntro">Sales, expenses, money in and out, debts and reports.</p>
             </div>
 
+            <div class="segmented stock-tabs biz-tabs" role="group" aria-label="Business sections">
+                <button type="button" data-biz-tab="overview" data-perm="money.view" aria-pressed="false" hidden>Overview</button>
+                <button type="button" data-biz-tab="sales" data-perm="sales.record|money.view" aria-pressed="false" hidden>Sales</button>
+                <button type="button" data-biz-tab="expenses" data-perm="expenses.record|money.view" aria-pressed="false" hidden>Expenses</button>
+                <button type="button" data-biz-tab="money" data-perm="money.view" aria-pressed="false" hidden>Money in</button>
+                <button type="button" data-biz-tab="debts" data-perm="debts.view" aria-pressed="false" hidden>Debts</button>
+                <button type="button" data-biz-tab="report" data-perm="money.view" aria-pressed="false" hidden>Reports</button>
+            </div>
+
+            <!-- Overview (owner): today, this month, balances, quick buttons, the latest money -->
+            <div class="biz-panel" id="biz-overview" hidden>
+                <div class="quick-actions" role="group" aria-label="Quick actions">
+                    <button type="button" class="quick-action" id="quickPurchase" data-perm="purchases.record" hidden>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+                        <span>Add purchase</span>
+                    </button>
+                    <button type="button" class="quick-action" id="quickSale" data-perm="sales.record" hidden>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/><path d="M2.5 3.5h3l2.6 12.2h10.6l2-8.2H6.6"/></svg>
+                        <span>New sale</span>
+                    </button>
+                    <button type="button" class="quick-action" id="quickExpense" data-perm="expenses.record" hidden>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h12v19l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>
+                        <span>Add expense</span>
+                    </button>
+                    <button type="button" class="quick-action" id="quickReport" data-perm="money.view" hidden>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+                        <span>View reports</span>
+                    </button>
+                </div>
+                <div id="bizOverview"></div>
+            </div>
+
+            <!-- Sales: stock goes down, money comes in (or a debt, on credit) -->
+            <div class="biz-panel" id="biz-sales" hidden>
+                <div class="report-controls biz-period" data-period-for="sales">
+                    <div class="report-quick" role="group" aria-label="Period">
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="today" aria-pressed="false">Today</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="week" aria-pressed="false">Last 7 days</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="month" aria-pressed="true">This month</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="last-month" aria-pressed="false">Last month</button>
+                    </div>
+                    <div class="report-dates">
+                        <div class="report-date">
+                            <label for="salesFrom">From</label>
+                            <input type="date" id="salesFrom" data-biz-from>
+                        </div>
+                        <div class="report-date">
+                            <label for="salesTo">To</label>
+                            <input type="date" id="salesTo" data-biz-to>
+                        </div>
+                    </div>
+                </div>
+                <div class="event-toolbar">
+                    <p class="count" id="salesCount" aria-live="polite"></p>
+                    <div class="event-toolbar-buttons">
+                        <button type="button" class="btn btn-primary btn-small" id="addSaleButton" data-perm="sales.record" hidden>+ New sale</button>
+                    </div>
+                </div>
+                <div id="salesSummary"></div>
+                <div class="list" id="salesList"></div>
+            </div>
+
+            <!-- Expenses: money going out (not stock: that is a purchase) -->
+            <div class="biz-panel" id="biz-expenses" hidden>
+                <div class="report-controls biz-period" data-period-for="expenses">
+                    <div class="report-quick" role="group" aria-label="Period">
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="today" aria-pressed="false">Today</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="week" aria-pressed="false">Last 7 days</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="month" aria-pressed="true">This month</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="last-month" aria-pressed="false">Last month</button>
+                    </div>
+                    <div class="report-dates">
+                        <div class="report-date">
+                            <label for="expensesFrom">From</label>
+                            <input type="date" id="expensesFrom" data-biz-from>
+                        </div>
+                        <div class="report-date">
+                            <label for="expensesTo">To</label>
+                            <input type="date" id="expensesTo" data-biz-to>
+                        </div>
+                    </div>
+                </div>
+                <div class="event-toolbar">
+                    <p class="count" id="expensesCount" aria-live="polite"></p>
+                    <div class="event-toolbar-buttons">
+                        <button type="button" class="btn btn-primary btn-small" id="addExpenseButton" data-perm="expenses.record" hidden>+ Add expense</button>
+                    </div>
+                </div>
+                <div id="expensesSummary"></div>
+                <div class="list" id="expensesList"></div>
+            </div>
+
+            <!-- Money in (owner): every payment received, wherever it came from -->
+            <div class="biz-panel" id="biz-money" hidden>
+                <div class="report-controls biz-period" data-period-for="money">
+                    <div class="report-quick" role="group" aria-label="Period">
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="today" aria-pressed="false">Today</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="week" aria-pressed="false">Last 7 days</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="month" aria-pressed="true">This month</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="last-month" aria-pressed="false">Last month</button>
+                    </div>
+                    <div class="report-dates">
+                        <div class="report-date">
+                            <label for="moneyFrom">From</label>
+                            <input type="date" id="moneyFrom" data-biz-from>
+                        </div>
+                        <div class="report-date">
+                            <label for="moneyTo">To</label>
+                            <input type="date" id="moneyTo" data-biz-to>
+                        </div>
+                    </div>
+                </div>
+                <div class="event-toolbar">
+                    <p class="count" id="moneyCount" aria-live="polite"></p>
+                    <div class="event-toolbar-buttons">
+                        <button type="button" class="btn btn-ghost btn-small" id="balancesButton">Starting balances</button>
+                        <button type="button" class="btn btn-primary btn-small" id="addMoneyButton">+ Other money in</button>
+                    </div>
+                </div>
+                <div id="moneySummary"></div>
+                <div class="list" id="moneyList"></div>
+            </div>
+
+            <!-- Debts: customers who owe the inn money, and what they paid back -->
+            <div class="biz-panel" id="biz-debts" hidden>
+                <p class="stock-key">Customers who owe the inn money, and what they have paid back.</p>
             <div class="stats debt-stats" id="debtStats"></div>
 
             <div class="event-toolbar debt-toolbar">
@@ -224,6 +351,34 @@
 
             <p class="count" id="debtCount" aria-live="polite"></p>
             <div class="list" id="debtList"></div>
+            </div>
+
+            <!-- Reports (owner): profit or loss, money in and out, balances, stock and debts -->
+            <div class="biz-panel" id="biz-report" hidden>
+                <div class="report-controls biz-period" data-period-for="report">
+                    <div class="report-quick" role="group" aria-label="Period">
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="today" aria-pressed="false">Today</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="week" aria-pressed="false">Last 7 days</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="month" aria-pressed="true">This month</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-biz-period="last-month" aria-pressed="false">Last month</button>
+                    </div>
+                    <div class="report-dates">
+                        <div class="report-date">
+                            <label for="reportFrom">From</label>
+                            <input type="date" id="reportFrom" data-biz-from>
+                        </div>
+                        <div class="report-date">
+                            <label for="reportTo">To</label>
+                            <input type="date" id="reportTo" data-biz-to>
+                        </div>
+                    </div>
+                </div>
+                <div class="report-actions biz-report-actions">
+                    <button type="button" class="btn btn-ghost btn-small" id="bizPrint">Print or save as PDF</button>
+                    <button type="button" class="btn btn-primary btn-small" id="bizDownload">Download Excel</button>
+                </div>
+                <div id="bizReport"></div>
+            </div>
         </section>
 
         <!-- AVAILABILITY -->
@@ -443,6 +598,9 @@
                             <option value="stock">Stock</option>
                             <option value="budget">Budget</option>
                             <option value="debts">Debts</option>
+                            <option value="sales">Sales</option>
+                            <option value="expenses">Expenses</option>
+                            <option value="money">Money in and balances</option>
                             <option value="bookings">Bookings</option>
                             <option value="events">Events</option>
                             <option value="rooms">Rooms</option>

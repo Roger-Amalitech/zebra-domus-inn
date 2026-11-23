@@ -157,6 +157,9 @@ function itemForAdmin(item, prices, totals, waitingCount) {
   // a count that waits for the owner's approval
   shown.waitingCount = waitingCount ? countForAdmin(waitingCount) : null;
 
+  // the selling price is no secret: whoever records sales needs it
+  shown.salePrice = item.salePrice === undefined ? null : item.salePrice;
+
   if (prices) {
     shown.unitCost = item.unitCost || 0;
     shown.value = round((item.unitCost || 0) * item.quantity);
@@ -234,6 +237,14 @@ function readItem(body, partial) {
   if (has("unitCost") || !partial) {
     values.unitCost = has("unitCost") && body.unitCost !== "" ? money(body.unitCost) : 0;
     if (values.unitCost === null) return { error: "The price must be a whole number of RWF." };
+  }
+
+  if (has("salePrice")) {
+    if (body.salePrice === "" || body.salePrice === null) values.salePrice = null;
+    else {
+      values.salePrice = money(body.salePrice);
+      if (values.salePrice === null) return { error: "The selling price must be a whole number of RWF." };
+    }
   }
 
   if (has("notes")) {
@@ -339,7 +350,10 @@ router.post("/items", requirePermission("stock.items"), async (req, res) => {
     const body = req.body || {};
     const { values, error } = readItem(body, false);
     if (error) return bad(res, error);
-    if (!seesPrices(req)) values.unitCost = 0;
+    if (!seesPrices(req)) {
+      values.unitCost = 0;
+      delete values.salePrice;
+    }
 
     const quantity = body.quantity === undefined || body.quantity === "" ? 0 : amount(body.quantity, 0, MAX_AMOUNT);
     if (quantity === null) return bad(res, "The starting quantity must be a number, 0 or more.");
@@ -410,7 +424,10 @@ router.patch("/items/:id", requirePermission("stock.items"), async (req, res) =>
 
     const { values, error } = readItem(req.body || {}, true);
     if (error) return bad(res, error);
-    if (!seesPrices(req)) delete values.unitCost; // only the owner changes prices
+    if (!seesPrices(req)) {
+      delete values.unitCost; // only the owner changes prices
+      delete values.salePrice;
+    }
     if (!Object.keys(values).length) return bad(res, "Nothing to change.");
 
     const before = await StockItem.findById(req.params.id).lean();
@@ -450,6 +467,9 @@ router.patch("/items/:id", requirePermission("stock.items"), async (req, res) =>
       said.push(`price RWF ${before.unitCost || 0} to RWF ${values.unitCost}`);
     }
     if (values.lowStockAt !== undefined && values.lowStockAt !== before.lowStockAt) said.push(`warn at ${qtyText(values.lowStockAt)}`);
+    if (values.salePrice !== undefined && values.salePrice !== (before.salePrice === undefined ? null : before.salePrice)) {
+      said.push(values.salePrice === null ? "no selling price" : `selling price RWF ${values.salePrice}`);
+    }
     await audit(req.admin, "stock", `Changed item ${item.name}` + (said.length ? `: ${said.join(", ")}` : ""));
 
     const waiting = await StockCount.findOne({ item: item._id, status: "waiting" }).lean();

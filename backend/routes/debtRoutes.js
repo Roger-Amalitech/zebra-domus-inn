@@ -28,6 +28,7 @@ const { parseDay, toDay, innToday } = require("../utils/availability");
 const { audit } = require("../utils/audit");
 const { money, text, nextRef } = require("../utils/stockOps");
 const { phoneKey } = require("../utils/limits");
+const { recordMoneyIn } = require("../utils/money");
 
 const router = express.Router();
 
@@ -75,6 +76,7 @@ function debtForAdmin(debt, today) {
     kind: debt.kind,
     description: debt.description,
     linkedRef: debt.linkedRef,
+    saleId: debt.sale || null,
     bookingId: debt.booking || null,
     eventId: debt.event || null,
     amount: debt.amount,
@@ -267,7 +269,10 @@ router.patch("/:id", requirePermission("debts.manage"), async (req, res) => {
     const changes = readCustomer(body, true);
     if (changes.error) return bad(res, changes.error);
 
-    if (body.amount !== undefined) {
+    if (body.amount !== undefined && debt.sale && Number(body.amount) !== debt.amount) {
+      return bad(res, `The amount comes from sale ${debt.linkedRef} and can't be changed here.`);
+    }
+    if (body.amount !== undefined && !debt.sale) {
       const owed = money(body.amount);
       if (!owed || owed > MAX_DEBT) return bad(res, "Write how much they owe, in RWF (a whole number).");
       if (owed <= debt.paid + debt.forgiven) return bad(res, `They have already paid ${rwf(debt.paid)}. The amount must be more than that, or record a payment instead.`);
@@ -335,6 +340,21 @@ router.post("/:id/payments", requirePermission("debts.manage"), async (req, res)
     const updated = await Debt.findOneAndUpdate({ _id: debt._id, status: "open", paid: debt.paid }, update, { returnDocument: "after" }).lean();
     if (!updated) return bad(res, "Someone else just recorded a payment on this debt. Refresh and try again.", 409);
 
+    await recordMoneyIn({
+      person: req.admin,
+      amount: paying,
+      day,
+      method: payment.method,
+      source: "debt",
+      sourceId: updated._id,
+      sourceRef: updated.ref,
+      // a sale on credit is income when sold; rooms and events count when the money comes
+      income: updated.sale ? "" : { room: "rooms", event: "events", restaurant: "sales", other: "other" }[updated.kind] || "other",
+      description: `Debt ${updated.ref}` + (updated.linkedRef ? ` (${updated.linkedRef})` : ""),
+      customerName: updated.customerName,
+      note: payment.note,
+    });
+
     let alsoMarked = "";
     if (fullyPaid && updated.booking) {
       const done = await Booking.updateOne({ _id: updated.booking, paymentStatus: { $ne: "paid" } }, { $set: { paymentStatus: "paid" } });
@@ -367,6 +387,7 @@ async function closeDebt(req, res, how) {
     const reason = text((req.body || {}).reason).slice(0, 200);
     if (reason.length < 3) return bad(res, how === "forgiven" ? "Write why the rest is forgiven." : "Write why this debt is cancelled.");
     if (how === "cancelled" && debt.paid > 0) return bad(res, `They already paid ${rwf(debt.paid)}, so it can't be cancelled. Forgive what is left instead.`);
+    if (how === "cancelled" && debt.sale) return bad(res, `This debt is for sale ${debt.linkedRef}. Cancel the sale instead (in Business, Sales): the items go back into the store.`);
 
     const still = left(debt);
     const set = { status: how, reason, closedAt: new Date(), closedByName: req.admin.name };

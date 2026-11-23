@@ -34,6 +34,11 @@ const PERMISSIONS = [
   { key: "debts.view", label: "See customers who owe money" },
   { key: "debts.manage", label: "Record debts and payments" },
   { key: "debts.forgive", label: "Forgive or cancel a debt" },
+  { key: "sales.record", label: "Record sales" },
+  { key: "sales.cancel", label: "Cancel a sale" },
+  { key: "expenses.record", label: "Record expenses" },
+  { key: "expenses.cancel", label: "Cancel an expense" },
+  { key: "money.view", label: "See money in and out, balances, profit and business reports" },
 ];
 
 const ALL = PERMISSIONS.map((p) => p.key);
@@ -54,6 +59,8 @@ const ROLE_PERMISSIONS = {
     "requests.manage",
     "debts.view",
     "debts.manage",
+    "sales.record",
+    "expenses.record",
   ],
   staff: ["requests.make"],
 };

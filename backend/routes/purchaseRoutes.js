@@ -24,6 +24,7 @@ const { audit } = require("../utils/audit");
 const { overBudget } = require("../utils/budget");
 const { MAX_AMOUNT, amount, money, text, qtyText, nextRef, changeStock } = require("../utils/stockOps");
 const { wholeNumberProblem } = require("../utils/units");
+const { METHODS, METHOD_NAMES } = require("../utils/money");
 
 const DAYS_BACK = 60;
 const MAX_LINES = 30;
@@ -50,6 +51,7 @@ function purchaseForAdmin(purchase, prices) {
     supplier: purchase.supplier,
     day: toDay(purchase.day),
     note: purchase.note || "",
+    paidWith: purchase.paidWith || "",
     status: purchase.status,
     lines: purchase.lines.map((line) => {
       const row = {
@@ -102,6 +104,8 @@ router.post("/", requirePermission("purchases.record"), async (req, res) => {
     const note = text(body.note);
 
     if (!supplier || supplier.length > 80) return bad(res, "Please enter where it was bought (up to 80 characters).");
+    const paidWith = body.paidWith === undefined || body.paidWith === "" ? "cash" : body.paidWith;
+    if (!METHODS.includes(paidWith)) return bad(res, "Choose how the supplier was paid.");
     if (note.length > 300) return bad(res, "The note can be up to 300 characters.");
 
     const todayText = innToday();
@@ -155,6 +159,7 @@ router.post("/", requirePermission("purchases.record"), async (req, res) => {
       note,
       lines,
       total,
+      paidWith,
       status: "waiting",
       createdById: req.admin._id,
       createdByName: req.admin.name,
@@ -163,7 +168,7 @@ router.post("/", requirePermission("purchases.record"), async (req, res) => {
     await audit(
       req.admin,
       "purchases",
-      `Recorded purchase ${purchase.ref} from ${supplier}: ${lines.length} item${lines.length === 1 ? "" : "s"}, ${rwf(total)}` +
+      `Recorded purchase ${purchase.ref} from ${supplier}: ${lines.length} item${lines.length === 1 ? "" : "s"}, ${rwf(total)} paid by ${METHOD_NAMES[paidWith]}` +
         warnings.map((w) => `; over the ${w.category} budget by ${rwf(w.over)}`).join("")
     );
 

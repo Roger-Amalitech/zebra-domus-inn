@@ -25,6 +25,7 @@ const { audit } = require("../utils/audit");
 const { nextRef, money } = require("../utils/stockOps");
 const { parseDay, toDay, innToday } = require("../utils/availability");
 const { eventTypes, readEvent, dayTaken, TYPE_KEYS, typeName } = require("../utils/events");
+const { METHODS, METHOD_NAMES, recordMoneyIn, voidMoneyIn } = require("../utils/money");
 
 const router = express.Router();
 
@@ -298,8 +299,23 @@ router.post("/:id/paid", changeEvents, async (req, res) => {
   try {
     const event = await findEvent(req, res);
     if (!event) return undefined;
-    if (typeof (req.body || {}).paid !== "boolean") return bad(res, "Say whether it is paid.");
-    const paid = req.body.paid;
+    const body = req.body || {};
+    if (typeof body.paid !== "boolean") return bad(res, "Say whether it is paid.");
+    const paid = body.paid;
+
+    // marked paid: how much, how and when (by default the event's price, cash, today)
+    let received = null;
+    if (paid && !event.paid) {
+      const method = body.paidWith === undefined || body.paidWith === "" ? "cash" : body.paidWith;
+      if (!METHODS.includes(method)) return bad(res, "Choose how they paid.");
+      const amountPaid = body.paidAmount === undefined || body.paidAmount === "" ? event.price : money(body.paidAmount);
+      if (!amountPaid || amountPaid < 1) return bad(res, "Write how much they paid, in RWF (a whole number).");
+      const today = innToday();
+      const dayText = body.paidDay || today;
+      const paidDay = parseDay(dayText);
+      if (!paidDay || dayText > today) return bad(res, "The day they paid can't be in the future.");
+      received = { method, amount: amountPaid, day: paidDay };
+    }
 
     const updated = await EventBooking.findOneAndUpdate(
       { _id: event._id, status: "confirmed" },
@@ -309,7 +325,27 @@ router.post("/:id/paid", changeEvents, async (req, res) => {
 
     if (!updated) return bad(res, "Only a confirmed event can be marked as paid.", 409);
 
-    await audit(req.admin, "events", `Marked ${short(updated)} as ${paid ? "paid" : "not paid"}`);
+    let said = `Marked ${short(updated)} as ${paid ? "paid" : "not paid"}`;
+    if (received) {
+      await recordMoneyIn({
+        person: req.admin,
+        amount: received.amount,
+        day: received.day,
+        method: received.method,
+        source: "event",
+        sourceId: updated._id,
+        sourceRef: updated.ref,
+        income: "events",
+        description: `${updated.typeName}, event ${updated.ref}`,
+        customerName: updated.name,
+      });
+      said += `: RWF ${received.amount.toLocaleString("en-US")} by ${METHOD_NAMES[received.method]}`;
+    }
+    if (!paid && event.paid) {
+      const taken = await voidMoneyIn({ source: "event", sourceId: updated._id }, req.admin, "Marked as not paid");
+      if (taken.length) said += `; money in ${taken.map((e) => e.ref).join(", ")} taken back`;
+    }
+    await audit(req.admin, "events", said);
     return res.json({ success: true, event: eventForAdmin(updated) });
   } catch (error) {
     return serverError(res, "Marking an event paid failed", error);

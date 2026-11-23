@@ -4155,3 +4155,299 @@ html.sheet-open body {
         padding: 0 16px;
     }
 }
+
+/* ---------- Business: overview, sales, expenses, money in, reports ---------- */
+
+.biz-tabs {
+    margin-top: 0;
+}
+
+.biz-period {
+    margin-bottom: 14px;
+}
+
+.biz-period .report-quick .btn[aria-pressed="true"] {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--white);
+}
+
+.biz-stats {
+    margin-bottom: 4px;
+}
+
+#bizOverview .section-title:first-child,
+#bizReport .section-title:first-child {
+    margin-top: 6px;
+}
+
+#bizReport .section-title,
+#bizOverview .section-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+}
+
+#salesSummary .report-wrap,
+#expensesSummary .report-wrap,
+#moneySummary .report-wrap,
+#bizReport .report-wrap {
+    margin-top: 14px;
+}
+
+#salesSummary,
+#expensesSummary,
+#moneySummary {
+    margin-bottom: 16px;
+}
+
+/* profit in the usual ink, a loss in red */
+.stat.is-loss .stat-number {
+    color: #B42318;
+}
+
+/* a card that opens something (Customers owe → Debts) */
+.stat.is-link {
+    cursor: pointer;
+}
+
+.stat.is-link:hover {
+    border-color: var(--ink);
+}
+
+.stat.is-link:focus-visible {
+    outline: 3px solid var(--ink);
+    outline-offset: 2px;
+}
+
+/* the four quick buttons */
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.quick-actions[hidden] {
+    display: none;
+}
+
+.quick-action {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 54px;
+    padding: 0 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--white);
+    color: var(--ink);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+}
+
+.quick-action:hover {
+    border-color: var(--ink);
+}
+
+.quick-action svg {
+    flex: none;
+}
+
+/* something to do before the balances are right */
+.biz-callout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    margin-top: 10px;
+    padding: 14px 16px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-card);
+    background: var(--white);
+    font-size: 14px;
+}
+
+.biz-callout p {
+    flex: 1 1 280px;
+    margin: 0;
+}
+
+/* the latest money in and out */
+.money-feed {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--white);
+    list-style: none;
+}
+
+.money-feed-row {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+}
+
+.money-feed-row:first-child {
+    border-top: 0;
+}
+
+.money-feed-day {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.money-feed-what {
+    display: grid;
+    min-width: 0;
+}
+
+.money-feed-what strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.money-feed-what span {
+    color: var(--muted);
+    font-size: 12.5px;
+}
+
+.money-feed-amount {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.money-feed-row.is-out .money-feed-amount {
+    color: var(--muted);
+}
+
+/* a sale: one box per item, with its total */
+.sale-lines {
+    display: grid;
+    gap: 10px;
+}
+
+.sale-line {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #FAFAFA;
+}
+
+.sale-line select,
+.sheet-field select#expenseCategory {
+    width: 100%;
+    min-height: 46px;
+    padding: 0 12px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: 12px;
+    background: var(--white);
+    font: inherit;
+    font-size: 15px;
+}
+
+.sale-line-total {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: right;
+}
+
+.sale-line-total:empty {
+    display: none;
+}
+
+.sale-remove {
+    justify-self: start;
+}
+
+.biz-card .booking-name {
+    font-variant-numeric: tabular-nums;
+}
+
+.biz-report-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: -4px 0 8px;
+}
+
+@media (min-width: 720px) {
+    .quick-actions {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .biz-stats.is-four {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .biz-stats.is-five {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .biz-stats.is-two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 720px) and (max-width: 1023px) {
+    .biz-stats.is-five {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 719px) {
+    .biz-stats.is-five > :first-child,
+    .biz-stats:not(.is-four):not(.is-two):not(.is-five) > :last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+    }
+}
+
+/* the business report prints with its own name at the foot of each page */
+@media print {
+    @page business {
+        size: A4 portrait;
+        margin: 14mm 12mm 16mm;
+
+        @bottom-left {
+            content: "Zebra Domus Inn · Business report";
+            color: #555555;
+            font-family: Arial, sans-serif;
+            font-size: 8pt;
+        }
+
+        @bottom-right {
+            content: "Page " counter(page) " of " counter(pages);
+            color: #555555;
+            font-family: Arial, sans-serif;
+            font-size: 8pt;
+        }
+    }
+
+    #printReport.is-business {
+        page: business;
+    }
+
+    #printReport.is-business .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+}

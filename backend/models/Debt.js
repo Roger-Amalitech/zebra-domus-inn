@@ -34,7 +34,8 @@ const debtSchema = new mongoose.Schema(
     description: { type: String, default: "" }, // what for, in words
     booking: { type: mongoose.Schema.Types.ObjectId, ref: "Booking" },
     event: { type: mongoose.Schema.Types.ObjectId, ref: "EventBooking" },
-    linkedRef: { type: String, default: "" }, // the booking or event reference
+    linkedRef: { type: String, default: "" }, // the booking, event or sale reference
+    sale: { type: mongoose.Schema.Types.ObjectId, ref: "Sale" }, // a sale on credit
 
     amount: { type: Number, required: true, min: 1 }, // owed at the start (RWF)
     paid: { type: Number, default: 0 },
