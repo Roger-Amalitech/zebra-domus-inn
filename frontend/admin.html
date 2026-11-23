@@ -39,6 +39,9 @@
 
         <button class="btn btn-primary btn-block" type="submit" id="signinButton">Sign in</button>
     </form>
+
+    <!-- Two-step sign-in after the password: the code from the phone, or setting it up (admin.js) -->
+    <section class="signin-card step-card" id="stepCard" aria-labelledby="stepTitle" hidden></section>
     <a href="index.html" class="signin-back">Back to the website</a>
 </main>
 
@@ -427,7 +430,7 @@
                     <div class="room-field">
                         <label for="staffPassword">First password</label>
                         <input id="staffPassword" type="text" autocomplete="new-password" spellcheck="false" maxlength="200" required aria-describedby="staffPasswordHelp">
-                        <p class="help" id="staffPasswordHelp">At least 8 characters. Give it to them in person; they can change it after signing in.</p>
+                        <p class="help" id="staffPasswordHelp">At least 10 characters, not a common word or the inn's name with numbers. Give it to them in person; they can change it after signing in.</p>
                     </div>
                     <div class="room-field" id="staffRoleField" hidden>
                         <label for="staffRole">Role</label>
@@ -470,7 +473,17 @@
                 </div>
             </div>
 
-            <p class="room-note" id="envOwnerNote" hidden>Your password is set in the backend/.env file on the server (ADMIN_PASSWORD). To change it, edit that line and restart the server.</p>
+            <p class="room-note warn-note" id="weakPasswordNote" hidden><strong>Your password is easy to guess.</strong> Please choose a stronger one: at least 10 characters, not a common word or the inn's name with numbers. A short sentence works well. On Render, open the web service, then Environment, change ADMIN_PASSWORD and save (Render deploys again).</p>
+
+            <p class="room-note" id="envOwnerNote" hidden>Your password is set on the server: ADMIN_PASSWORD in the web service's Environment on Render. To change it, edit it there and save.</p>
+
+            <!-- Two-step sign-in: a code from the phone after the password -->
+            <section class="form-card two-step-card" id="twoStepCard" aria-labelledby="twoStepTitle">
+                <h2 id="twoStepTitle">Two-step sign-in</h2>
+                <p class="two-step-status" id="twoStepStatus"></p>
+                <div class="two-step-actions" id="twoStepActions"></div>
+                <div class="two-step-body" id="twoStepBody"></div>
+            </section>
 
             <form class="form-card" id="passwordForm" novalidate>
                 <h2>Change my password</h2>
@@ -482,7 +495,7 @@
                     <div class="room-field">
                         <label for="newPassword">New password</label>
                         <input id="newPassword" type="password" autocomplete="new-password" maxlength="200" required aria-describedby="newPasswordHelp">
-                        <p class="help" id="newPasswordHelp">At least 8 characters.</p>
+                        <p class="help" id="newPasswordHelp">At least 10 characters, not a common word or the inn's name with numbers. A short sentence works well, like: blue gate opens at seven.</p>
                     </div>
                     <div class="room-field">
                         <label for="repeatPassword">New password again</label>
@@ -509,6 +522,7 @@
 
 <script src="api-config.js"></script>
 <script src="xlsx-lite.js"></script>
+<script src="vendor/qrcode.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

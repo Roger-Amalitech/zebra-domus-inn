@@ -40,15 +40,25 @@ app.use(helmet({
 }));
 
 
+// The website never needs the camera, microphone, location or payments in the browser.
+app.use((req, res, next) => {
+  res.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+  next();
+});
+
+// Other addresses allowed to call the API from a browser. The site and the API
+// share one address, so this is only for the inn's own domain and, on a
+// computer (not on Render), for a preview tool such as VS Code Live Server.
+const ALLOWED_ORIGINS = [
+  "https://zebradormusinn.com",
+  "https://www.zebradormusinn.com",
+];
+if (!process.env.RENDER) {
+  ALLOWED_ORIGINS.push("http://localhost:3000", "http://localhost:5500", "http://127.0.0.1:5500");
+}
+
 app.use(cors({
-    origin: [
-        "http://localhost:3000",
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "https://zebra-domus-inn-website.onrender.com",
-        "https://zebradormusinn.com",
-        "https://www.zebradormusinn.com"
-    ],
+    origin: ALLOWED_ORIGINS,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
@@ -104,7 +114,13 @@ const startServer = async () => {
     await connectDB();
     await ensureOwnerFromEnv();
 
-    app.listen(PORT, () => {
+    // Express 5 calls this also when the port can't be opened: then stop, so the
+    // host sees the failure instead of a server that answers nothing.
+    app.listen(PORT, (error) => {
+      if (error) {
+        console.error(`Failed to start server: port ${PORT} could not be opened (${error.code || error.message}).`);
+        process.exit(1);
+      }
       console.log(`Zebra Dormus Inn server running on port ${PORT}`);
       console.log(`Website:   http://localhost:${PORT}`);
       console.log(`Admin:     http://localhost:${PORT}/admin.html`);

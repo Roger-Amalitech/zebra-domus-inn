@@ -11,27 +11,21 @@ const express = require("express");
 
 const EventBooking = require("../models/EventBooking");
 const { nextRef } = require("../utils/stockOps");
-const { toDay } = require("../utils/availability");
+const { toDay, parseDay, innToday } = require("../utils/availability");
 const { eventTypes, bookableDays, takenDays, readEvent, dayTaken, TIMES, MAX_PEOPLE } = require("../utils/events");
+const { makeLimit, filledTrap, phoneKey } = require("../utils/limits");
 
 const router = express.Router();
 
-/* A few requests an hour from one place is plenty; more is a robot. */
-const LIMIT = 8;
-const WINDOW_MS = 60 * 60 * 1000;
-const recent = new Map();
+/* A few requests an hour from one place is plenty; more is a robot.
+   One guest (phone or email) can have only two requests waiting at once. */
+const perHour = makeLimit(8, 60 * 60 * 1000);
+const WAITING_PER_GUEST = 2;
 
-function tooMany(ip) {
-  const now = Date.now();
-  const times = (recent.get(ip) || []).filter((t) => now - t < WINDOW_MS);
-  if (times.length >= LIMIT) {
-    recent.set(ip, times);
-    return true;
-  }
-  times.push(now);
-  recent.set(ip, times);
-  if (recent.size > 5000) recent.clear(); // never let it grow without end
-  return false;
+async function waitingFor(phone, email) {
+  const key = phoneKey(phone);
+  const waiting = await EventBooking.find({ status: "waiting", day: { $gte: parseDay(innToday()) } }).select("phone email").lean();
+  return waiting.filter((event) => (key.length === 9 && phoneKey(event.phone) === key) || (email && event.email === email)).length;
 }
 
 function bad(res, message, status = 400, extra = {}) {
@@ -60,6 +54,11 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
+    if (filledTrap(req.body)) {
+      console.warn("Event request turned away: the hidden form field was filled in.");
+      return bad(res, "Please refresh the page and try again.");
+    }
+
     const read = readEvent(req.body);
     if (read.error) return bad(res, read.error);
     const v = read.values;
@@ -71,7 +70,12 @@ router.post("/", async (req, res) => {
       return bad(res, "That day already has an event. Please choose another day.", 409, { code: "DAY_TAKEN" });
     }
 
-    if (tooMany(req.ip)) return bad(res, "Too many requests. Please call the inn instead.", 429);
+    if (perHour.full(req.ip)) return bad(res, "Too many requests. Please call the inn instead.", 429);
+    perHour.add(req.ip);
+
+    if ((await waitingFor(v.phone, v.email)) >= WAITING_PER_GUEST) {
+      return bad(res, `You already have ${WAITING_PER_GUEST} event requests waiting for the inn. Please wait for the inn to call you, or call us.`, 429, { code: "TOO_MANY_WAITING" });
+    }
 
     const event = await EventBooking.create({
       ref: await nextRef("E"),

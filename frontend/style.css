@@ -3735,3 +3735,13 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     .about-card.has-details,
     .about-photo img { transition: none; }
 }
+
+/* A form field people never see: spam programs fill it in and are turned away */
+.form-trap {
+    position: absolute;
+    left: -10000px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}

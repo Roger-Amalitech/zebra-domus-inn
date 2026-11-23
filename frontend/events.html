@@ -61,6 +61,12 @@
 
         <form id="eventForm" class="booking-form" novalidate>
 
+            <!-- Left empty by people (they never see it). Spam programs fill it in and are turned away. -->
+            <div class="form-trap" aria-hidden="true">
+                <label for="eventLeaveEmpty">Leave this empty</label>
+                <input type="text" id="eventLeaveEmpty" name="leave_empty" tabindex="-1" autocomplete="off" value="">
+            </div>
+
             <!-- Which event: cards with a photo and the price -->
             <fieldset class="form-block room-choice">
                 <legend data-ev="whichEvent">Which event?</legend>

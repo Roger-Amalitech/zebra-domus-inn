@@ -849,7 +849,8 @@ async function handleBookingSubmit(event) {
         checkIn: document.getElementById("checkIn").value,
         checkOut: document.getElementById("checkOut").value,
         guests: stay.guests,
-        paymentMethod: getSelectedPayment()
+        paymentMethod: getSelectedPayment(),
+        leave_empty: (document.getElementById("bookingLeaveEmpty") || {}).value || ""
     };
 
     setSubmitting(true);

@@ -58,6 +58,46 @@ const adminUserSchema = new mongoose.Schema(
     lastLoginAt: {
       type: Date,
     },
+
+    // Two-step sign-in: after the password, a 6-digit code from an
+    // authenticator app (utils/totp.js). Required for the owner.
+    twoStepOn: {
+      type: Boolean,
+      default: false,
+    },
+
+    twoStepSince: {
+      type: Date,
+    },
+
+    // The secrets below are never sent to the dashboard: every lookup leaves
+    // them out unless the sign-in code asks for them by name.
+    totpSecret: {
+      type: String,
+      default: "",
+      select: false,
+    },
+
+    // a secret being set up, until the first code from the phone proves it works
+    totpPending: {
+      type: String,
+      default: "",
+      select: false,
+    },
+
+    // the last code's time step: a code works only once
+    totpLastStep: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+
+    // fingerprints of the one-time backup codes still unused
+    backupCodes: {
+      type: [String],
+      default: [],
+      select: false,
+    },
   },
   { timestamps: true }
 );

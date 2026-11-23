@@ -427,7 +427,8 @@
             phone: byId("eventPhone").value.trim(),
             email: byId("eventEmail").value.trim(),
             organisation: byId("eventOrganisation").value.trim(),
-            note: byId("eventNote").value.trim()
+            note: byId("eventNote").value.trim(),
+            leave_empty: (byId("eventLeaveEmpty") || {}).value || ""
         };
 
         setSending(true);

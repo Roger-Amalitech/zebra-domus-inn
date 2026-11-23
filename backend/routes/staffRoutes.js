@@ -4,7 +4,8 @@
 
    GET    /            everyone who can sign in
    POST   /            { name, email, password, role?, department? }
-   PATCH  /:id         { name?, active?, password?, role?, department? }
+   PATCH  /:id         { name?, active?, password?, role?, department?, twoStepOff? }
+                       twoStepOff: true turns off two-step sign-in (a lost phone)
    DELETE /:id         remove an account
 
    The owner adds and changes managers and staff.
@@ -23,6 +24,7 @@ const {
   publicUser,
   ownerEmailFromEnv,
   clearFailuresFor,
+  clearTwoStep,
 } = require("../utils/adminAuth");
 const { canManage } = require("../utils/permissions");
 const { DEPARTMENTS } = require("../utils/departments");
@@ -101,7 +103,7 @@ router.post("/", async (req, res) => {
     if (!name || name.length > 80) return bad(res, "Please enter a name (up to 80 characters).");
     if (!isEmail(email)) return bad(res, "Please enter a valid email address.");
 
-    const weak = passwordProblem(password);
+    const weak = passwordProblem(password, { name, email });
     if (weak) return bad(res, weak);
 
     if (!["manager", "staff"].includes(role)) return bad(res, "Choose Manager or Staff.");
@@ -172,11 +174,19 @@ router.patch("/:id", async (req, res) => {
     }
 
     if (body.password !== undefined) {
-      const weak = passwordProblem(body.password);
+      const weak = passwordProblem(body.password, user);
       if (weak) return bad(res, weak);
       user.passwordHash = await hashPassword(body.password);
       clearFailuresFor(user.email); // locked out by wrong passwords? the new one works at once
       said.push("password reset");
+      signOut = true;
+    }
+
+    // a lost phone: two-step sign-in off, so the password alone works until they set it up again
+    if (body.twoStepOff === true && user.twoStepOn) {
+      await clearTwoStep(user._id);
+      user.twoStepOn = false;
+      said.push("two-step sign-in turned off");
       signOut = true;
     }
 

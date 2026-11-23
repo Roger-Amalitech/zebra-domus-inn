@@ -61,6 +61,12 @@
 
         <form id="bookingForm" class="booking-form" method="post" action="book.html">
 
+            <!-- Left empty by people (they never see it). Spam programs fill it in and are turned away. -->
+            <div class="form-trap" aria-hidden="true">
+                <label for="bookingLeaveEmpty">Leave this empty</label>
+                <input type="text" id="bookingLeaveEmpty" name="leave_empty" tabindex="-1" autocomplete="off" value="">
+            </div>
+
             <!-- Your stay: dates and guests (date-range.js turns the two dates into one field) -->
             <div class="form-block">
                 <h2 data-book="yourStay">Your stay</h2>

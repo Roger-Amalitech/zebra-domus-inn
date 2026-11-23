@@ -2,9 +2,17 @@
    ZEBRA DORMUS INN
    Admin API (everything except /login needs the admin token)
 
-   POST  /api/admin/login              { email, password } -> { token, user }
+   POST  /api/admin/login              { email, password } -> { token, user },
+                                       or { step: "code" | "setup", ticket } when two-step sign-in comes next
+   POST  /api/admin/login/code         { ticket, code } -> { token, user }   (6-digit code or a backup code)
+   POST  /api/admin/login/setup        { ticket } -> { secret, link }       (owner setting it up at sign-in)
+   POST  /api/admin/login/setup/confirm { ticket, code } -> { token, user, backupCodes }
    GET   /api/admin/me                 who is signed in
    POST  /api/admin/me/password        { currentPassword, newPassword }
+   POST  /api/admin/me/two-step/start  -> { secret, link }       turn on two-step sign-in
+   POST  /api/admin/me/two-step/confirm { code } -> { backupCodes }
+   POST  /api/admin/me/two-step/off    { password }               (not for the owner: required)
+   POST  /api/admin/me/two-step/backup-codes { code } -> { backupCodes }   new ones, the old ones stop working
    GET   /api/admin/summary            today's arrivals, departures, guests staying, waiting bookings, events
    GET   /api/admin/bookings           ?when=upcoming|past|all &status=all|pending|confirmed|cancelled &q=text
    PATCH /api/admin/bookings/:id       { bookingStatus?, paymentStatus? }
@@ -38,6 +46,16 @@ const adminEventRoutes = require("./adminEventRoutes");
 const { audit } = require("../utils/audit");
 const {
   login,
+  loginCode,
+  loginSetupStart,
+  loginSetupConfirm,
+  startTwoStep,
+  confirmTwoStep,
+  clearTwoStep,
+  newBackupCodesFor,
+  backupCodesLeft,
+  withSecrets,
+  twoStepRequired,
   requireAdmin,
   passwordMatches,
   passwordProblem,
@@ -47,6 +65,7 @@ const {
   ownerEmailFromEnv,
 } = require("../utils/adminAuth");
 const { requirePermission, requireManager } = require("../utils/permissions");
+const totp = require("../utils/totp");
 const {
   parseDay,
   toDay,
@@ -64,6 +83,9 @@ router.use((req, res, next) => {
 });
 
 router.post("/login", login);
+router.post("/login/code", loginCode);
+router.post("/login/setup", loginSetupStart);
+router.post("/login/setup/confirm", loginSetupConfirm);
 
 router.use(requireAdmin);
 
@@ -115,8 +137,73 @@ function serverError(res, label, error) {
 
 /* ---------- The signed-in person ---------- */
 
-router.get("/me", (req, res) => {
-  res.json({ success: true, user: publicUser(req.admin) });
+router.get("/me", async (req, res) => {
+  try {
+    const left = req.admin.twoStepOn ? await backupCodesLeft(req.admin._id) : 0;
+    return res.json({ success: true, user: publicUser(req.admin), backupCodesLeft: left });
+  } catch (error) {
+    return serverError(res, "Account check failed", error);
+  }
+});
+
+/* ---------- Two-step sign-in, from My account ---------- */
+
+router.post("/me/two-step/start", async (req, res) => {
+  try {
+    if (req.admin.twoStepOn) {
+      return res.status(409).json({ success: false, message: "Two-step sign-in is already on." });
+    }
+    return res.json({ success: true, ...(await startTwoStep(req.admin)) });
+  } catch (error) {
+    return serverError(res, "Two-step setup failed", error);
+  }
+});
+
+router.post("/me/two-step/confirm", async (req, res) => {
+  try {
+    const done = await confirmTwoStep(req.admin._id, (req.body || {}).code);
+    if (done.why) return res.status(400).json({ success: false, message: done.why });
+    return res.json({ success: true, user: publicUser(done.user), backupCodes: done.codes });
+  } catch (error) {
+    return serverError(res, "Two-step setup failed", error);
+  }
+});
+
+router.post("/me/two-step/off", async (req, res) => {
+  try {
+    if (twoStepRequired(req.admin)) {
+      return res.status(403).json({ success: false, message: "The owner's account must use two-step sign-in." });
+    }
+    const user = await AdminUser.findById(req.admin._id);
+    const password = (req.body || {}).password;
+    if (typeof password !== "string" || !(await passwordMatches(password, user.passwordHash))) {
+      return res.status(400).json({ success: false, message: "Your password isn't right." });
+    }
+    await clearTwoStep(user._id);
+    await audit(user, "sign-in", "Turned off two-step sign-in");
+    user.twoStepOn = false;
+    return res.json({ success: true, user: publicUser(user) });
+  } catch (error) {
+    return serverError(res, "Turning off two-step sign-in failed", error);
+  }
+});
+
+/* New backup codes need a code from the app (not a backup code). */
+router.post("/me/two-step/backup-codes", async (req, res) => {
+  try {
+    const user = await withSecrets(req.admin._id);
+    if (!user.twoStepOn) return res.status(400).json({ success: false, message: "Two-step sign-in is off." });
+
+    const step = totp.checkCode(user.totpSecret, (req.body || {}).code, user.totpLastStep || 0);
+    if (!step) {
+      return res.status(400).json({ success: false, message: "That code isn't right. Type the newest 6-digit code from the app." });
+    }
+    user.totpLastStep = step;
+    await user.save();
+    return res.json({ success: true, backupCodes: await newBackupCodesFor(user) });
+  } catch (error) {
+    return serverError(res, "New backup codes failed", error);
+  }
 });
 
 router.post("/me/password", async (req, res) => {
@@ -127,7 +214,7 @@ router.post("/me/password", async (req, res) => {
     if (user.email === ownerEmailFromEnv()) {
       return res.status(400).json({
         success: false,
-        message: "Your password is set in backend/.env. Change ADMIN_PASSWORD there and restart the server.",
+        message: "Your password is set on the server (ADMIN_PASSWORD on Render). Change it there and deploy again.",
       });
     }
 
@@ -135,7 +222,7 @@ router.post("/me/password", async (req, res) => {
       return res.status(400).json({ success: false, message: "Your current password isn't right." });
     }
 
-    const weak = passwordProblem(body.newPassword);
+    const weak = passwordProblem(body.newPassword, user);
     if (weak) {
       return res.status(400).json({ success: false, message: weak });
     }

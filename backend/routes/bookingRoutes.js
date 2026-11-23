@@ -13,8 +13,41 @@ const {
   innToday,
   availabilityForRooms,
 } = require("../utils/availability");
+const { makeLimit, filledTrap, phoneKey } = require("../utils/limits");
 
 const MAX_NIGHTS = 60;
+
+/* Stopping fake bookings. A waiting booking holds a room until the inn
+   confirms or cancels it, so a program sending hundreds of them could make
+   the inn look full. Many guests in Rwanda share one internet address
+   through their mobile network, so the limits per address are generous;
+   the limit per guest (email or phone) is the strict one. */
+const TRIES_PER_HOUR = 40; // any booking request, right or wrong, from one address
+const BOOKINGS_PER_HOUR = 10; // bookings made from one address
+const BOOKINGS_PER_DAY = 30;
+const WAITING_PER_GUEST = 3; // bookings one email or phone may have waiting at once
+
+const triesPerHour = makeLimit(TRIES_PER_HOUR, 60 * 60 * 1000);
+const madePerHour = makeLimit(BOOKINGS_PER_HOUR, 60 * 60 * 1000);
+const madePerDay = makeLimit(BOOKINGS_PER_DAY, 24 * 60 * 60 * 1000);
+
+function tooManyResponse(res, minutes) {
+  return res.status(429).json({
+    success: false,
+    code: "TOO_MANY",
+    message: `Too many booking requests from this connection. Please try again in ${minutes} minutes, or call the inn.`,
+  });
+}
+
+// waiting bookings for stays not yet over, with this email or phone
+async function waitingFor(email, phone) {
+  const today = parseDay(innToday());
+  const key = phoneKey(phone);
+  const waiting = await Booking.find({ bookingStatus: "pending", checkOut: { $gt: today } })
+    .select("guestEmail guestPhone")
+    .lean();
+  return waiting.filter((booking) => booking.guestEmail === email || (key.length === 9 && phoneKey(booking.guestPhone) === key)).length;
+}
 
 const allowedPaymentMethods = [
   "MTN Mobile Money",
@@ -60,6 +93,17 @@ function roomTakenResponse(res, room, alternatives) {
 router.post("/", async (req, res) => {
   try {
     const body = req.body || {};
+    const ip = req.ip || "unknown";
+
+    if (triesPerHour.full(ip)) return tooManyResponse(res, triesPerHour.minutesLeft(ip));
+    triesPerHour.add(ip);
+
+    // the hidden field people never see: only spam programs fill it in
+    if (filledTrap(body)) {
+      console.warn("Booking turned away: the hidden form field was filled in.");
+      return res.status(400).json({ success: false, message: "Please refresh the page and try again." });
+    }
+
     const guestName = text(body.guestName);
     const guestEmail = text(body.guestEmail).toLowerCase();
     const guestPhone = text(body.guestPhone);
@@ -186,6 +230,18 @@ router.post("/", async (req, res) => {
       });
     }
 
+    // One guest can have only a few bookings waiting for the inn at once.
+    if ((await waitingFor(guestEmail, guestPhone)) >= WAITING_PER_GUEST) {
+      return res.status(429).json({
+        success: false,
+        code: "TOO_MANY_WAITING",
+        message: `You already have ${WAITING_PER_GUEST} bookings waiting for the inn to confirm. Please wait for the inn to contact you, or call us to book more rooms.`,
+      });
+    }
+
+    if (madePerHour.full(ip)) return tooManyResponse(res, madePerHour.minutesLeft(ip));
+    if (madePerDay.full(ip)) return tooManyResponse(res, madePerDay.minutesLeft(ip));
+
     // Is a room of this type free on every night of the stay?
     // Cancelled bookings do not block availability.
     const before = await availabilityForRooms([room], arrival, departure);
@@ -227,6 +283,9 @@ router.post("/", async (req, res) => {
       await Booking.deleteOne({ _id: booking._id });
       return roomTakenResponse(res, room, await freeAlternatives(arrival, departure, guestCount));
     }
+
+    madePerHour.add(ip);
+    madePerDay.add(ip);
 
     return res.status(201).json({
       success: true,

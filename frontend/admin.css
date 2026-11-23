@@ -3517,3 +3517,244 @@ html.sheet-open body {
         border-bottom: 1px solid #111111;
     }
 }
+
+/* ---------- Two-step sign-in (sign-in page and My account) ---------- */
+
+.step-card {
+    max-width: 440px;
+}
+
+.step-card h1:focus {
+    outline: none;
+}
+
+.step-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.step-form label {
+    margin: 14px 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.code-input,
+.two-step-inline input {
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--white);
+    font-size: 16px;
+}
+
+.code-input {
+    max-width: 220px;
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.18em;
+}
+
+.code-input:focus,
+.two-step-inline input:focus {
+    border-color: var(--ink);
+    outline: none;
+    box-shadow: var(--ring);
+}
+
+.step-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin-top: 14px;
+}
+
+.link-button {
+    padding: 6px 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.setup-steps {
+    display: grid;
+    gap: 18px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: setup;
+}
+
+.setup-steps > li {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    padding-left: 40px;
+    counter-increment: setup;
+}
+
+.setup-steps > li::before {
+    content: counter(setup);
+    position: absolute;
+    top: -2px;
+    left: 0;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--white);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.setup-steps > li > span {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.setup-qr {
+    display: grid;
+    place-items: center;
+    width: 212px;
+    min-height: 212px;
+    margin: 10px 0 4px;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #FFFFFF;
+    color: var(--muted);
+    font-size: 14px;
+    text-align: center;
+}
+
+.setup-qr svg {
+    display: block;
+    width: 196px;
+    height: 196px;
+}
+
+.setup-manual summary {
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.setup-manual p {
+    margin: 8px 0 0;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.setup-key {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    word-break: break-word;
+}
+
+.codes-title {
+    margin: 4px 0 0;
+    font-size: 20px;
+}
+
+.backup-codes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 16px;
+    margin: 12px 0;
+    padding: 14px 16px 14px 36px;
+    border: 1.5px dashed var(--line-strong);
+    border-radius: 12px;
+    background: var(--soft);
+}
+
+.backup-codes code {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.codes-actions,
+.two-step-actions,
+.two-step-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.check-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0 14px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.check-line input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--ink);
+}
+
+.two-step-status {
+    margin: 4px 0 14px;
+    line-height: 1.5;
+}
+
+.two-step-body {
+    margin-top: 6px;
+}
+
+.two-step-body:empty {
+    display: none;
+}
+
+.two-step-body > .btn-ghost:first-child {
+    margin-bottom: 14px;
+}
+
+.two-step-inline {
+    max-width: 360px;
+}
+
+.two-step-inline .help {
+    margin: 6px 0 0;
+}
+
+.warn-note {
+    border: 1px solid #E0A100;
+    background: #FFF7E0;
+    color: var(--ink);
+}
+
+@media (max-width: 420px) {
+    .backup-codes {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* "Buy these" in the Buy soon box, and the "already in the store" tick in a purchase */
+.stock-alert-button {
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.sheet-check .check-line {
+    margin: 0 0 4px;
+}
+
+.sheet-check .help {
+    margin: 0;
+}

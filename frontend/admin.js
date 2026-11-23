@@ -243,7 +243,7 @@
         }
 
         // Signed out: the session ended, or the account was removed or turned off.
-        if (response.status === 401 && path !== "/admin/login") {
+        if (response.status === 401 && path.indexOf("/admin/login") !== 0) {
             var why = data && data.message && data.message !== "Please sign in again."
                 ? data.message
                 : "You were signed out. Please sign in again.";
@@ -270,7 +270,9 @@
                     : "Something went wrong (" + response.status + "). Please try again.";
             }
 
-            throw new AdminError(message, response.status);
+            var failure = new AdminError(message, response.status);
+            failure.code = (data && data.code) || "";
+            throw failure;
         }
 
         return data;
@@ -399,6 +401,9 @@
         user = null;
         $("app").hidden = true;
         $("signin").hidden = false;
+        $("stepCard").hidden = true;
+        $("stepCard").textContent = "";
+        $("signinForm").hidden = false;
         $("password").value = "";
         $("signinMessage").textContent = message || "";
         document.title = "Staff sign-in | Zebra Dormus Inn";
@@ -524,10 +529,10 @@
 
         try {
             var data = await signInWaiting(email.value.trim(), password.value, message);
-            setToken(data.token);
             password.value = "";
-            markActive(true);
-            showApp(data.user);
+            if (data.step === "code") showCodeStep(data.ticket);
+            else if (data.step === "setup") showSetupStep(data.ticket);
+            else enterDashboard(data);
         } catch (error) {
             message.textContent = error.message;
             password.select();
@@ -540,6 +545,436 @@
     $("signoutButton").addEventListener("click", function () {
         signOut("You have signed out.");
     });
+
+    /* ---------- Two-step sign-in ----------
+       After the password: the 6-digit code from the authenticator app on the
+       phone (or a backup code), or, for the owner the first time, setting it up.
+       The same setup and backup-code screens are used in My account. */
+
+    function brandBadge() {
+        return el("span", { className: "brand-badge" }, [
+            el("img", { src: "images/logo/zebra-domus-logo-white.png", alt: "Zebra Dormus Inn", width: "90", height: "38" })
+        ]);
+    }
+
+    // The QR code the app scans, drawn as an SVG (vendor/qrcode.js works out the squares)
+    function qrPicture(textValue) {
+        if (typeof window.qrcode !== "function") {
+            return el("p", { className: "muted", text: "The QR code couldn't be drawn. Use the key below instead." });
+        }
+        var ns = "http://www.w3.org/2000/svg";
+        var qr = window.qrcode(0, "M");
+        qr.addData(textValue);
+        qr.make();
+
+        var count = qr.getModuleCount();
+        var margin = 4;
+        var size = count + margin * 2;
+        var squares = "";
+        for (var row = 0; row < count; row += 1) {
+            for (var col = 0; col < count; col += 1) {
+                if (qr.isDark(row, col)) squares += "M" + (col + margin) + " " + (row + margin) + "h1v1h-1z";
+            }
+        }
+
+        var svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+        svg.setAttribute("width", "196");
+        svg.setAttribute("height", "196");
+        svg.setAttribute("shape-rendering", "crispEdges");
+        svg.setAttribute("role", "img");
+        svg.setAttribute("aria-label", "QR code to scan with the authenticator app");
+        var back = document.createElementNS(ns, "rect");
+        back.setAttribute("width", String(size));
+        back.setAttribute("height", String(size));
+        back.setAttribute("fill", "#FFFFFF");
+        var marks = document.createElementNS(ns, "path");
+        marks.setAttribute("d", squares);
+        marks.setAttribute("fill", "#111111");
+        svg.appendChild(back);
+        svg.appendChild(marks);
+        return svg;
+    }
+
+    function codeInput(id) {
+        return el("input", {
+            id: id, type: "text", inputmode: "numeric", autocomplete: "one-time-code",
+            maxlength: "6", spellcheck: "false", autocapitalize: "none", className: "code-input"
+        });
+    }
+
+    function cleanCode(value) {
+        return String(value || "").replace(/\s/g, "");
+    }
+
+    /* Setting up: install the app, scan the QR code, type the first code.
+       options: { idPrefix, start(), confirm(code), onDone(data) } */
+    function twoStepSetup(container, options) {
+        var p = options.idPrefix;
+        var qrBox = el("div", { className: "setup-qr", text: "Preparing your QR code…" });
+        var key = el("code", { className: "setup-key" });
+        var account = el("span");
+        var input = codeInput(p + "Code");
+        var message = el("p", { className: "form-message", role: "alert" });
+        var go = el("button", { type: "submit", className: "btn btn-primary btn-block", text: "Turn on two-step sign-in", disabled: true });
+
+        var form = el("form", { className: "step-form", novalidate: true }, [
+            el("label", { for: p + "Code", text: "6-digit code from the app" }),
+            input,
+            message,
+            go
+        ]);
+
+        container.appendChild(el("ol", { className: "setup-steps" }, [
+            el("li", {}, [
+                el("strong", { text: "Install an authenticator app on your phone." }),
+                el("span", { text: "Google Authenticator or Microsoft Authenticator: free from the Play Store or the App Store." })
+            ]),
+            el("li", {}, [
+                el("strong", { text: "In the app, add an account and scan this QR code." }),
+                qrBox,
+                el("details", { className: "setup-manual" }, [
+                    el("summary", { text: "Can't scan it? Type a key instead" }),
+                    el("p", {}, ["In the app choose \"Enter a setup key\". Account: ", account, ". Key: ", key, ". Type: time-based."])
+                ])
+            ]),
+            el("li", {}, [
+                el("strong", { text: "Type the 6-digit code the app shows for Zebra Dormus Inn." }),
+                el("span", { text: "The code changes every 30 seconds." }),
+                form
+            ])
+        ]));
+
+        options.start().then(function (data) {
+            qrBox.textContent = "";
+            qrBox.appendChild(qrPicture(data.link));
+            key.textContent = data.secret.replace(/(.{4})/g, "$1 ").trim();
+            account.textContent = "Zebra Dormus Inn (" + data.account + ")";
+            go.disabled = false;
+        }).catch(function (error) {
+            qrBox.textContent = "";
+            message.textContent = error.message || "Something went wrong. Please try again.";
+        });
+
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            var code = cleanCode(input.value);
+            if (!/^\d{6}$/.test(code)) {
+                message.textContent = "Please type the 6 digits the app shows.";
+                input.focus();
+                return;
+            }
+            go.disabled = true;
+            message.textContent = "Checking…";
+            try {
+                var data = await options.confirm(code);
+                message.textContent = "";
+                options.onDone(data);
+            } catch (error) {
+                message.textContent = error.message;
+                input.select();
+                go.disabled = false;
+            }
+        });
+
+        return input;
+    }
+
+    /* The 8 backup codes, shown once. options: { idPrefix, codes, email, onDone, doneText } */
+    function backupCodesScreen(container, options) {
+        container.textContent = "";
+        var check = el("input", { type: "checkbox", id: options.idPrefix + "Saved" });
+        var done = el("button", { type: "button", className: "btn btn-primary btn-block", text: options.doneText || "Continue", disabled: true });
+        var copied = el("p", { className: "form-message", role: "status" });
+
+        var fileText = [
+            "Zebra Dormus Inn: backup codes for two-step sign-in",
+            "Account: " + (options.email || ""),
+            "Made on: " + new Date().toLocaleString("en-GB", { timeZone: "Africa/Kigali" }),
+            "",
+            "Each code works once, instead of the 6-digit code from the phone.",
+            "Keep them away from the phone.",
+            ""
+        ].concat(options.codes).join("\r\n");
+
+        var copy = el("button", { type: "button", className: "btn btn-ghost btn-small", text: "Copy the codes" });
+        var save = el("button", { type: "button", className: "btn btn-ghost btn-small", text: "Download as a file" });
+
+        container.appendChild(el("h2", { className: "codes-title", id: options.idPrefix + "CodesTitle", text: "Save your backup codes" }));
+        container.appendChild(el("p", {
+            className: "muted",
+            text: "If you lose your phone, each code lets you sign in once instead of the 6-digit code. " +
+                "Keep them somewhere safe away from your phone: printed and locked in a drawer, or in a password manager. They are shown only now."
+        }));
+        container.appendChild(el("ol", { className: "backup-codes", "aria-labelledby": options.idPrefix + "CodesTitle" },
+            options.codes.map(function (code) { return el("li", {}, [el("code", { text: code })]); })));
+        container.appendChild(el("div", { className: "codes-actions" }, [copy, save]));
+        container.appendChild(copied);
+        container.appendChild(el("label", { className: "check-line", for: options.idPrefix + "Saved" }, [check, " I have saved these codes somewhere safe"]));
+        container.appendChild(done);
+
+        copy.addEventListener("click", function () {
+            var write = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(fileText) : Promise.reject();
+            write.then(function () { copied.textContent = "Copied. Paste them somewhere safe."; })
+                .catch(function () { copied.textContent = "Copying isn't allowed here. Please download the file or write the codes down."; });
+        });
+        save.addEventListener("click", function () {
+            var link = el("a", {
+                href: URL.createObjectURL(new Blob([fileText], { type: "text/plain;charset=utf-8" })),
+                download: "zebra-dormus-backup-codes.txt"
+            });
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+            copied.textContent = "Downloaded. Move the file somewhere safe, away from this phone or computer if you can.";
+        });
+        check.addEventListener("change", function () { done.disabled = !check.checked; });
+        done.addEventListener("click", options.onDone);
+        copy.focus();
+    }
+
+    /* ----- at sign-in ----- */
+
+    function stepCard(titleText, introText) {
+        var card = $("stepCard");
+        card.textContent = "";
+        card.appendChild(brandBadge());
+        card.appendChild(el("h1", { id: "stepTitle", text: titleText, tabindex: "-1" }));
+        if (introText) card.appendChild(el("p", { className: "muted", text: introText }));
+        $("signinForm").hidden = true;
+        card.hidden = false;
+        return card;
+    }
+
+    function backToPassword(message) {
+        $("stepCard").hidden = true;
+        $("stepCard").textContent = "";
+        $("signinForm").hidden = false;
+        $("signinMessage").textContent = message || "";
+        $("password").focus();
+    }
+
+    function enterDashboard(data) {
+        setToken(data.token);
+        $("stepCard").hidden = true;
+        $("stepCard").textContent = "";
+        $("signinForm").hidden = false;
+        markActive(true);
+        showApp(data.user);
+
+        if (typeof data.backupCodesLeft === "number" && data.backupCodesLeft <= 2) {
+            toast("You have " + plural(data.backupCodesLeft, "backup code", "backup codes") + " left. Make new ones in My account.");
+        } else if (data.user && data.user.passwordWeak) {
+            toast("Your password is easy to guess. See My account to change it.");
+        }
+    }
+
+    function showCodeStep(ticket) {
+        var card = stepCard("Two-step sign-in", "Open the authenticator app on your phone and type the 6-digit code for Zebra Dormus Inn.");
+        var backup = false;
+        var label = el("label", { for: "signinCode", text: "6-digit code" });
+        var input = codeInput("signinCode");
+        var message = el("p", { className: "form-message", role: "alert" });
+        var go = el("button", { type: "submit", className: "btn btn-primary btn-block", text: "Sign in" });
+        var swap = el("button", { type: "button", className: "link-button", text: "Lost your phone? Use a backup code" });
+        var back = el("button", { type: "button", className: "link-button", text: "Back" });
+        var form = el("form", { className: "step-form", novalidate: true }, [label, input, message, go]);
+
+        card.appendChild(form);
+        card.appendChild(el("div", { className: "step-links" }, [swap, back]));
+        input.focus();
+
+        swap.addEventListener("click", function () {
+            backup = !backup;
+            label.textContent = backup ? "Backup code (like k7pq2-mx9ta)" : "6-digit code";
+            input.setAttribute("maxlength", backup ? "11" : "6");
+            input.setAttribute("inputmode", backup ? "text" : "numeric");
+            input.setAttribute("autocomplete", backup ? "off" : "one-time-code");
+            swap.textContent = backup ? "Use the code from the app instead" : "Lost your phone? Use a backup code";
+            message.textContent = "";
+            input.value = "";
+            input.focus();
+        });
+        back.addEventListener("click", function () { backToPassword(""); });
+
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            var code = cleanCode(input.value);
+            if (backup ? code.replace(/-/g, "").length !== 10 : !/^\d{6}$/.test(code)) {
+                message.textContent = backup ? "A backup code has 10 letters and numbers." : "Please type the 6 digits the app shows.";
+                input.focus();
+                return;
+            }
+            go.disabled = true;
+            go.textContent = "Checking…";
+            message.textContent = "";
+            try {
+                enterDashboard(await api("POST", "/admin/login/code", { ticket: ticket, code: code }));
+            } catch (error) {
+                if (error.code === "SIGN_IN_AGAIN") {
+                    backToPassword(error.message);
+                    return;
+                }
+                message.textContent = error.message;
+                input.select();
+            } finally {
+                go.disabled = false;
+                go.textContent = "Sign in";
+            }
+        });
+    }
+
+    function showSetupStep(ticket) {
+        var card = stepCard("Set up two-step sign-in",
+            "The owner's account needs a second step to sign in: a 6-digit code from your phone. " +
+            "Even someone who learns your password can't get in without your phone. You set it up once; it takes about two minutes.");
+        var body = el("div", { className: "step-body" });
+        var back = el("button", { type: "button", className: "link-button", text: "Not now: back to sign-in" });
+        card.appendChild(body);
+        card.appendChild(el("div", { className: "step-links" }, [back]));
+        back.addEventListener("click", function () { backToPassword(""); });
+
+        twoStepSetup(body, {
+            idPrefix: "signinSetup",
+            start: function () { return api("POST", "/admin/login/setup", { ticket: ticket }); },
+            confirm: function (code) { return api("POST", "/admin/login/setup/confirm", { ticket: ticket, code: code }); },
+            onDone: function (data) {
+                back.remove();
+                backupCodesScreen(body, {
+                    idPrefix: "signinSetup",
+                    codes: data.backupCodes,
+                    email: data.user.email,
+                    doneText: "Continue to the dashboard",
+                    onDone: function () { enterDashboard(data); }
+                });
+            }
+        });
+        $("stepTitle").focus();
+    }
+
+    /* ----- in My account ----- */
+
+    function renderTwoStep(left) {
+        var two = user.twoStep || { on: false, required: false };
+        var status = $("twoStepStatus");
+        var actions = $("twoStepActions");
+        var body = $("twoStepBody");
+        actions.textContent = "";
+        body.textContent = "";
+
+        if (two.on) {
+            status.textContent = "On. After your password, signing in asks for the code from your phone. Backup codes left: " + left + "." +
+                (two.required ? " The owner's account always uses it." : "");
+        } else {
+            status.textContent = two.required
+                ? "Required for your account. You'll be asked to set it up when you next sign in."
+                : "Off. Turn it on so that a stolen or guessed password alone can't open your account.";
+        }
+
+        function button(textValue, cls, onClick) {
+            var b = el("button", { type: "button", className: "btn btn-small " + cls, text: textValue });
+            b.addEventListener("click", onClick);
+            actions.appendChild(b);
+            return b;
+        }
+
+        function cancelButton() {
+            var b = el("button", { type: "button", className: "btn btn-ghost btn-small", text: "Cancel" });
+            b.addEventListener("click", function () { renderTwoStep(left); });
+            return b;
+        }
+
+        function showCodes(codes) {
+            actions.textContent = "";
+            backupCodesScreen(body, {
+                idPrefix: "account",
+                codes: codes,
+                email: user.email,
+                doneText: "Done",
+                onDone: function () { loadAccount().catch(showLoadError); }
+            });
+        }
+
+        if (!two.on) {
+            button("Set up two-step sign-in", "btn-primary", function () {
+                actions.textContent = "";
+                body.appendChild(cancelButton());
+                var input = twoStepSetup(body, {
+                    idPrefix: "account",
+                    start: function () { return api("POST", "/admin/me/two-step/start"); },
+                    confirm: function (code) { return api("POST", "/admin/me/two-step/confirm", { code: code }); },
+                    onDone: function (data) {
+                        applyUser(data.user);
+                        toast("Two-step sign-in is on.");
+                        showCodes(data.backupCodes);
+                    }
+                });
+                body.scrollIntoView({ block: "nearest" });
+                input.focus();
+            });
+            return;
+        }
+
+        button("Make new backup codes", "btn-ghost", function () {
+            actions.textContent = "";
+            var input = codeInput("newCodesCode");
+            var message = el("p", { className: "form-message", role: "alert" });
+            var form = el("form", { className: "step-form two-step-inline", novalidate: true }, [
+                el("label", { for: "newCodesCode", text: "6-digit code from the app" }),
+                input,
+                el("p", { className: "help", text: "Your old backup codes stop working when the new ones are made." }),
+                message,
+                el("div", { className: "two-step-buttons" }, [
+                    el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Make new codes" }),
+                    cancelButton()
+                ])
+            ]);
+            body.appendChild(form);
+            input.focus();
+            form.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                try {
+                    var data = await api("POST", "/admin/me/two-step/backup-codes", { code: cleanCode(input.value) });
+                    showCodes(data.backupCodes);
+                } catch (error) {
+                    message.textContent = error.status === 401 ? "" : error.message;
+                    input.select();
+                }
+            });
+        });
+
+        if (!two.required) {
+            button("Turn off", "btn-ghost", function () {
+                actions.textContent = "";
+                var input = el("input", { id: "twoStepOffPassword", type: "password", autocomplete: "current-password", maxlength: "200" });
+                var message = el("p", { className: "form-message", role: "alert" });
+                var form = el("form", { className: "step-form two-step-inline", novalidate: true }, [
+                    el("label", { for: "twoStepOffPassword", text: "Your password, to turn off two-step sign-in" }),
+                    input,
+                    message,
+                    el("div", { className: "two-step-buttons" }, [
+                        el("button", { type: "submit", className: "btn btn-primary btn-small", text: "Turn off" }),
+                        cancelButton()
+                    ])
+                ]);
+                body.appendChild(form);
+                input.focus();
+                form.addEventListener("submit", async function (event) {
+                    event.preventDefault();
+                    try {
+                        var data = await api("POST", "/admin/me/two-step/off", { password: input.value });
+                        applyUser(data.user);
+                        toast("Two-step sign-in is off.");
+                        loadAccount().catch(showLoadError);
+                    } catch (error) {
+                        message.textContent = error.status === 401 ? "" : error.message;
+                        input.select();
+                    }
+                });
+            });
+        }
+    }
 
     /* ---------- Signing out a screen nobody is using ---------- */
 
@@ -1840,6 +2275,7 @@
                     el("div", { className: "badges" }, [
                         el("span", { className: ROLE_BADGE[account.role] || "badge", text: ROLE_NAMES[account.role] || account.role }),
                         account.active ? null : el("span", { className: "badge badge-muted", text: "Turned off" }),
+                        account.twoStep && account.twoStep.on ? el("span", { className: "badge badge-dashed", text: "Two-step on" }) : null,
                         isSelf ? el("span", { className: "badge badge-dashed", text: "You" }) : null
                     ])
                 ]),
@@ -1924,8 +2360,8 @@
 
             form.addEventListener("submit", function (event) {
                 event.preventDefault();
-                if (input.value.length < 8) {
-                    toast("The password must be at least 8 characters.", true);
+                if (input.value.length < 10) {
+                    toast("The password must be at least 10 characters.", true);
                     input.focus();
                     return;
                 }
@@ -1958,7 +2394,7 @@
             if (!account.canEdit) {
                 var why = "";
                 if (isSelf) why = "This is you. Change your password in My account.";
-                else if (account.fromEnv && isOwner()) why = "The owner's sign-in comes from backend/.env on the server. Change it there.";
+                else if (account.fromEnv && isOwner()) why = "The owner's sign-in comes from the server (ADMIN_EMAIL and ADMIN_PASSWORD on Render). Change it there.";
                 else if (account.role === "manager") why = "Only the owner can change a manager.";
                 if (why) actions.appendChild(el("p", { className: "staff-meta", text: why }));
                 else actions.hidden = true;
@@ -1974,7 +2410,27 @@
                     account.active ? account.name + " has been turned off and signed out." : account.name + " can sign in again."
                 );
             }));
+            if (account.twoStep && account.twoStep.on) {
+                actions.appendChild(button("Turn off two-step", "btn-ghost", askTwoStepOff));
+            }
             actions.appendChild(button("Remove", "btn-ghost btn-danger", askToRemove));
+        }
+
+        /* A lost phone: two-step sign-in off, so their password alone works
+           until they set it up again in My account. */
+        function askTwoStepOff() {
+            actions.textContent = "";
+            var keep = button("Keep it on", "btn-ghost", renderActions);
+            actions.appendChild(el("p", {
+                className: "confirm-text",
+                text: "Turn off two-step sign-in for " + account.name + "? Do this only if they lost their phone. " +
+                    "They will sign in with their password alone until they set it up again in My account."
+            }));
+            actions.appendChild(button("Yes, turn it off", "btn-primary", function () {
+                change("PATCH", { twoStepOff: true }, "Two-step sign-in is off for " + account.name + ". They have been signed out.");
+            }));
+            actions.appendChild(keep);
+            keep.focus();
         }
 
         renderActions();
@@ -2034,8 +2490,8 @@
             return;
         }
 
-        if (password.value.length < 8) {
-            message.textContent = "The first password must be at least 8 characters.";
+        if (password.value.length < 10) {
+            message.textContent = "The first password must be at least 10 characters.";
             password.focus();
             return;
         }
@@ -2081,7 +2537,9 @@
         });
 
         $("envOwnerNote").hidden = !user.fromEnv;
+        $("weakPasswordNote").hidden = !user.passwordWeak;
         $("passwordForm").hidden = Boolean(user.fromEnv);
+        renderTwoStep(data.backupCodesLeft || 0);
     }
 
     $("passwordForm").addEventListener("input", function () {
@@ -2104,8 +2562,8 @@
             return;
         }
 
-        if (newPassword.value.length < 8) {
-            message.textContent = "The new password must be at least 8 characters.";
+        if (newPassword.value.length < 10) {
+            message.textContent = "The new password must be at least 10 characters.";
             newPassword.focus();
             return;
         }
@@ -2336,7 +2794,45 @@
         });
 
         box.textContent = "Buy soon: " + names.join(", ") + (short.length > 8 ? " and " + (short.length - 8) + " more." : ".");
+        if (can("purchases.record")) {
+            box.appendChild(el("span", { text: " " }));
+            box.appendChild(button("Buy these", "btn-primary btn-small stock-alert-button", function () { addStock(short); }));
+        }
         box.hidden = false;
+    }
+
+    /* How much to buy so an item is comfortably above its warning level again:
+       twice the warning level, less what is there (rounded up). Empty when not low. */
+    function suggestedAmount(item) {
+        if (!(item.lowStockAt > 0)) return null;
+        var need = item.lowStockAt * 2 - Math.max(item.quantity, 0);
+        if (need <= 0) return null;
+        return isWholeUnit(item.unit) ? Math.ceil(need - 1e-9) : Math.ceil(need * 10 - 1e-9) / 10;
+    }
+
+    /* "+ Add stock": new stock comes in through a purchase (what was bought, for how much,
+       from where). The owner records it, already filled in; a manager checks in what the
+       owner bought, under Purchases. */
+    async function addStock(items) {
+        if (can("purchases.record")) {
+            openPurchaseForm(items.map(function (item) { return { item: item, quantity: suggestedAmount(item) }; }));
+            return;
+        }
+
+        var item = items[0];
+        try {
+            var data = await api("GET", "/admin/purchases");
+            var coming = (data.purchases || []).filter(function (p) {
+                return p.status === "waiting" && p.lines.some(function (line) { return String(line.itemId) === String(item._id); });
+            });
+            showStockTab("purchases");
+            await loadPurchases(false);
+            toast(coming.length
+                ? "The owner bought " + item.name + ": press Check in on " + coming[0].ref + " when it arrives, and the stock goes up."
+                : "New " + item.name + " is added when the owner records a purchase. Ask the owner; you check it in here when it arrives.");
+        } catch (error) {
+            if (error.status !== 401) toast(error.message, true);
+        }
     }
 
     function fillCategorySelect() {
@@ -2973,6 +3469,9 @@
         ]);
 
         if (item.active) {
+            if (can("purchases.record") || can("purchases.receive")) {
+                actions.appendChild(button("+ Add stock", item.status === "ok" ? "btn-ghost" : "btn-primary", function () { addStock([item]); }));
+            }
             if (can("stock.issue")) actions.appendChild(button("− Issue", "btn-ghost", function () { openMove(item, "out"); }));
             if (can("stock.count")) actions.appendChild(button("Count", "btn-ghost", function () { openMove(item, "count"); }));
             if (can("stock.writeoff")) actions.appendChild(button("Expired / damaged", "btn-ghost", function () { openMove(item, "loss"); }));
@@ -3834,8 +4333,10 @@
     }
 
     /* Owner: record what was bought, in a big form */
-    function openPurchaseForm() {
+    /* prefill: [{ item, quantity }] from "+ Add stock" or "Buy these" */
+    function openPurchaseForm(prefill) {
         var items = stock.items.filter(function (i) { return i.active; });
+        prefill = Array.isArray(prefill) ? prefill.filter(function (p) { return p.item && p.item.active; }) : [];
         var budget = null;
         var budgetMonth = "";
 
@@ -3908,10 +4409,10 @@
             update();
         }
 
-        function addLine() {
+        function addLine(preItem, preQuantity) {
             count += 1;
             var id = "purchaseItem-" + count;
-            var select = itemSelect(id, items, "", false);
+            var select = itemSelect(id, items, preItem ? preItem._id : "", false);
             var amount = el("input", { id: id + "-qty", type: "text", inputmode: "decimal", autocomplete: "off", className: "line-qty-input" });
             var cost = el("input", { id: id + "-cost", type: "text", inputmode: "numeric", autocomplete: "off", className: "line-cost-input" });
             var unit = el("span", { className: "input-unit", text: "" });
@@ -3945,18 +4446,41 @@
                 ])
             ]);
 
+            if (preItem) {
+                unit.textContent = preItem.unit;
+                if (preItem.unitCost) cost.value = String(preItem.unitCost);
+                if (preQuantity) amount.value = String(preQuantity);
+            }
+
             linesBox.appendChild(row);
             return select;
         }
 
-        addLine();
+        if (prefill.length) {
+            prefill.forEach(function (p) { addLine(p.item, p.quantity); });
+        } else {
+            addLine();
+        }
+
+        // the owner can also check it in: already in the store room? Then the stock goes up now
+        var inStore = null;
+        var inStoreField = null;
+        if (can("purchases.receive")) {
+            inStore = el("input", { type: "checkbox", id: "purchaseInStore" });
+            inStoreField = el("div", { className: "sheet-check" }, [
+                el("label", { className: "check-line", for: "purchaseInStore" }, [inStore, " It's already in the store room: add it to the stock now"]),
+                el("p", { className: "help", text: "Leave it unticked when the manager receives the delivery: they check it in under Purchases." })
+            ]);
+        }
 
         var note = el("input", { id: "purchaseNote", type: "text", maxlength: "300", autocomplete: "off", placeholder: "For example: paid with mobile money" });
 
         var opened = openSheet({
             kicker: "Record a purchase",
             title: "What did you buy?",
-            sub: "The stock goes up when the manager checks it in.",
+            sub: can("purchases.receive")
+                ? "The stock goes up when it is checked in. Already in the store room? Tick the box at the end."
+                : "The stock goes up when the manager checks it in.",
             wide: true,
             fields: [
                 el("div", { className: "sheet-pair" }, [
@@ -3967,7 +4491,8 @@
                 el("button", { type: "button", className: "btn btn-ghost add-line-big", text: "+ Add another item", onclick: function () { addLine().focus(); } }),
                 totalLine,
                 budgetBox,
-                sheetField("purchaseNote", "Note (optional)", [note])
+                sheetField("purchaseNote", "Note (optional)", [note]),
+                inStoreField
             ],
             submitText: "Save purchase",
             onSubmit: async function (ctx) {
@@ -3998,7 +4523,20 @@
                 var warn = data.warnings.map(function (w) {
                     return " Over the " + w.category + " budget by " + formatRwf(w.over) + ".";
                 }).join("");
-                toast(data.purchase.ref + " saved (" + formatRwf(data.purchase.total) + "). The manager checks it in when it arrives." + warn, Boolean(warn));
+
+                if (inStore && inStore.checked) {
+                    try {
+                        await api("POST", "/admin/purchases/" + data.purchase._id + "/receive", {
+                            note: "Checked in when it was recorded",
+                            lines: body.lines.map(function (line) { return { itemId: line.itemId, received: line.quantity }; })
+                        });
+                        toast(data.purchase.ref + " saved (" + formatRwf(data.purchase.total) + ") and added to the stock." + warn, Boolean(warn));
+                    } catch (error) {
+                        toast(data.purchase.ref + " saved, but it couldn't be checked in: " + error.message + " Check it in under Purchases.", true);
+                    }
+                } else {
+                    toast(data.purchase.ref + " saved (" + formatRwf(data.purchase.total) + "). The manager checks it in when it arrives." + warn, Boolean(warn));
+                }
                 load("stock", true);
             }
         });
@@ -4009,7 +4547,7 @@
         checkBudget();
     }
 
-    $("newPurchaseButton").addEventListener("click", openPurchaseForm);
+    $("newPurchaseButton").addEventListener("click", function () { openPurchaseForm(); });
 
     /* ----- Budget (owner) ----- */
 
