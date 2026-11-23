@@ -3293,7 +3293,7 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
 
 /* =========================================
    PHOTOS: a collage, like a photo grid.
-   One big photo and smaller ones around it, with thin white gaps and
+   One big photo and smaller ones around it, touching (no gaps), with
    rounded outer corners. Pointing at a photo darkens it a little and the
    photo grows inside its frame; tapping opens it full screen (gallery.js).
    Phone: two columns.  Tablet and computer: four columns, three rows.
@@ -3302,7 +3302,7 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-rows: 118px;
-    gap: 6px;
+    gap: 0;
     margin: 14px 0 0;
     padding: 0;
     list-style: none;
@@ -3401,7 +3401,6 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     .photo-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
         grid-auto-rows: 150px;
-        gap: 8px;
         margin-top: 24px;
         border-radius: 20px;
     }
