@@ -1077,6 +1077,163 @@ router.get("/report", requirePermission("stock.view"), async (req, res) => {
   }
 });
 
+/* ---------- Month by month (owner) ----------
+   GET /months: the last 6 calendar months, this one so far. For each month: money paid
+   to suppliers (and by category), stock used, written off and count differences (each
+   item at its last price paid, like the report), room-nights sold and the value in store
+   at the month's end. Also this month so far against the same days of last month, and
+   the price paid for each item last month and this month (from the purchases). */
+
+const MONTHS_SHOWN = 6;
+
+function nextMonthText(month) {
+  const [year, mon] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, mon, 1)).toISOString().slice(0, 7);
+}
+
+function previousMonthText(month) {
+  const [year, mon] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, mon - 2, 1)).toISOString().slice(0, 7);
+}
+
+router.get("/months", requirePermission("stock.prices"), async (req, res) => {
+  try {
+    const todayText = innToday();
+    const today = parseDay(todayText);
+    const thisMonth = todayText.slice(0, 7);
+
+    const months = [thisMonth];
+    while (months.length < MONTHS_SHOWN) months.unshift(previousMonthText(months[0]));
+
+    const startOf = (month) => parseDay(`${month}-01`);
+    const lastDayOf = (month) => addDays(startOf(nextMonthText(month)), -1);
+    const firstStart = startOf(months[0]);
+
+    const [items, moves, purchases] = await Promise.all([
+      StockItem.find().select("quantity unitCost").lean(),
+      StockMovement.find({ day: { $gte: firstStart } }).select("item type change day").lean(),
+      Purchase.find({ status: { $ne: "cancelled" }, day: { $gte: firstStart } }).select("day lines").lean(),
+    ]);
+
+    const costOf = new Map(items.map((item) => [String(item._id), item.unitCost || 0]));
+    const valueOf = (move) => move.change * (costOf.get(String(move.item)) || 0);
+
+    // the money and stock figures for the days from..to (both included)
+    async function figures(from, to) {
+      const during = moves.filter((move) => move.day >= from && move.day <= to);
+      const sumOf = (type) => round(during.filter((move) => move.type === type).reduce((total, move) => total + valueOf(move), 0));
+
+      const byCategory = {};
+      let bought = 0;
+      purchases
+        .filter((purchase) => purchase.day >= from && purchase.day <= to)
+        .forEach((purchase) => {
+          purchase.lines.forEach((line) => {
+            const spent = line.quantity * line.unitCost;
+            bought += spent;
+            byCategory[line.category] = (byCategory[line.category] || 0) + spent;
+          });
+        });
+      Object.keys(byCategory).forEach((category) => { byCategory[category] = Math.round(byCategory[category]); });
+
+      return {
+        bought: Math.round(bought),
+        byCategory,
+        used: -sumOf("out"),
+        writtenOff: -sumOf("loss"),
+        corrections: sumOf("count"),
+        roomNights: await roomNightsBetween(from, to),
+      };
+    }
+
+    // what was in store when the day ended: today's stock less every change after it
+    function valueAtEndOf(day) {
+      const after = new Map();
+      moves.filter((move) => move.day > day).forEach((move) => {
+        const id = String(move.item);
+        after.set(id, (after.get(id) || 0) + move.change);
+      });
+      return Math.round(items.reduce((total, item) => {
+        const id = String(item._id);
+        const quantity = item.quantity - (after.get(id) || 0);
+        return total + Math.max(quantity, 0) * (costOf.get(id) || 0);
+      }, 0));
+    }
+
+    const rows = [];
+    for (const month of months) {
+      const from = startOf(month);
+      const lastDay = lastDayOf(month);
+      const to = lastDay < today ? lastDay : today;
+      rows.push({
+        month,
+        from: toDay(from),
+        to: toDay(to),
+        soFar: month === thisMonth && to < lastDay,
+        ...(await figures(from, to)),
+        valueAtEnd: valueAtEndOf(to),
+      });
+    }
+
+    // this month so far, against the same days of last month
+    const lastMonth = months[months.length - 2];
+    const dayOfMonth = Number(todayText.slice(8, 10));
+    const sameTo = (() => {
+      const end = addDays(startOf(lastMonth), dayOfMonth - 1);
+      return end < lastDayOf(lastMonth) ? end : lastDayOf(lastMonth);
+    })();
+    const sameDays = {
+      days: dayOfMonth,
+      thisMonth: { from: toDay(startOf(thisMonth)), to: todayText, ...rows[rows.length - 1] },
+      lastMonth: { from: toDay(startOf(lastMonth)), to: toDay(sameTo), ...(await figures(startOf(lastMonth), sameTo)) },
+    };
+    delete sameDays.thisMonth.month;
+
+    // the price paid for each item, last month and this month (average of the purchases)
+    const prices = new Map();
+    purchases.forEach((purchase) => {
+      const month = toDay(purchase.day).slice(0, 7);
+      if (month !== lastMonth && month !== thisMonth) return;
+      const when = month === thisMonth ? "now" : "before";
+      purchase.lines.forEach((line) => {
+        const id = String(line.item);
+        const entry = prices.get(id) || { itemName: line.itemName, unit: line.unit, category: line.category, before: null, now: null };
+        const slot = entry[when] || { quantity: 0, spent: 0 };
+        slot.quantity += line.quantity;
+        slot.spent += line.quantity * line.unitCost;
+        entry[when] = slot;
+        prices.set(id, entry);
+      });
+    });
+    const priceRows = [...prices.values()]
+      .map((entry) => {
+        const average = (slot) => (slot && slot.quantity ? Math.round(slot.spent / slot.quantity) : null);
+        return {
+          itemName: entry.itemName,
+          unit: entry.unit,
+          category: entry.category,
+          before: average(entry.before),
+          now: average(entry.now),
+          boughtBefore: entry.before ? round(entry.before.quantity) : 0,
+          boughtNow: entry.now ? round(entry.now.quantity) : 0,
+        };
+      })
+      .sort((a, b) => a.category.localeCompare(b.category) || a.itemName.localeCompare(b.itemName));
+
+    return res.json({
+      success: true,
+      months: rows,
+      thisMonth,
+      lastMonth,
+      sameDays,
+      prices: priceRows,
+      categories: STOCK_CATEGORIES,
+    });
+  } catch (error) {
+    return serverError(res, "Month by month failed", error);
+  }
+});
+
 /* ---------- Monthly budgets (owner) ---------- */
 
 router.get("/budget", requirePermission("budget.manage"), async (req, res) => {

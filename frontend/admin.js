@@ -5245,13 +5245,166 @@
         if (!nights) box.appendChild(note("There were no confirmed room-nights in this period, so there is no cost per room-night."));
     }
 
+    /* ----- Month by month (owner): always calendar months, whatever dates are chosen above -----
+       This month so far against the same days of last month; the last 6 months in two small
+       charts and a table; spending by category per month; prices paid last month and this month. */
+
+    // Jan, Feb … Sep (always three letters)
+    function shortMonth(month) {
+        return monthOnly(month).slice(0, 3);
+    }
+
+    function monthOnly(month) {
+        return new Date(month + "-01T00:00:00Z").toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
+    }
+
+    function perNightOf(row) {
+        return row.roomNights ? row.used / row.roomNights : null;
+    }
+
+    // the months worth showing: from the first one with anything in it (at least the last two)
+    function monthsWithData(data) {
+        var rows = data.months;
+        var first = rows.findIndex(function (m) { return m.bought || m.used || m.writtenOff || m.corrections || m.roomNights || m.valueAtEnd; });
+        if (first < 0) first = rows.length - 2;
+        return rows.slice(Math.min(first, rows.length - 2));
+    }
+
+    /* A small column chart: one bar per month, the same ink for every month,
+       this month (so far) striped; values on the last two bars, the rest on hover and in the table. */
+    function monthChart(titleText, rows, valueOf) {
+        var values = rows.map(valueOf);
+        var max = Math.max.apply(null, values.concat([1]));
+        var plot = el("div", {
+            className: "mm-plot",
+            role: "img",
+            "aria-label": titleText + " per month: " + rows.map(function (m, i) {
+                return shortMonth(m.month) + (m.soFar ? " so far" : "") + " " + rwf(values[i]);
+            }).join(", ")
+        });
+        var axis = el("div", { className: "mm-axis", "aria-hidden": "true" });
+
+        rows.forEach(function (m, i) {
+            var labelled = i >= rows.length - 2;
+            var bar = el("span", { className: "mm-bar" + (m.soFar ? " is-so-far" : "") });
+            bar.style.height = Math.max(values[i] > 0 ? 2 : 0, Math.round((values[i] / max) * 100)) + "%";
+            plot.appendChild(el("div", { className: "mm-col" }, [
+                labelled ? el("span", { className: "mm-value", text: num(values[i]) }) : null,
+                bar,
+                el("span", { className: "mm-tip", "aria-hidden": "true", text: monthOnly(m.month) + (m.soFar ? " so far" : "") + ": " + rwf(values[i]) })
+            ]));
+            axis.appendChild(el("span", { text: shortMonth(m.month) + (m.soFar ? " (so far)" : "") }));
+        });
+
+        return el("figure", { className: "mm-chart" }, [
+            el("figcaption", { className: "mm-chart-title" }, [el("strong", { text: titleText }), el("span", { text: "RWF" })]),
+            plot,
+            axis
+        ]);
+    }
+
+    function renderMonths(data) {
+        var box = $("monthReport");
+        box.textContent = "";
+        if (!data) return;
+
+        var rows = monthsWithData(data);
+        var now = data.months[data.months.length - 1];
+        var before = data.months[data.months.length - 2];
+        var same = data.sameDays;
+        var nowName = monthOnly(data.thisMonth);
+        var beforeName = monthOnly(data.lastMonth);
+
+        box.appendChild(title("This month and last month"));
+
+        // this month so far against the same days of last month
+        var a = same.thisMonth;
+        var b = same.lastMonth;
+        var heads = now.soFar
+            ? [{ head: "Measure", left: true }, { head: nowName + " so far" }, { head: beforeName + ", same days" }, { head: "Change" }]
+            : [{ head: "Measure", left: true }, { head: nowName }, { head: beforeName }, { head: "Change" }];
+        var perA = perNightOf(a);
+        var perB = perNightOf(b);
+        box.appendChild(dataTable(
+            now.soFar
+                ? nowName + " 1–" + Number(a.to.slice(8, 10)) + " against " + beforeName + " 1–" + Number(b.to.slice(8, 10))
+                : nowName + " against " + beforeName,
+            heads, [
+                ["Paid to suppliers", rwf(a.bought), rwf(b.bought), changeText(a.bought, b.bought)],
+                ["Stock used", rwf(a.used), rwf(b.used), changeText(a.used, b.used)],
+                ["Written off", rwf(a.writtenOff), rwf(b.writtenOff), changeText(a.writtenOff, b.writtenOff)],
+                ["Count differences", signedRwf(a.corrections), signedRwf(b.corrections),
+                    Math.round(a.corrections) && Math.round(b.corrections) ? changeText(Math.abs(a.corrections), Math.abs(b.corrections)) : "—"],
+                ["Room-nights sold", String(a.roomNights), String(b.roomNights), changeText(a.roomNights, b.roomNights)],
+                ["Stock used per room-night", perA === null ? "—" : rwf(perA), perB === null ? "—" : rwf(perB),
+                    perA === null || perB === null ? "—" : changeText(perA, perB)]
+            ], null, "compare stack"));
+
+        if (now.soFar) {
+            box.appendChild(note("Same days, so the two months compare fairly. " + monthName(data.lastMonth) + " as a whole month: " +
+                rwf(before.bought) + " paid to suppliers, " + rwf(before.used) + " of stock used, " + rwf(before.writtenOff) + " written off."));
+        }
+
+        // the last 6 months
+        box.appendChild(title("Month by month"));
+        box.appendChild(el("div", { className: "mm-charts" }, [
+            monthChart("Paid to suppliers", rows, function (m) { return m.bought; }),
+            monthChart("Stock used", rows, function (m) { return m.used; })
+        ]));
+
+        box.appendChild(dataTable("Each month (" + monthName(rows[0].month) + " to " + monthName(data.thisMonth) + ")",
+            [{ head: "Month", left: true }, { head: "Paid to suppliers" }, { head: "Stock used" }, { head: "Written off" },
+                { head: "Count differences" }, { head: "Room-nights" }, { head: "Used per room-night" }, { head: "Value in store at the end" }],
+            rows.slice().reverse().map(function (m) {
+                var per = perNightOf(m);
+                return [monthName(m.month) + (m.soFar ? " (so far)" : ""), rwf(m.bought), rwf(m.used), rwf(m.writtenOff), signedRwf(m.corrections),
+                    String(m.roomNights), per === null ? "—" : rwf(per), rwf(m.valueAtEnd)];
+            }), null, "month-list stack"));
+
+        // what was bought, by category, each month
+        var categories = (data.categories || []).filter(function (c) {
+            return rows.some(function (m) { return m.byCategory && m.byCategory[c]; });
+        });
+        if (categories.length) {
+            box.appendChild(dataTable("Paid to suppliers, by category",
+                [{ head: "Category", left: true }].concat(rows.map(function (m) { return { head: shortMonth(m.month) + (m.soFar ? " (so far)" : "") }; })),
+                categories.map(function (c) {
+                    return [c].concat(rows.map(function (m) { return m.byCategory[c] ? rwf(m.byCategory[c]) : "—"; }));
+                }),
+                ["Total"].concat(rows.map(function (m) { return rwf(m.bought); })), "category-months stack"));
+        }
+
+        // prices paid: last month and this month
+        if (data.prices && data.prices.length) {
+            box.appendChild(dataTable("Prices paid for one: " + beforeName + " and " + nowName,
+                [{ head: "Item", left: true }, { head: beforeName }, { head: nowName }, { head: "Change" }],
+                data.prices.map(function (p) {
+                    var one = " for one " + oneUnit(p.unit);
+                    return [
+                        p.itemName,
+                        p.before === null ? "Not bought" : rwf(p.before) + one,
+                        p.now === null ? "Not bought" : rwf(p.now) + one,
+                        p.before === null || p.now === null ? "—" : { text: changeText(p.now, p.before), className: p.now > p.before ? "is-strong" : null }
+                    ];
+                }), null, "price-list stack"));
+            box.appendChild(note("The average price paid in each month's purchases. A rise shows in bold."));
+        } else {
+            box.appendChild(emptyNote("No purchases in " + beforeName + " or " + nowName + " yet, so there are no prices to compare."));
+        }
+    }
+
     async function loadReport() {
         if (!stock.reportFrom) setPeriod("month");
 
         $("reportRange").textContent = "Loading…";
 
-        var data = await api("GET", "/admin/stock/report?from=" + stock.reportFrom + "&to=" + stock.reportTo);
+        var answers = await Promise.all([
+            api("GET", "/admin/stock/report?from=" + stock.reportFrom + "&to=" + stock.reportTo),
+            can("stock.prices") ? api("GET", "/admin/stock/months") : Promise.resolve(null)
+        ]);
+        var data = answers[0];
         stock.report = data;
+        stock.months = answers[1];
         $("reportFrom").value = data.from;
         $("reportTo").value = data.to;
 
@@ -5260,6 +5413,7 @@
             plural(data.rows.length, "item", "items");
 
         renderSummary(data);
+        renderMonths(stock.months);
         renderStockTables(data, prices);
         showReportView();
         renderReorder(data, prices);
@@ -5335,6 +5489,107 @@
     });
 
     /* ----- Excel: one sheet per part, with RWF formats and totals that Excel adds up ----- */
+
+    /* The owner's "Month by month" sheet: the same figures as the screen, with formulas for totals and changes */
+    function monthSheet(m, footer) {
+        var X = window.ZDXlsx;
+        var H = function (text) { return { v: text, s: "head" }; };
+        var M = function (value) { return { v: Math.round(Number(value || 0)), s: "money" }; };
+        var rows = monthsWithData(m);
+        var now = m.months[m.months.length - 1];
+        var nowName = monthOnly(m.thisMonth);
+        var beforeName = monthOnly(m.lastMonth);
+        var a = m.sameDays.thisMonth;
+        var b = m.sameDays.lastMonth;
+        var out = [];
+
+        function change(row, value, before, absolute) {
+            if (!Math.round(before)) return "";
+            var f = absolute ? "IF(C" + row + "=0,\"\",ABS(B" + row + ")/ABS(C" + row + ")-1)" : "IF(C" + row + "=0,\"\",B" + row + "/C" + row + "-1)";
+            var v = absolute ? Math.abs(value) / Math.abs(before) - 1 : value / before - 1;
+            return { v: Math.round(v * 100) / 100, s: "pct", f: f };
+        }
+
+        out.push([{ v: "This month and last month", s: "subtitle" }]);
+        out.push([H("Measure"), H(now.soFar ? nowName + " 1–" + Number(a.to.slice(8, 10)) + " (so far)" : nowName),
+            H(now.soFar ? beforeName + " 1–" + Number(b.to.slice(8, 10)) + " (same days)" : beforeName), H("Change")]);
+        [
+            ["Paid to suppliers", a.bought, b.bought, true, false],
+            ["Stock used", a.used, b.used, true, false],
+            ["Written off", a.writtenOff, b.writtenOff, true, false],
+            ["Count differences", a.corrections, b.corrections, true, true],
+            ["Room-nights sold", a.roomNights, b.roomNights, false, false]
+        ].forEach(function (k) {
+            var row = out.length + 1;
+            out.push([k[0], k[3] ? M(k[1]) : { v: k[1] }, k[3] ? M(k[2]) : { v: k[2] }, change(row, k[1], k[2], k[4])]);
+        });
+        var perRow = out.length + 1;
+        out.push(["Stock used per room-night",
+            a.roomNights ? { v: Math.round(a.used / a.roomNights), s: "money", f: "ROUND(B" + (perRow - 4) + "/B" + (perRow - 1) + ",0)" } : "—",
+            b.roomNights ? { v: Math.round(b.used / b.roomNights), s: "money", f: "ROUND(C" + (perRow - 4) + "/C" + (perRow - 1) + ",0)" } : "—",
+            a.roomNights && b.roomNights ? change(perRow, a.used / a.roomNights, b.used / b.roomNights) : ""]);
+        if (now.soFar) out.push([{ v: "Same days of each month, so the two compare fairly.", s: "note" }]);
+        out.push([]);
+
+        // each month, oldest first
+        out.push([{ v: "Each month", s: "subtitle" }]);
+        out.push([H("Month"), H("Paid to suppliers"), H("Stock used"), H("Written off"), H("Count differences"), H("Room-nights"),
+            H("Used per room-night"), H("Value in store at the end")]);
+        var first = out.length + 1;
+        rows.forEach(function (mo) {
+            var row = out.length + 1;
+            out.push([monthName(mo.month) + (mo.soFar ? " (so far)" : ""), M(mo.bought), M(mo.used), M(mo.writtenOff), M(mo.corrections), { v: mo.roomNights },
+                mo.roomNights ? { v: Math.round(mo.used / mo.roomNights), s: "money", f: "IF(F" + row + "=0,\"\",ROUND(C" + row + "/F" + row + ",0))" } : "",
+                M(mo.valueAtEnd)]);
+        });
+        var last = out.length;
+        var sum = function (key) { return rows.reduce(function (t, mo) { return t + (mo[key] || 0); }, 0); };
+        var col = function (i) { return X.column(i); };
+        var totalRow = last + 1;
+        out.push([{ v: "Total", s: "total" },
+            { v: Math.round(sum("bought")), s: "moneyTotal", f: "SUM(" + col(1) + first + ":" + col(1) + last + ")" },
+            { v: Math.round(sum("used")), s: "moneyTotal", f: "SUM(" + col(2) + first + ":" + col(2) + last + ")" },
+            { v: Math.round(sum("writtenOff")), s: "moneyTotal", f: "SUM(" + col(3) + first + ":" + col(3) + last + ")" },
+            { v: Math.round(sum("corrections")), s: "moneyTotal", f: "SUM(" + col(4) + first + ":" + col(4) + last + ")" },
+            { v: sum("roomNights"), s: "numberTotal", f: "SUM(" + col(5) + first + ":" + col(5) + last + ")" },
+            sum("roomNights") ? { v: Math.round(sum("used") / sum("roomNights")), s: "moneyTotal", f: "ROUND(C" + totalRow + "/F" + totalRow + ",0)" } : { v: "", s: "total" },
+            { v: "", s: "total" }]);
+        out.push([{ v: "Values use each item's last price paid. Room-nights come from confirmed bookings.", s: "note" }]);
+        out.push([]);
+
+        // paid to suppliers, by category, each month
+        var categories = (m.categories || []).filter(function (c) {
+            return rows.some(function (mo) { return mo.byCategory && mo.byCategory[c]; });
+        });
+        if (categories.length) {
+            out.push([{ v: "Paid to suppliers, by category", s: "subtitle" }]);
+            out.push([H("Category")].concat(rows.map(function (mo) { return H(monthName(mo.month) + (mo.soFar ? " (so far)" : "")); })));
+            var cFirst = out.length + 1;
+            categories.forEach(function (c) {
+                out.push([c].concat(rows.map(function (mo) { return M(mo.byCategory[c] || 0); })));
+            });
+            var cLast = out.length;
+            out.push([{ v: "Total", s: "total" }].concat(rows.map(function (mo, i) {
+                return { v: Math.round(mo.bought), s: "moneyTotal", f: "SUM(" + col(i + 1) + cFirst + ":" + col(i + 1) + cLast + ")" };
+            })));
+            out.push([]);
+        }
+
+        // prices paid
+        out.push([{ v: "Prices paid for one (average of each month's purchases)", s: "subtitle" }]);
+        out.push([H("Item"), H(beforeName), H(nowName), H("Change"), H("Counted in"), H("Bought in " + beforeName), H("Bought in " + nowName)]);
+        if (!(m.prices || []).length) out.push([{ v: "No purchases in " + beforeName + " or " + nowName + " yet.", s: "note" }]);
+        (m.prices || []).forEach(function (p) {
+            var row = out.length + 1;
+            out.push([p.itemName,
+                p.before === null ? "Not bought" : M(p.before),
+                p.now === null ? "Not bought" : M(p.now),
+                p.before === null || p.now === null ? "" : { v: Math.round((p.now / p.before - 1) * 100) / 100, s: "pct", f: "C" + row + "/B" + row + "-1" },
+                p.unit, { v: p.boughtBefore || 0 }, { v: p.boughtNow || 0 }]);
+        });
+
+        return { name: "Month by month", cols: [34, 18, 18, 14, 16, 14, 16, 18], footer: footer, rows: out };
+    }
 
     function excelSheets(data) {
         var X = window.ZDXlsx;
@@ -5424,6 +5679,7 @@
             s.push(["Items running low today", { v: (data.reorder || []).length }]);
         }
         sheets.push({ name: "Summary", cols: [52, 22, 18, 12], rows: s, footer: footer });
+        if (prices && stock.months) sheets.push(monthSheet(stock.months, "Zebra Dormus Inn · Stock report · Month by month"));
 
         /* Items */
         var itemHead = ["Category", "Item", "Counted in", "At start", "Received", "Used", "Expired / damaged", "Count differences", "Remaining", "Warn at"];

@@ -3767,3 +3767,174 @@ html.sheet-open body {
 .sheet-check .help {
     margin: 0;
 }
+
+/* ---------- Month by month: two small column charts ---------- */
+
+.mm-charts {
+    display: grid;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.mm-chart {
+    margin: 0;
+    padding: 16px 16px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--white);
+}
+
+.mm-chart-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 15px;
+}
+
+.mm-chart-title span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.mm-plot {
+    display: flex;
+    align-items: stretch;
+    height: 150px;
+    padding-top: 22px; /* room for the value on the tallest bar */
+    border-bottom: 1px solid #DDDDDD;
+}
+
+.mm-col {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.mm-bar {
+    display: block;
+    width: 100%;
+    max-width: 24px;
+    border-radius: 4px 4px 0 0;
+    background: var(--ink);
+}
+
+/* this month, still going: striped */
+.mm-bar.is-so-far {
+    background: repeating-linear-gradient(135deg, var(--ink) 0 3px, #8C8C8C 3px 6px);
+}
+
+.mm-value {
+    margin-bottom: 4px;
+    color: var(--ink);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.mm-tip {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    z-index: 2;
+    display: none;
+    padding: 5px 9px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--white);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.mm-col:first-child .mm-tip {
+    left: 0;
+    transform: none;
+}
+
+.mm-col:last-child .mm-tip {
+    right: 0;
+    left: auto;
+    transform: none;
+}
+
+.mm-col:hover .mm-tip {
+    display: block;
+}
+
+.mm-col:hover .mm-bar {
+    opacity: 0.82;
+}
+
+.mm-axis {
+    display: flex;
+    margin-top: 6px;
+}
+
+.mm-axis span {
+    flex: 1 1 0;
+    min-width: 0;
+    color: var(--muted);
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: center;
+}
+
+#monthReport .report-wrap {
+    margin-top: 14px;
+}
+
+@media (min-width: 720px) {
+    .mm-charts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media print {
+    #printReport .mm-charts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        break-inside: avoid;
+    }
+
+    #printReport .mm-chart {
+        padding: 8px 10px;
+        border-radius: 6px;
+    }
+
+    #printReport .mm-plot {
+        height: 110px;
+    }
+
+    #printReport .mm-bar {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    #printReport .mm-tip {
+        display: none !important;
+    }
+}
+
+/* the months table has eight columns: headings wrap so it fits a computer screen without scrolling */
+.month-list thead th {
+    white-space: normal;
+    vertical-align: bottom;
+}
+
+.month-list th,
+.month-list td {
+    padding-right: 10px;
+    padding-left: 10px;
+}
+
+.month-list tbody th.room-col {
+    min-width: 120px;
+}
