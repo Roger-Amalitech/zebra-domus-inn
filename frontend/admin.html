@@ -370,6 +370,32 @@
             <!-- Audit (owner) -->
             <div class="stock-panel" id="stock-audit" hidden>
                 <p class="stock-key">Every change anyone makes, with who and when. Nobody can edit or delete it.</p>
+
+                <!-- the period: quick choices or any two dates -->
+                <div class="report-controls audit-period">
+                    <div class="report-quick" role="group" aria-label="Period">
+                        <button type="button" class="btn btn-ghost btn-small" data-audit-period="today" aria-pressed="false">Today</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-audit-period="week" aria-pressed="false">Last 7 days</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-audit-period="month" aria-pressed="false">This month</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-audit-period="last-month" aria-pressed="false">Last month</button>
+                        <button type="button" class="btn btn-ghost btn-small" data-audit-period="all" aria-pressed="false">Everything</button>
+                    </div>
+                    <div class="report-dates">
+                        <div class="report-date">
+                            <label for="auditFrom">From</label>
+                            <input type="date" id="auditFrom">
+                        </div>
+                        <div class="report-date">
+                            <label for="auditTo">To</label>
+                            <input type="date" id="auditTo">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- for the period: the money, who did what, sign-ins and security alerts -->
+                <div id="auditSummary" aria-live="polite"></div>
+
+                <h2 class="section-title audit-list-title">Every change, day by day</h2>
                 <div class="filters audit-filters">
                     <div class="field-select">
                         <label for="auditArea" class="visually-hidden">Show</label>

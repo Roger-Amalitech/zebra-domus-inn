@@ -3745,19 +3745,34 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     overflow: hidden;
 }
 
-/* ===== Phones: only the headline on the photo, sitting just above the date card =====
-   The short description under it is hidden on phones (it is still shown from tablets up),
-   the photo is a little shorter, and the headline sits low in it instead of in the middle,
-   so there is no big empty gap above "Check-in – Check-out". */
-@media (max-width: 767px) {
+/* ===== Top of the home page: only the headline on the photo, right above the date box =====
+   The short description under the headline is hidden on every screen. Phones and tablets:
+   the headline sits low in the photo, just above the date card. Computers: the date bar
+   moves up to sit just under the headline, as on Marriott. */
+.hero-text .lead { display: none; }
+
+@media (max-width: 1023px) {
     :root { --hero-fade: 64px; } /* the soft bottom edge mostly hides under the card */
+    .hero-text { justify-content: flex-end; }
+    /* it sits over the white gate, so a slightly deeper shadow keeps it readable */
+    .hero-text h1 { text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 2px 24px rgba(0, 0, 0, 0.5); }
+}
+
+/* phones: a little shorter photo; the card covers its last 40px, then about 36px of space */
+@media (max-width: 767px) {
     .hero-image { height: clamp(380px, 54svh, 470px); }
     .has-overlay-header .hero-image { height: calc(clamp(380px, 54svh, 470px) + var(--header-height)); }
-    .hero-text {
-        justify-content: flex-end;
-        padding-bottom: 76px; /* 40px under the card + about 36px of space */
-    }
-    .hero-text .lead { display: none; }
-    /* it now sits over the white gate, so a slightly deeper shadow keeps it readable */
-    .hero-text h1 { text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 2px 24px rgba(0, 0, 0, 0.5); }
+    .hero-text { padding-bottom: 76px; }
+}
+
+/* tablets: the card covers the last 56px of the photo, then about 40px of space */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .hero-image,
+    .has-overlay-header .hero-image { height: calc(clamp(420px, 50vh, 560px) + var(--header-height)); }
+    .hero-text { padding-bottom: 96px; }
+}
+
+/* computers: the bar starts 48px under the headline (one line, its line height is 1.12) */
+@media (min-width: 1024px) {
+    .search { top: calc(var(--header-height) + var(--hero-top) + 1.12 * clamp(44px, 3.8vw, 56px) + 48px); }
 }

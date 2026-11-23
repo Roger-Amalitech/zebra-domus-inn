@@ -5861,11 +5861,16 @@
         }, 1000);
     }
 
-    /* ----- Audit log (owner) ----- */
+    /* ----- Audit log (owner) -----
+       Choose a period (Today, Last 7 days, This month, Last month, Everything, or any two dates).
+       For that period: the money (paid to suppliers, stock used, written off, count differences),
+       how many changes, sign-ins and security alerts, and who did what. Then every change,
+       grouped by day (the date once, then the time of each change). */
 
     var AUDIT_AREA_NAMES = {
         "sign-in": "Sign-in",
         bookings: "Bookings",
+        events: "Events",
         rooms: "Rooms",
         users: "Users",
         stock: "Stock",
@@ -5874,9 +5879,127 @@
         budget: "Budget"
     };
 
+    stock.auditPeriod = "month";
+    stock.auditFrom = "";
+    stock.auditTo = "";
+    stock.auditDay = "";
+
+    function setAuditPeriod(kind) {
+        var today = kigaliToday();
+        var first = today.slice(0, 8) + "01";
+        stock.auditPeriod = kind;
+
+        if (kind === "today") {
+            stock.auditFrom = today;
+            stock.auditTo = today;
+        } else if (kind === "week") {
+            stock.auditFrom = addDays(today, -6);
+            stock.auditTo = today;
+        } else if (kind === "last-month") {
+            var lastDay = addDays(first, -1);
+            stock.auditFrom = lastDay.slice(0, 8) + "01";
+            stock.auditTo = lastDay;
+        } else if (kind === "all") {
+            stock.auditFrom = "";
+            stock.auditTo = today;
+        } else {
+            stock.auditPeriod = kind === "dates" ? "dates" : "month";
+            if (kind !== "dates") {
+                stock.auditFrom = first;
+                stock.auditTo = today;
+            }
+        }
+
+        $("auditFrom").value = stock.auditFrom;
+        $("auditTo").value = stock.auditTo;
+        document.querySelectorAll("[data-audit-period]").forEach(function (b) {
+            b.setAttribute("aria-pressed", String(b.getAttribute("data-audit-period") === stock.auditPeriod));
+        });
+    }
+
+    function auditPeriodText() {
+        if (!stock.auditFrom) return "Everything up to " + longDay(stock.auditTo);
+        return stock.auditFrom === stock.auditTo ? longDay(stock.auditFrom) : rangeText(stock.auditFrom, stock.auditTo);
+    }
+
+    function auditPeriodParams() {
+        var params = [];
+        if (stock.auditFrom) params.push("from=" + stock.auditFrom);
+        if (stock.auditTo) params.push("to=" + stock.auditTo);
+        return params;
+    }
+
+    // the Rwanda date of a moment, as "YYYY-MM-DD"
+    function kigaliDayOf(iso) {
+        try {
+            return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Kigali", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+        } catch (error) {
+            return String(iso).slice(0, 10);
+        }
+    }
+
+    function areasText(areas) {
+        return Object.keys(areas)
+            .sort(function (a, b) { return areas[b] - areas[a]; })
+            .map(function (area) { return (AUDIT_AREA_NAMES[area] || area) + " " + areas[area]; })
+            .join(", ") || "Only signed in";
+    }
+
+    function renderAuditSummary(summary, report) {
+        var box = $("auditSummary");
+        box.textContent = "";
+
+        box.appendChild(el("h2", { className: "section-title" }, [
+            document.createTextNode("In this period"),
+            el("span", { className: "audit-range", text: auditPeriodText() })
+        ]));
+
+        // the money
+        if (report && report.totals) {
+            var t = report.totals;
+            var purchases = (report.suppliers || []).reduce(function (n, s) { return n + s.purchases; }, 0);
+            box.appendChild(el("div", { className: "stats money-stats audit-money" }, [
+                moneyStat(boughtTotal(report), "Paid to suppliers", plural(purchases, "purchase", "purchases")),
+                moneyStat(t.used, "Stock used", "Issued to departments"),
+                moneyStat(t.writtenOff, "Written off", "Expired, damaged or lost"),
+                moneyStat(t.corrections, "Count differences", t.corrections < 0 ? "Missing at counts" : t.corrections > 0 ? "Found at counts" : "Counts matched the record", true)
+            ]));
+        }
+
+        // how busy, and anything worrying
+        box.appendChild(el("div", { className: "stats audit-counts" }, [
+            staticStat(summary.changes, "Changes made", plural(summary.byPerson.filter(function (p) { return p.changes; }).length, "person", "people")),
+            staticStat(summary.signIns, "Sign-ins", "To the dashboard"),
+            el("div", { className: "stat is-static" + (summary.securityAlerts ? " is-alert" : "") }, [
+                el("span", { className: "stat-number", text: String(summary.securityAlerts) }),
+                el("span", { className: "stat-label", text: "Security alerts" }),
+                el("span", { className: "stat-note", text: summary.securityAlerts ? "Wrong passwords or codes: check below" : "None" })
+            ])
+        ]));
+
+        // who did what
+        if (summary.byPerson.length) {
+            box.appendChild(dataTable("Who did what",
+                [{ head: "Person", left: true }, { head: "Role", left: true }, { head: "Changes" }, { head: "Sign-ins" }, { head: "What they changed", left: true }],
+                summary.byPerson.map(function (p) {
+                    return [p.name, ROLE_NAMES[p.role] || p.role || "—", String(p.changes), String(p.signIns), areasText(p.areas)];
+                }), null, "audit-people stack"));
+        }
+
+        if (report && report.totals) {
+            box.appendChild(note("Money uses each item's last price paid, as in the Report tab. Open the Report tab for the same period to see it item by item."));
+        }
+    }
+
+    function auditDayHeading(day, count) {
+        return el("h3", { className: "audit-day" }, [
+            el("span", { text: formatDay(day, { weekday: "long", day: "numeric", month: "long", year: "numeric" }) })
+        ]);
+    }
+
     function auditRow(entry) {
         return el("article", { className: "audit-row" }, [
-            el("p", { className: "audit-when", text: bookedAt(entry.createdAt) }),
+            el("p", { className: "audit-when", text: clock(new Date(entry.createdAt)) }),
             el("div", {}, [
                 el("p", { className: "audit-what", text: entry.action }),
                 el("p", {
@@ -5887,25 +6010,37 @@
         ]);
     }
 
-    async function loadAudit(more) {
-        var list = $("auditList");
-        var params = [];
-
+    function auditListParams() {
+        var params = auditPeriodParams();
         if (stock.auditArea) params.push("area=" + encodeURIComponent(stock.auditArea));
         if (stock.auditQ) params.push("q=" + encodeURIComponent(stock.auditQ));
+        return params;
+    }
+
+    async function loadAuditList(more) {
+        var list = $("auditList");
+        var params = auditListParams();
         if (more && stock.auditBefore) params.push("before=" + encodeURIComponent(stock.auditBefore));
 
         if (!more) {
             stock.auditEntries = [];
+            stock.auditDay = "";
             placeholder(list, "Loading the audit log…");
         }
 
-        var data = await api("GET", "/admin/audit" + (params.length ? "?" + params.join("&") : ""));
+        var data = await api("GET", "/admin/audit?" + params.join("&"));
 
         if (!more) list.textContent = "";
-        if (!data.entries.length && !more) list.appendChild(el("p", { className: "empty", text: "Nothing found." }));
+        if (!data.entries.length && !more) {
+            list.appendChild(el("p", { className: "empty", text: stock.auditQ || stock.auditArea ? "Nothing found for this search in this period." : "Nothing happened in this period." }));
+        }
 
         data.entries.forEach(function (entry) {
+            var day = kigaliDayOf(entry.createdAt);
+            if (day !== stock.auditDay) {
+                stock.auditDay = day;
+                list.appendChild(auditDayHeading(day));
+            }
             stock.auditEntries.push(entry);
             list.appendChild(auditRow(entry));
         });
@@ -5915,11 +6050,52 @@
         $("moreAudit").hidden = data.entries.length < 100;
     }
 
+    async function loadAuditSummary() {
+        var box = $("auditSummary");
+        placeholder(box, "Adding up the period…");
+        var answers = await Promise.all([
+            api("GET", "/admin/audit/summary?" + auditPeriodParams().join("&")),
+            can("stock.prices")
+                ? api("GET", "/admin/stock/report?from=" + (stock.auditFrom || "all") + "&to=" + stock.auditTo).catch(function () { return null; })
+                : Promise.resolve(null)
+        ]);
+        renderAuditSummary(answers[0], answers[1]);
+    }
+
+    async function loadAudit(more) {
+        if (!stock.auditTo) setAuditPeriod(stock.auditPeriod || "month");
+        if (more) return loadAuditList(true);
+        await Promise.all([loadAuditSummary(), loadAuditList(false)]);
+    }
+
+    document.querySelectorAll("[data-audit-period]").forEach(function (b) {
+        b.addEventListener("click", function () {
+            setAuditPeriod(b.getAttribute("data-audit-period"));
+            loadAudit(false).catch(showLoadError);
+        });
+    });
+
+    ["auditFrom", "auditTo"].forEach(function (id) {
+        $(id).addEventListener("change", function () {
+            var from = $("auditFrom").value;
+            var to = $("auditTo").value;
+            if (!to) return;
+            if (from && to < from) {
+                toast("The end date can't be before the start date.");
+                return;
+            }
+            stock.auditFrom = from;
+            stock.auditTo = to;
+            setAuditPeriod("dates");
+            loadAudit(false).catch(showLoadError);
+        });
+    });
+
     var auditTimer = null;
 
     $("auditArea").addEventListener("change", function () {
         stock.auditArea = this.value;
-        loadAudit(false).catch(showLoadError);
+        loadAuditList(false).catch(showLoadError);
     });
 
     $("auditSearch").addEventListener("input", function () {
@@ -5927,7 +6103,7 @@
         clearTimeout(auditTimer);
         auditTimer = setTimeout(function () {
             stock.auditQ = box.value.trim();
-            loadAudit(false).catch(showLoadError);
+            loadAuditList(false).catch(showLoadError);
         }, 350);
     });
 
@@ -5935,11 +6111,25 @@
         loadAudit(true).catch(showLoadError);
     });
 
-    $("auditDownload").addEventListener("click", function () {
-        var lines = [["When", "Who", "Role", "Area", "What"]].concat(stock.auditEntries.map(function (entry) {
-            return [bookedAt(entry.createdAt), entry.userName, ROLE_NAMES[entry.role] || entry.role, AUDIT_AREA_NAMES[entry.area] || entry.area, entry.action];
-        }));
-        downloadCsv(lines, "zebra-domus-audit-" + kigaliToday() + ".csv");
+    // the whole period (with the area and search chosen), not only what is on the screen
+    $("auditDownload").addEventListener("click", async function () {
+        var button = this;
+        button.disabled = true;
+        try {
+            var params = auditListParams();
+            if (!stock.auditFrom) params.push("from=2000-01-01");
+            params.push("all=1");
+            var data = await api("GET", "/admin/audit?" + params.join("&"));
+            var lines = [["Date", "Time", "Who", "Role", "Area", "What"]].concat(data.entries.map(function (entry) {
+                return [kigaliDayOf(entry.createdAt), clock(new Date(entry.createdAt)), entry.userName,
+                    ROLE_NAMES[entry.role] || entry.role, AUDIT_AREA_NAMES[entry.area] || entry.area, entry.action];
+            }));
+            downloadCsv(lines, "zebra-domus-audit-" + (stock.auditFrom || "start") + "-to-" + stock.auditTo + ".csv");
+        } catch (error) {
+            showLoadError(error);
+        } finally {
+            button.disabled = false;
+        }
     });
 
     /* ----- Loading the Stock section ----- */

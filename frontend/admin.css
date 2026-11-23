@@ -3938,3 +3938,77 @@ html.sheet-open body {
 .month-list tbody th.room-col {
     min-width: 120px;
 }
+
+/* ---------- Audit: the period, its summary and the changes day by day ---------- */
+
+/* the chosen period stands out */
+.audit-period .report-quick .btn[aria-pressed="true"] {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--white);
+}
+
+#auditSummary .section-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    margin-top: 12px;
+}
+
+.audit-range {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#auditSummary .stats + .stats {
+    margin-top: 10px;
+}
+
+.audit-counts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* a security alert in the period: a red edge and number */
+.stat.is-alert {
+    border-color: #B42318;
+    box-shadow: inset 3px 0 0 #B42318;
+}
+
+.stat.is-alert .stat-number {
+    color: #B42318;
+}
+
+#auditSummary .report-wrap {
+    margin-top: 14px;
+}
+
+.audit-list-title {
+    margin-top: 28px;
+}
+
+/* one heading per day, then the time of each change */
+.audit-day {
+    margin: 14px 0 0;
+    padding: 0 2px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.audit-day:first-child {
+    margin-top: 0;
+}
+
+@media (min-width: 720px) {
+    .audit-row {
+        grid-template-columns: 64px minmax(0, 1fr);
+    }
+}
+
+@media (min-width: 900px) {
+    .audit-money {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
