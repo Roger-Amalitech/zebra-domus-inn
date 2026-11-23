@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 /* Who did what, and when. Written by the server on every change;
    nobody can edit or delete it from the dashboard. */
-const AUDIT_AREAS = ["sign-in", "bookings", "events", "rooms", "users", "stock", "purchases", "requests", "budget"];
+const AUDIT_AREAS = ["sign-in", "bookings", "events", "rooms", "users", "stock", "purchases", "requests", "budget", "debts"];
 
 const auditLogSchema = new mongoose.Schema(
   {

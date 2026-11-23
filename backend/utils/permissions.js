@@ -31,6 +31,9 @@ const PERMISSIONS = [
   { key: "requests.make", label: "Ask for supplies" },
   { key: "requests.manage", label: "Issue or turn down supply requests" },
   { key: "audit.view", label: "See the audit log" },
+  { key: "debts.view", label: "See customers who owe money" },
+  { key: "debts.manage", label: "Record debts and payments" },
+  { key: "debts.forgive", label: "Forgive or cancel a debt" },
 ];
 
 const ALL = PERMISSIONS.map((p) => p.key);
@@ -49,6 +52,8 @@ const ROLE_PERMISSIONS = {
     "purchases.view",
     "purchases.receive",
     "requests.manage",
+    "debts.view",
+    "debts.manage",
   ],
   staff: ["requests.make"],
 };

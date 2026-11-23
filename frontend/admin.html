@@ -68,6 +68,10 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5a5.5 5.5 0 0 0-5.5 5.5c0 3.6 3.4 7.2 5.5 8.5 2.1-1.3 5.5-4.9 5.5-8.5A5.5 5.5 0 0 0 12 2.5z"/><path d="M11 16.5l-1 1.5h4l-1-1.5"/><path d="M12 18c0 1.5-1.5 2-1.5 3.5"/></svg>
                 <span>Events</span>
             </a>
+            <a href="#debts" class="tab" data-view="debts" data-perm="debts.view" hidden>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H5a2 2 0 0 1-2-2"/><circle cx="16.5" cy="13.5" r="1.3"/></svg>
+                <span>Debts</span>
+            </a>
             <a href="#availability" class="tab" data-view="availability" data-perm="bookings.view" hidden>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 <span>Availability</span>
@@ -187,6 +191,39 @@
 
             <p class="count" id="eventCount" aria-live="polite"></p>
             <div class="list" id="eventList"></div>
+        </section>
+
+        <!-- DEBTS: customers who owe the inn money, and what they paid back -->
+        <section class="view" id="view-debts" aria-labelledby="debtsHeading" hidden>
+            <div class="view-head">
+                <h1 id="debtsHeading">Debts</h1>
+                <p class="muted">Customers who owe the inn money, and what they have paid back.</p>
+            </div>
+
+            <div class="stats debt-stats" id="debtStats"></div>
+
+            <div class="event-toolbar debt-toolbar">
+                <div class="segmented" id="debtShow" role="group" aria-label="Which debts">
+                    <button type="button" data-show="open" aria-pressed="true">Still owed</button>
+                    <button type="button" data-show="overdue" aria-pressed="false">Late</button>
+                    <button type="button" data-show="paid" aria-pressed="false">Paid</button>
+                    <button type="button" data-show="closed" aria-pressed="false">Forgiven or cancelled</button>
+                </div>
+                <div class="event-toolbar-buttons">
+                    <button type="button" class="btn btn-ghost btn-small" id="debtDownload">Download for Excel</button>
+                    <button type="button" class="btn btn-primary btn-small" id="addDebtButton" data-perm="debts.manage" hidden>+ New debt</button>
+                </div>
+            </div>
+
+            <div class="filters debt-filters">
+                <div class="field-search">
+                    <label for="debtSearch" class="visually-hidden">Search debts</label>
+                    <input type="search" id="debtSearch" placeholder="Search a name, phone or D-0001" autocomplete="off" maxlength="60">
+                </div>
+            </div>
+
+            <p class="count" id="debtCount" aria-live="polite"></p>
+            <div class="list" id="debtList"></div>
         </section>
 
         <!-- AVAILABILITY -->
@@ -405,6 +442,7 @@
                             <option value="requests">Requests</option>
                             <option value="stock">Stock</option>
                             <option value="budget">Budget</option>
+                            <option value="debts">Debts</option>
                             <option value="bookings">Bookings</option>
                             <option value="events">Events</option>
                             <option value="rooms">Rooms</option>
@@ -440,8 +478,8 @@
             </div>
 
             <ul class="role-guide" aria-label="What each role can do">
-                <li><strong>Owner</strong> Records purchases, sets budgets, approves count differences, sees money reports and the audit log, changes rooms and prices.</li>
-                <li><strong>Manager</strong> Checks purchases into the store, issues supplies, counts stock, handles staff requests and bookings, adds staff.</li>
+                <li><strong>Owner</strong> Records purchases, sets budgets, approves count differences, sees money reports and the audit log, changes rooms and prices, forgives debts.</li>
+                <li><strong>Manager</strong> Checks purchases into the store, issues supplies, counts stock, handles staff requests and bookings, records debts and payments, adds staff.</li>
                 <li><strong>Staff</strong> Asks for supplies for their department and confirms receiving them. Can't change stock numbers.</li>
             </ul>
 

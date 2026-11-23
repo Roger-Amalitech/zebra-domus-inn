@@ -25,6 +25,7 @@
          /api/admin/requests           staff ask for supplies; the manager issues them (requestRoutes.js)
          /api/admin/audit              who did what (owner), see auditRoutes.js
          /api/admin/events             house parties and swimming competitions (adminEventRoutes.js)
+         /api/admin/debts              customers who owe money, and their payments (debtRoutes.js)
 
    What each role may do is checked on every request (utils/permissions.js).
    Every change is written to the audit log (utils/audit.js).
@@ -43,6 +44,7 @@ const purchaseRoutes = require("./purchaseRoutes");
 const requestRoutes = require("./requestRoutes");
 const auditRoutes = require("./auditRoutes");
 const adminEventRoutes = require("./adminEventRoutes");
+const debtRoutes = require("./debtRoutes");
 const { audit } = require("../utils/audit");
 const {
   login,
@@ -95,6 +97,7 @@ router.use("/purchases", purchaseRoutes);
 router.use("/requests", requestRoutes);
 router.use("/audit", requirePermission("audit.view"), auditRoutes);
 router.use("/events", adminEventRoutes);
+router.use("/debts", debtRoutes);
 
 const seeBookings = requirePermission("bookings.view");
 const changeBookings = requirePermission("bookings.manage");

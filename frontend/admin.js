@@ -12,12 +12,13 @@
 
     var API = window.ZD_API || "/api";
     var TOKEN_KEY = "zdAdminToken";
-    var VIEWS = ["today", "bookings", "events", "availability", "stock", "rooms", "users", "account"];
+    var VIEWS = ["today", "bookings", "events", "debts", "availability", "stock", "rooms", "users", "account"];
     // what each section needs ("" = everyone, "a|b" = either)
     var VIEW_NEEDS = {
         today: "bookings.view",
         bookings: "bookings.view",
         events: "bookings.view",
+        debts: "debts.view",
         availability: "bookings.view",
         stock: "stock.view|requests.make",
         rooms: "rooms.manage",
@@ -1064,7 +1065,7 @@
         return view;
     }
 
-    var TITLES = { today: "Today", bookings: "Bookings", events: "Events", availability: "Availability", stock: "Stock", rooms: "Rooms", users: "Users", account: "My account" };
+    var TITLES = { today: "Today", bookings: "Bookings", events: "Events", debts: "Debts", availability: "Availability", stock: "Stock", rooms: "Rooms", users: "Users", account: "My account" };
 
     function show(view, first) {
         var changed = view !== current || first;
@@ -1103,6 +1104,7 @@
         today: loadToday,
         bookings: loadBookings,
         events: loadEvents,
+        debts: loadDebts,
         availability: loadAvailability,
         rooms: loadRooms,
         stock: loadStock,
@@ -1309,6 +1311,15 @@
                 actions.appendChild(button("Mark as paid", "btn-ghost", function () {
                     change({ paymentStatus: "paid" }, "Marked as paid.");
                 }));
+                if (can("debts.manage")) {
+                    actions.appendChild(button("Add to debts", "btn-ghost", function () {
+                        openDebtForm({ from: {
+                            kind: "room", id: booking._id, ref: booking.bookingReference,
+                            name: booking.guestName, phone: booking.guestPhone, amount: booking.totalPrice,
+                            description: (booking.roomName || "Room") + ", " + stayDay(booking.checkIn) + " → " + stayDay(booking.checkOut)
+                        } });
+                    }));
+                }
             }
 
             actions.appendChild(button("Cancel booking", "btn-ghost btn-danger", askToCancel));
@@ -1669,6 +1680,15 @@
                     actions.appendChild(button("Mark as paid", "btn-ghost", function () {
                         send("paid", { paid: true }, event.ref + " marked as paid.");
                     }));
+                    if (can("debts.manage")) {
+                        actions.appendChild(button("Add to debts", "btn-ghost", function () {
+                            openDebtForm({ from: {
+                                kind: "event", id: event._id, ref: event.ref,
+                                name: event.name, phone: event.phone, amount: event.price,
+                                description: event.typeName + ", " + eventDay(event.day)
+                            } });
+                        }));
+                    }
                 }
                 actions.appendChild(button("Cancel event", "btn-ghost btn-danger", function () { askReason("cancel"); }));
             }
@@ -3092,6 +3112,420 @@
     function clock(date) {
         return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Kigali" });
     }
+
+    /* ---------- Debts: customers who owe the inn money ----------
+       Totals at the top (still owed, late, paid back this month), then the debts:
+       still owed (late ones first), late, paid, or forgiven / cancelled.
+       The owner and the manager record debts and payments; only the owner forgives
+       what is left or cancels a debt recorded by mistake. */
+
+    var debts = { show: "open", q: "", request: 0, list: [] };
+
+    var DEBT_KINDS = [
+        { value: "room", label: "Room booking" },
+        { value: "event", label: "Event" },
+        { value: "restaurant", label: "Restaurant or bar" },
+        { value: "other", label: "Other" }
+    ];
+    var DEBT_KIND_NAMES = { room: "Room booking", event: "Event", restaurant: "Restaurant or bar", other: "Other" };
+    var PAY_METHODS = [
+        { value: "cash", label: "Cash" },
+        { value: "momo", label: "MTN MoMo" },
+        { value: "airtel", label: "Airtel Money" },
+        { value: "card", label: "Card" },
+        { value: "bank", label: "Bank" }
+    ];
+    var PAY_METHOD_NAMES = { cash: "Cash", momo: "MTN MoMo", airtel: "Airtel Money", card: "Card", bank: "Bank" };
+    var DEBT_BADGE = {
+        open: { text: "Still owed", className: "badge" },
+        late: { text: "Late", className: "badge badge-late" },
+        paid: { text: "Paid", className: "badge badge-solid" },
+        forgiven: { text: "Forgiven", className: "badge badge-muted" },
+        cancelled: { text: "Cancelled", className: "badge badge-muted" }
+    };
+
+    function debtDay(text) { return formatDay(text, { day: "numeric", month: "short", year: "numeric" }); }
+
+    function daysBetween(from, to) {
+        return Math.round((new Date(to + "T00:00:00Z") - new Date(from + "T00:00:00Z")) / 86400000);
+    }
+
+    // a whole number of RWF from what was typed ("50,000" is fine); NaN if not
+    function rwfTyped(value) {
+        var clean = String(value || "").replace(/[\s,]/g, "").replace(/^rwf/i, "");
+        return /^\d+$/.test(clean) ? Number(clean) : NaN;
+    }
+
+    function moneyInput(id, value) {
+        return el("div", { className: "input-with-unit" }, [
+            el("input", { id: id, type: "text", inputmode: "numeric", autocomplete: "off", value: value ? String(value) : "" }),
+            el("span", { className: "input-unit", text: "RWF" })
+        ]);
+    }
+
+    function debtStats(summary) {
+        var box = $("debtStats");
+        box.textContent = "";
+        box.appendChild(moneyStat(summary.owed, "Still owed",
+            summary.openCount ? plural(summary.customers, "customer", "customers") + " · " + plural(summary.openCount, "debt", "debts") : "Nobody owes the inn money"));
+        var late = moneyStat(summary.overdueOwed, "Late",
+            summary.overdueCount ? plural(summary.overdueCount, "debt", "debts") + " past the day they promised" : "Nothing late");
+        if (summary.overdueCount) late.classList.add("is-alert");
+        box.appendChild(late);
+        box.appendChild(moneyStat(summary.paidThisMonth, "Paid back this month", plural(summary.paymentsThisMonth, "payment", "payments")));
+    }
+
+    function debtCard(debt, today) {
+        var open = debt.status === "open";
+        var whatsapp = debt.phone ? whatsappNumber(debt.phone) : "";
+        var shown = open && debt.overdue ? "late" : debt.status;
+        var paidShare = debt.amount ? Math.min(1, (debt.paid + debt.forgiven) / debt.amount) : 0;
+
+        var when = "Since " + debtDay(debt.day);
+        if (debt.dueDay) {
+            when += " · pay by " + debtDay(debt.dueDay);
+            if (debt.overdue) when += " (" + plural(daysBetween(debt.dueDay, today), "day", "days") + " late)";
+        }
+
+        var forWhat = DEBT_KIND_NAMES[debt.kind] + (debt.linkedRef ? " " + debt.linkedRef : "") + (debt.description ? ": " + debt.description : "");
+
+        var bar = el("div", { className: "debt-bar", "aria-hidden": "true" }, [el("span")]);
+        bar.firstChild.style.width = Math.round(paidShare * 100) + "%";
+
+        var details = [
+            el("p", { className: "debt-amount" }, open
+                ? [el("strong", { text: formatRwf(debt.left) }), document.createTextNode(" left of " + formatRwf(debt.amount))]
+                : [el("strong", { text: formatRwf(debt.amount) }), document.createTextNode(
+                    debt.status === "paid" ? " paid in full" :
+                    debt.status === "forgiven" ? " · paid " + formatRwf(debt.paid) + ", forgave " + formatRwf(debt.forgiven) :
+                    " · cancelled")]),
+            debt.status !== "cancelled" ? bar : null,
+            el("p", { className: "booking-room", text: forWhat }),
+            el("p", { className: "booking-dates", text: when }),
+            el("p", { className: "booking-ref", text: debt.ref + " · recorded by " + (debt.createdByName || "someone") }),
+            debt.note ? el("p", { className: "booking-meta", text: "Note: " + debt.note }) : null,
+            debt.reason ? el("p", { className: "booking-meta", text: (debt.status === "forgiven" ? "Forgiven" : "Cancelled") + " by " + debt.closedByName + ": " + debt.reason }) : null
+        ];
+
+        if (debt.payments.length) {
+            details.push(el("div", { className: "debt-payments" }, [
+                el("p", { className: "debt-payments-title", text: plural(debt.payments.length, "payment", "payments") + ", " + formatRwf(debt.paid) }),
+                el("ul", {}, debt.payments.slice().reverse().map(function (p) {
+                    return el("li", {}, [
+                        el("span", { className: "debt-pay-day", text: debtDay(p.day) }),
+                        el("strong", { text: formatRwf(p.amount) }),
+                        el("span", { text: PAY_METHOD_NAMES[p.method] + (p.receivedByName ? " · received by " + p.receivedByName : "") + (p.note ? " · " + p.note : "") })
+                    ]);
+                }))
+            ]));
+        }
+
+        var main = el("div", { className: "booking-main" }, [
+            el("div", { className: "booking-top" }, [
+                el("h2", { className: "booking-name", text: debt.customerName }),
+                el("div", { className: "badges" }, [badge(DEBT_BADGE, shown)])
+            ]),
+            el("div", { className: "booking-details" }, details)
+        ]);
+
+        var contact = debt.phone ? el("div", { className: "booking-contact" }, [
+            el("a", { className: "contact-link", href: telHref(debt.phone), "aria-label": "Call " + debt.customerName }, [icon("phone"), el("span", { text: debt.phone })]),
+            whatsapp ? el("a", {
+                className: "contact-link",
+                href: "https://wa.me/" + whatsapp,
+                target: "_blank",
+                rel: "noopener noreferrer",
+                "aria-label": "WhatsApp " + debt.customerName
+            }, [icon("whatsapp"), el("span", { text: "WhatsApp" })]) : null
+        ]) : null;
+
+        var actions = el("div", { className: "booking-actions" });
+        if (open && can("debts.manage")) {
+            actions.appendChild(button("Record payment", "btn-primary", function () { openDebtPayment(debt); }));
+            actions.appendChild(button("Change", "btn-ghost", function () { openDebtForm({ debt: debt }); }));
+        }
+        if (open && can("debts.forgive")) {
+            if (debt.paid > 0) actions.appendChild(button("Forgive the rest", "btn-ghost", function () { openDebtClose(debt, "forgive"); }));
+            else actions.appendChild(button("Cancel debt", "btn-ghost btn-danger", function () { openDebtClose(debt, "cancel"); }));
+        }
+
+        return el("article", { className: "booking debt" + (open ? "" : " is-closed") + (debt.overdue ? " is-late" : ""), "data-id": debt._id }, [main, contact, actions]);
+    }
+
+    async function loadDebts(quiet) {
+        var request = ++debts.request;
+        var list = $("debtList");
+        if (!quiet) {
+            $("debtCount").textContent = "";
+            placeholder(list, "Loading debts…");
+        }
+
+        var data = await api("GET", "/admin/debts?show=" + debts.show + (debts.q ? "&q=" + encodeURIComponent(debts.q) : ""));
+        if (request !== debts.request) return; // a newer list is on its way
+
+        debts.list = data.debts;
+        debtStats(data.summary);
+
+        var n = data.debts.length;
+        var left = data.debts.reduce(function (sum, d) { return sum + d.left; }, 0);
+        $("debtCount").textContent = {
+            open: plural(n, "debt", "debts") + " still owed" + (n ? ", " + formatRwf(left) + " in all" : ""),
+            overdue: plural(n, "late debt", "late debts") + (n ? ", " + formatRwf(left) + ": call them" : ""),
+            paid: plural(n, "debt", "debts") + " paid in full",
+            closed: plural(n, "debt", "debts") + " forgiven or cancelled"
+        }[debts.show] + (debts.q ? " for “" + debts.q + "”" : "");
+
+        list.textContent = "";
+        if (!n) {
+            list.appendChild(el("p", {
+                className: "empty",
+                text: debts.q ? "Nothing found." : {
+                    open: "Nobody owes the inn money.",
+                    overdue: "No late debts.",
+                    paid: "No debts paid in full yet.",
+                    closed: "No debts forgiven or cancelled."
+                }[debts.show]
+            }));
+            return;
+        }
+        data.debts.forEach(function (debt) { list.appendChild(debtCard(debt, data.today)); });
+    }
+
+    document.querySelectorAll("#debtShow [data-show]").forEach(function (b) {
+        b.addEventListener("click", function () {
+            debts.show = b.getAttribute("data-show");
+            document.querySelectorAll("#debtShow [data-show]").forEach(function (other) {
+                other.setAttribute("aria-pressed", String(other === b));
+            });
+            load("debts", false);
+        });
+    });
+
+    var debtTimer = null;
+    $("debtSearch").addEventListener("input", function () {
+        var box = this;
+        clearTimeout(debtTimer);
+        debtTimer = setTimeout(function () {
+            debts.q = box.value.trim();
+            load("debts", false);
+        }, 350);
+    });
+
+    $("addDebtButton").addEventListener("click", function () { openDebtForm({}); });
+
+    async function afterDebtChange(message) {
+        toast(message);
+        if (current === "debts") await load("debts", true);
+        else if (current === "bookings" || current === "events" || current === "today") await load(current, true);
+    }
+
+    /* A new debt (options.from: a booking or event to fill it in from), or changing one (options.debt) */
+    function openDebtForm(options) {
+        var editing = options.debt || null;
+        var from = options.from || null;
+        var today = kigaliToday();
+
+        var name = el("input", { id: "debtName", type: "text", maxlength: "80", autocomplete: "off", "data-autofocus": "true" });
+        var phone = el("input", { id: "debtPhone", type: "tel", maxlength: "30", autocomplete: "off", placeholder: "078X XXX XXX" });
+        var amountBox = moneyInput("debtAmount", "");
+        var amount = amountBox.querySelector("input");
+        var description = el("input", { id: "debtFor", type: "text", maxlength: "200", autocomplete: "off", placeholder: "For example: 2 nights, Deluxe Room; drinks at the bar" });
+        var day = el("input", { id: "debtDay", type: "date", max: today, value: today });
+        var due = el("input", { id: "debtDue", type: "date" });
+        var noteBox = el("input", { id: "debtNote", type: "text", maxlength: "300", autocomplete: "off", placeholder: "For example: works at the district office" });
+        var kind = choiceChips("What is it for?", DEBT_KINDS, editing ? editing.kind : from ? from.kind : "restaurant");
+
+        if (editing) {
+            name.value = editing.customerName;
+            phone.value = editing.phone;
+            amount.value = String(editing.amount);
+            description.value = editing.description;
+            due.value = editing.dueDay;
+            noteBox.value = editing.note;
+        } else if (from) {
+            name.value = from.name || "";
+            phone.value = from.phone || "";
+            amount.value = from.amount ? String(from.amount) : "";
+            description.value = from.description || "";
+        }
+
+        var fields = [
+            el("div", { className: "sheet-pair" }, [
+                sheetField("debtName", "Customer's name", [name]),
+                sheetField("debtPhone", "Their phone number (optional)", [phone])
+            ])
+        ];
+        if (from) fields.push(el("p", { className: "sheet-note", text: "For " + (from.kind === "event" ? "event " : "booking ") + from.ref + ". When it is paid in full, the " + (from.kind === "event" ? "event" : "booking") + " is marked paid too." }));
+        else if (!editing) fields.push(kind.node);
+        fields.push(sheetField("debtFor", "What for (optional)", [description]));
+        fields.push(el("div", { className: "sheet-pair" }, [
+            sheetField("debtAmount", editing ? "Amount owed in total" : "How much they owe", [amountBox],
+                editing && editing.paid ? "They have paid " + formatRwf(editing.paid) + " so far." : null),
+            editing ? sheetField("debtDue", "They will pay by (optional)", [due]) : sheetField("debtDay", "Since", [day])
+        ]));
+        if (!editing) fields.push(sheetField("debtDue", "They will pay by (optional)", [due], "The day they promised. After it, the debt shows as late."));
+        fields.push(sheetField("debtNote", "Note (optional)", [noteBox]));
+
+        openSheet({
+            kicker: editing ? editing.ref : from ? "Add to debts" : "New debt",
+            title: editing ? "Change " + editing.customerName + "'s debt" : "Someone owes the inn money",
+            sub: editing ? null : "Record what they owe now; record each payment when it comes.",
+            wide: true,
+            fields: fields,
+            submitText: editing ? "Save changes" : "Save debt",
+            onSubmit: async function (ctx) {
+                if (name.value.trim().length < 2) return ctx.problem("Write the customer's name.", name);
+                if (phone.value.trim() && (phone.value.match(/\d/g) || []).length < 9) return ctx.problem("Check the phone number (at least 9 digits), or leave it empty.", phone);
+                var owed = rwfTyped(amount.value);
+                if (!(owed >= 1)) return ctx.problem("Write how much they owe, in RWF (a whole number).", amount);
+                if (editing && owed <= editing.paid + editing.forgiven) return ctx.problem("They have already paid " + formatRwf(editing.paid) + ". The amount must be more than that.", amount);
+                var startDay = editing ? editing.day : day.value;
+                if (!editing && (!day.value || day.value > today)) return ctx.problem("Choose when the debt started (today or before).", day);
+                if (due.value && due.value < startDay) return ctx.problem("The day they will pay can't be before the debt started.", due);
+
+                var body = {
+                    customerName: name.value.trim(),
+                    phone: phone.value.trim(),
+                    description: description.value.trim(),
+                    amount: owed,
+                    dueDay: due.value || "",
+                    note: noteBox.value.trim()
+                };
+                if (editing) {
+                    await api("PATCH", "/admin/debts/" + editing._id, body);
+                    await afterDebtChange(editing.ref + " saved.");
+                    return;
+                }
+                body.day = day.value;
+                body.kind = from ? from.kind : kind.value() || "other";
+                if (from && from.kind === "event") body.eventId = from.id;
+                if (from && from.kind === "room") body.bookingId = from.id;
+                var data = await api("POST", "/admin/debts", body);
+                await afterDebtChange(data.debt.ref + " saved: " + data.debt.customerName + " owes " + formatRwf(data.debt.amount) + ".");
+            }
+        });
+    }
+
+    function openDebtPayment(debt) {
+        var today = kigaliToday();
+        var amountBox = moneyInput("payAmount", debt.left);
+        var amount = amountBox.querySelector("input");
+        amount.setAttribute("data-autofocus", "true");
+        var method = choiceChips("How did they pay?", PAY_METHODS, "cash");
+        var day = el("input", { id: "payDay", type: "date", min: debt.day, max: today, value: today });
+        var noteBox = el("input", { id: "payNote", type: "text", maxlength: "200", autocomplete: "off", placeholder: "For example: MoMo reference" });
+
+        openSheet({
+            kicker: debt.ref + " · " + debt.customerName,
+            title: "Record a payment",
+            sub: formatRwf(debt.left) + " left of " + formatRwf(debt.amount) + ". They can pay part of it now and the rest later.",
+            fields: [
+                el("div", { className: "sheet-pair" }, [
+                    sheetField("payAmount", "How much they paid", [amountBox]),
+                    sheetField("payDay", "Day", [day])
+                ]),
+                method.node,
+                sheetField("payNote", "Note (optional)", [noteBox])
+            ],
+            submitText: "Save payment",
+            onSubmit: async function (ctx) {
+                var paying = rwfTyped(amount.value);
+                if (!(paying >= 1)) return ctx.problem("Write how much they paid, in RWF (a whole number).", amount);
+                if (paying > debt.left) return ctx.problem("They only owe " + formatRwf(debt.left) + ". Write " + formatRwf(debt.left) + " or less.", amount);
+                if (!method.value()) return ctx.problem("Choose how they paid.", { focus: method.focus });
+                if (!day.value || day.value > today || day.value < debt.day) return ctx.problem("Choose the day they paid (between " + debtDay(debt.day) + " and today).", day);
+                var data = await api("POST", "/admin/debts/" + debt._id + "/payments", { amount: paying, method: method.value(), day: day.value, note: noteBox.value.trim() });
+                await afterDebtChange(data.fullyPaid
+                    ? debt.customerName + " has paid everything. " + debt.ref + " is closed."
+                    : formatRwf(paying) + " saved. " + formatRwf(data.debt.left) + " still to pay.");
+            }
+        });
+    }
+
+    function openDebtClose(debt, how) {
+        var reason = el("input", { id: "debtReason", type: "text", maxlength: "200", autocomplete: "off", "data-autofocus": "true",
+            placeholder: how === "forgive" ? "For example: regular guest, agreed discount" : "For example: recorded twice" });
+        openSheet({
+            kicker: debt.ref + " · " + debt.customerName,
+            title: how === "forgive" ? "Forgive " + formatRwf(debt.left) + "?" : "Cancel this debt?",
+            sub: how === "forgive"
+                ? "They paid " + formatRwf(debt.paid) + ". The " + formatRwf(debt.left) + " left will no longer be owed. This can't be undone."
+                : "Only for a debt recorded by mistake. It stays in the list as cancelled.",
+            fields: [sheetField("debtReason", how === "forgive" ? "Why is it forgiven?" : "Why cancel it?", [reason])],
+            submitText: how === "forgive" ? "Forgive the rest" : "Cancel debt",
+            onSubmit: async function (ctx) {
+                if (reason.value.trim().length < 3) return ctx.problem("Write a short reason.", reason);
+                await api("POST", "/admin/debts/" + debt._id + "/" + (how === "forgive" ? "forgive" : "cancel"), { reason: reason.value.trim() });
+                await afterDebtChange(how === "forgive" ? debt.ref + ": the rest is forgiven." : debt.ref + " cancelled.");
+            }
+        });
+    }
+
+    /* Excel: every debt (whatever the filter) and every payment */
+    $("debtDownload").addEventListener("click", async function () {
+        var buttonNode = this;
+        buttonNode.disabled = true;
+        try {
+            var data = await api("GET", "/admin/debts?show=all");
+            var X = window.ZDXlsx;
+            var H = function (t) { return { v: t, s: "head" }; };
+            var M = function (n) { return { v: Math.round(n || 0), s: "money" }; };
+            var D = function (day) { return day ? { v: X.excelDay(day), s: "date" } : ""; };
+            var STATUS = { open: "Still owed", paid: "Paid", forgiven: "Forgiven", cancelled: "Cancelled" };
+            var today = data.today;
+
+            var rows = [
+                [{ v: "Zebra Domus Inn · Debts", s: "title" }],
+                [{ v: "Made on " + debtDay(today) + ". Still owed: " + formatRwf(data.summary.owed) + " by " + plural(data.summary.customers, "customer", "customers") + ".", s: "subtitle" }],
+                [],
+                [H("Reference"), H("Customer"), H("Phone"), H("For"), H("Since"), H("Pay by"), H("Owed"), H("Paid"), H("Forgiven"), H("Left"), H("Status"), H("Recorded by")]
+            ];
+            var first = rows.length + 1;
+            data.debts.forEach(function (d) {
+                var r = rows.length + 1;
+                var forWhat = DEBT_KIND_NAMES[d.kind] + (d.linkedRef ? " " + d.linkedRef : "") + (d.description ? ": " + d.description : "");
+                rows.push([d.ref, d.customerName, d.phone, forWhat, D(d.day), D(d.dueDay),
+                    M(d.status === "cancelled" ? 0 : d.amount), M(d.paid), M(d.forgiven),
+                    { v: d.status === "cancelled" ? 0 : d.left, s: "money", f: d.status === "cancelled" ? "0" : "G" + r + "-H" + r + "-I" + r },
+                    STATUS[d.status] + (d.overdue ? " (late)" : ""), d.createdByName]);
+            });
+            var last = rows.length;
+            if (data.debts.length) {
+                rows.push([{ v: "Total", s: "total" }, "", "", "", "", ""].concat(["G", "H", "I", "J"].map(function (c) {
+                    var sum = data.debts.reduce(function (t, d) {
+                        var v = { G: d.status === "cancelled" ? 0 : d.amount, H: d.paid, I: d.forgiven, J: d.status === "cancelled" ? 0 : d.left }[c];
+                        return t + v;
+                    }, 0);
+                    return { v: sum, s: "moneyTotal", f: "SUM(" + c + first + ":" + c + last + ")" };
+                })));
+            } else {
+                rows.push([{ v: "No debts recorded yet.", s: "note" }]);
+            }
+
+            var pays = [[{ v: "Payments received on debts", s: "title" }], [], [H("Day"), H("Reference"), H("Customer"), H("Amount"), H("How"), H("Received by"), H("Note")]];
+            var pFirst = pays.length + 1;
+            data.debts.forEach(function (d) {
+                d.payments.forEach(function (p) {
+                    pays.push([D(p.day), d.ref, d.customerName, M(p.amount), PAY_METHOD_NAMES[p.method], p.receivedByName, p.note]);
+                });
+            });
+            var pLast = pays.length;
+            if (pLast >= pFirst) {
+                pays.push([{ v: "Total", s: "total" }, "", "", { v: data.debts.reduce(function (t, d) { return t + d.paid; }, 0), s: "moneyTotal", f: "SUM(D" + pFirst + ":D" + pLast + ")" }]);
+            } else {
+                pays.push([{ v: "No payments yet.", s: "note" }]);
+            }
+
+            X.download("zebra-domus-debts-" + today + ".xlsx", [
+                { name: "Debts", cols: [11, 24, 16, 36, 12, 12, 14, 14, 14, 14, 16, 18], rows: rows, footer: "Zebra Domus Inn · Debts" },
+                { name: "Payments", cols: [12, 11, 24, 14, 14, 18, 30], rows: pays, footer: "Zebra Domus Inn · Debt payments" }
+            ]);
+        } catch (error) {
+            showLoadError(error);
+        } finally {
+            buttonNode.disabled = false;
+        }
+    });
 
     /* ---------- Units ---------- */
 
@@ -5876,7 +6310,8 @@
         stock: "Stock",
         purchases: "Purchases",
         requests: "Requests",
-        budget: "Budget"
+        budget: "Budget",
+        debts: "Debts"
     };
 
     stock.auditPeriod = "month";
