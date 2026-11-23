@@ -3744,3 +3744,20 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     height: 1px;
     overflow: hidden;
 }
+
+/* ===== Phones: only the headline on the photo, sitting just above the date card =====
+   The short description under it is hidden on phones (it is still shown from tablets up),
+   the photo is a little shorter, and the headline sits low in it instead of in the middle,
+   so there is no big empty gap above "Check-in – Check-out". */
+@media (max-width: 767px) {
+    :root { --hero-fade: 64px; } /* the soft bottom edge mostly hides under the card */
+    .hero-image { height: clamp(380px, 54svh, 470px); }
+    .has-overlay-header .hero-image { height: calc(clamp(380px, 54svh, 470px) + var(--header-height)); }
+    .hero-text {
+        justify-content: flex-end;
+        padding-bottom: 76px; /* 40px under the card + about 36px of space */
+    }
+    .hero-text .lead { display: none; }
+    /* it now sits over the white gate, so a slightly deeper shadow keeps it readable */
+    .hero-text h1 { text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 2px 24px rgba(0, 0, 0, 0.5); }
+}
