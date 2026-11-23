@@ -1,4 +1,4 @@
-/* Zebra Dormus Inn: the events on the home page (#events).
+/* Zebra Domus Inn: the events on the home page (#events).
    The house party and the swimming competition are shown like the rooms:
    white cards with a photo, the name, the price and when the next day is free.
    On a phone they slide sideways; with a mouse the card grows a little.

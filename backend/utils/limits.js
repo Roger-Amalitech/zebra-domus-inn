@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Simple limits on how often something may happen, kept in the server's memory.
 
      const perHour = makeLimit(5, 60 * 60 * 1000);

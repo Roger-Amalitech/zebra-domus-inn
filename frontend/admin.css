@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Staff dashboard (admin.html)
    Black and white, like the website.
 ========================================= */
@@ -3293,7 +3293,7 @@ html.sheet-open body {
         margin: 14mm 12mm 16mm;
 
         @bottom-left {
-            content: "Zebra Dormus Inn · Stock report";
+            content: "Zebra Domus Inn · Stock report";
             color: #555555;
             font-family: Arial, sans-serif;
             font-size: 8pt;

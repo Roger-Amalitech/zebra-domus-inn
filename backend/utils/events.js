@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Events guests can book: house parties and swimming competitions.
 
    - Each kind of event has one fixed price, set by the owner in the

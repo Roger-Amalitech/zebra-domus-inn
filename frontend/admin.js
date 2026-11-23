@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Staff dashboard: sign in, today, bookings, events,
    availability grid, stock, rooms and users.
    Each person sees only what their role may do:
@@ -406,7 +406,7 @@
         $("signinForm").hidden = false;
         $("password").value = "";
         $("signinMessage").textContent = message || "";
-        document.title = "Staff sign-in | Zebra Dormus Inn";
+        document.title = "Staff sign-in | Zebra Domus Inn";
         try {
             ($("email").value ? $("password") : $("email")).focus();
         } catch (error) {
@@ -553,7 +553,7 @@
 
     function brandBadge() {
         return el("span", { className: "brand-badge" }, [
-            el("img", { src: "images/logo/zebra-domus-logo-white.png", alt: "Zebra Dormus Inn", width: "90", height: "38" })
+            el("img", { src: "images/logo/zebra-domus-logo-white.png", alt: "Zebra Domus Inn", width: "90", height: "38" })
         ]);
     }
 
@@ -639,7 +639,7 @@
                 ])
             ]),
             el("li", {}, [
-                el("strong", { text: "Type the 6-digit code the app shows for Zebra Dormus Inn." }),
+                el("strong", { text: "Type the 6-digit code the app shows for Zebra Domus Inn." }),
                 el("span", { text: "The code changes every 30 seconds." }),
                 form
             ])
@@ -649,7 +649,7 @@
             qrBox.textContent = "";
             qrBox.appendChild(qrPicture(data.link));
             key.textContent = data.secret.replace(/(.{4})/g, "$1 ").trim();
-            account.textContent = "Zebra Dormus Inn (" + data.account + ")";
+            account.textContent = "Zebra Domus Inn (" + data.account + ")";
             go.disabled = false;
         }).catch(function (error) {
             qrBox.textContent = "";
@@ -688,7 +688,7 @@
         var copied = el("p", { className: "form-message", role: "status" });
 
         var fileText = [
-            "Zebra Dormus Inn: backup codes for two-step sign-in",
+            "Zebra Domus Inn: backup codes for two-step sign-in",
             "Account: " + (options.email || ""),
             "Made on: " + new Date().toLocaleString("en-GB", { timeZone: "Africa/Kigali" }),
             "",
@@ -721,7 +721,7 @@
         save.addEventListener("click", function () {
             var link = el("a", {
                 href: URL.createObjectURL(new Blob([fileText], { type: "text/plain;charset=utf-8" })),
-                download: "zebra-dormus-backup-codes.txt"
+                download: "zebra-domus-backup-codes.txt"
             });
             document.body.appendChild(link);
             link.click();
@@ -771,7 +771,7 @@
     }
 
     function showCodeStep(ticket) {
-        var card = stepCard("Two-step sign-in", "Open the authenticator app on your phone and type the 6-digit code for Zebra Dormus Inn.");
+        var card = stepCard("Two-step sign-in", "Open the authenticator app on your phone and type the 6-digit code for Zebra Domus Inn.");
         var backup = false;
         var label = el("label", { for: "signinCode", text: "6-digit code" });
         var input = codeInput("signinCode");
@@ -1087,7 +1087,7 @@
         if (view === "account") $("accountButton").setAttribute("aria-current", "page");
         else $("accountButton").removeAttribute("aria-current");
 
-        document.title = TITLES[view] + " | Admin | Zebra Dormus Inn";
+        document.title = TITLES[view] + " | Admin | Zebra Domus Inn";
 
         if (changed) window.scrollTo(0, 0);
 
@@ -5452,10 +5452,10 @@
         copy.className = "pr-body";
 
         var head = el("header", { className: "pr-head" }, [
-            el("div", { className: "pr-logo" }, [el("img", { src: "images/logo/zebra-domus-logo-white.png", alt: "Zebra Dormus Inn" })]),
+            el("div", { className: "pr-logo" }, [el("img", { src: "images/logo/zebra-domus-logo-white.png", alt: "Zebra Domus Inn" })]),
             el("div", { className: "pr-title" }, [
                 el("h1", { text: "Stock report" }),
-                el("p", { text: "Zebra Dormus Inn · Huye, Rwanda" })
+                el("p", { text: "Zebra Domus Inn · Huye, Rwanda" })
             ]),
             el("dl", { className: "pr-meta" }, [
                 el("dt", { text: "Period" }), el("dd", { text: rangeText(data.from, data.to) + " (" + plural(data.days, "day", "days") + ")" }),
@@ -5594,7 +5594,7 @@
     function excelSheets(data) {
         var X = window.ZDXlsx;
         var prices = can("stock.prices");
-        var footer = "Zebra Dormus Inn · Stock report · " + rangeText(data.from, data.to);
+        var footer = "Zebra Domus Inn · Stock report · " + rangeText(data.from, data.to);
         var H = function (text) { return { v: text, s: "head" }; };
         var M = function (value) { return { v: Math.round(Number(value || 0)), s: "money" }; };
         var D = function (day) { return { v: X.excelDay(day), s: "date" }; };
@@ -5607,7 +5607,7 @@
 
         /* Summary */
         var s = [
-            [{ v: "Zebra Dormus Inn · Stock report", s: "title" }],
+            [{ v: "Zebra Domus Inn · Stock report", s: "title" }],
             [{ v: "Huye, Rwanda", s: "note" }],
             [],
             [{ v: "Period", s: "bold" }, rangeText(data.from, data.to) + " (" + plural(data.days, "day", "days") + ")"],
@@ -5679,7 +5679,7 @@
             s.push(["Items running low today", { v: (data.reorder || []).length }]);
         }
         sheets.push({ name: "Summary", cols: [52, 22, 18, 12], rows: s, footer: footer });
-        if (prices && stock.months) sheets.push(monthSheet(stock.months, "Zebra Dormus Inn · Stock report · Month by month"));
+        if (prices && stock.months) sheets.push(monthSheet(stock.months, "Zebra Domus Inn · Stock report · Month by month"));
 
         /* Items */
         var itemHead = ["Category", "Item", "Counted in", "At start", "Received", "Used", "Expired / damaged", "Count differences", "Remaining", "Warn at"];
@@ -5833,7 +5833,7 @@
     $("reportDownload").addEventListener("click", function () {
         var data = stock.report;
         if (!data || !window.ZDXlsx) return;
-        window.ZDXlsx.download("zebra-dormus-stock-report-" + data.from + "-to-" + data.to + ".xlsx", excelSheets(data));
+        window.ZDXlsx.download("zebra-domus-stock-report-" + data.from + "-to-" + data.to + ".xlsx", excelSheets(data));
     });
 
     /* A file Excel opens: comma separated, with the BOM so letters like é show correctly. */
@@ -5939,7 +5939,7 @@
         var lines = [["When", "Who", "Role", "Area", "What"]].concat(stock.auditEntries.map(function (entry) {
             return [bookedAt(entry.createdAt), entry.userName, ROLE_NAMES[entry.role] || entry.role, AUDIT_AREA_NAMES[entry.area] || entry.area, entry.action];
         }));
-        downloadCsv(lines, "zebra-dormus-audit-" + kigaliToday() + ".csv");
+        downloadCsv(lines, "zebra-domus-audit-" + kigaliToday() + ".csv");
     });
 
     /* ----- Loading the Stock section ----- */

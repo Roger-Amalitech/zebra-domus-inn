@@ -1,4 +1,4 @@
-/* Zebra Dormus Inn: "The Zebra Dormus experience" on the home page (#about).
+/* Zebra Domus Inn: "The Zebra Domus experience" on the home page (#about).
    The card opens a full-screen view with the same look as a room's:
    photos of the inn to swipe through, what guests can enjoy, good-to-know notes,
    and "Book your stay" at the bottom with the lowest room price.
@@ -10,7 +10,7 @@
 
     /* The photos in the view, in order, with the caption key from translations.js */
     var PHOTOS = [
-        { src: "images/main-house.jpg", caption: "capMainHouse", alt: "The main house of Zebra Dormus Inn and its garden" },
+        { src: "images/main-house.jpg", caption: "capMainHouse", alt: "The main house of Zebra Domus Inn and its garden" },
         { src: "images/pool.jpg", caption: "capPool", alt: "The outdoor pool" },
         { src: "images/pool-second.jpg", caption: "capPool2", alt: "Second swimming pool beside the inn" },
         { src: "images/lounge.jpg", caption: "capLounge", alt: "Bright lounge with cream sofas" },
@@ -385,7 +385,7 @@
         els.next.setAttribute("aria-label", t.next);
         els.track.setAttribute("aria-label", t.gallery);
 
-        els.eyebrow.textContent = pageWord("experience", "The Zebra Dormus experience");
+        els.eyebrow.textContent = pageWord("experience", "The Zebra Domus experience");
         els.title.textContent = pageWord("aboutTitle", "More than a stay. A place to feel at home.");
         els.placeText.textContent = t.place;
         els.description.textContent = pageWord("aboutDescription", "");

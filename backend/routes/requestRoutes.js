@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Supply requests, mounted at /api/admin/requests
 
    GET   /                staff: their own requests; manager/owner: everyone's

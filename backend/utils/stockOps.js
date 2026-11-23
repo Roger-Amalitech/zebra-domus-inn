@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Shared stock helpers: numbers, references and safe quantity changes.
 ========================================= */
 

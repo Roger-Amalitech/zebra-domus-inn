@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Audit log (owner only), mounted at /api/admin/audit
 
    GET /   ?area=stock|purchases|requests|budget|bookings|events|rooms|users|sign-in

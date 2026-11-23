@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Staff sign-in with email and password.
 
    The owner's sign-in comes from backend/.env:

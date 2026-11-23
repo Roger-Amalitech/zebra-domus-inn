@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Room availability: how many rooms of each type
    are free for a stay, counted night by night.
 ========================================= */

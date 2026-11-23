@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Home page: each room card says whether the room is booked
    tonight, or for the dates picked in "Check-in / Check-out".
    Asks the booking server (GET /api/availability), counts only.

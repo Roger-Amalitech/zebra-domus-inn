@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Stock (store room), mounted at /api/admin/stock
 
    GET   /items                  items with in stock / used / remaining     (stock.view)

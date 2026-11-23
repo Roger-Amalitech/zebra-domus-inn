@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Event requests from the website, mounted at /api/events
 
    GET   /     the events with their prices, and the days already taken

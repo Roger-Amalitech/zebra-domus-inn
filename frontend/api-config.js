@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Where the booking server (the backend) is.
 
    Leave BOOKING_SERVER empty while the website is opened from the
@@ -8,7 +8,7 @@
 
    If the backend is ever hosted at its own, different address, put
    that address here, for example:
-   var BOOKING_SERVER = "https://zebra-dormus-api.onrender.com";
+   var BOOKING_SERVER = "https://zebra-domus-api.onrender.com";
 ========================================= */
 
 (function () {

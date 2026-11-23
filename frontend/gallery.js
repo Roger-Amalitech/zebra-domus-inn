@@ -1,4 +1,4 @@
-/* Zebra Dormus Inn: the photo grid.
+/* Zebra Domus Inn: the photo grid.
    The photos sit in a collage (index.html, #photoGrid): one big photo and smaller ones
    around it. The last photo in the collage is shaded with "+8 photos" on it: the photos
    that are only in the full-screen view. Tapping any photo opens it full screen:

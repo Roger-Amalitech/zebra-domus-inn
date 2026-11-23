@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    User accounts, mounted at /api/admin/staff (owner and managers)
 
    GET    /            everyone who can sign in

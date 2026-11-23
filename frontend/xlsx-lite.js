@@ -1,4 +1,4 @@
-/* Zebra Dormus Inn: a small Excel (.xlsx) file writer for the dashboard's reports.
+/* Zebra Domus Inn: a small Excel (.xlsx) file writer for the dashboard's reports.
    No outside library: an .xlsx file is a zip of a few XML files, written here directly.
 
    ZDXlsx.download("report.xlsx", [

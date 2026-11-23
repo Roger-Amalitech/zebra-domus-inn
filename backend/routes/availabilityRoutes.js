@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    GET /api/availability?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD
    Tells the booking page how many rooms of each type are free.
    Shows counts only, never who booked.

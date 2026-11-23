@@ -1,4 +1,4 @@
-/* Zebra Dormus Inn: the header is see-through over the top photo,
+/* Zebra Domus Inn: the header is see-through over the top photo,
    and turns solid white as soon as the guest scrolls or opens the menu. */
 (function () {
     var SOLID_AFTER = 40; // pixels scrolled before the header turns white

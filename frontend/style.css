@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Black-and-white version of the Huye motel mobile design:
    Inter (Marriott-style) · black, white and greys ·
    imigongo border in the footer. Photos stay in colour.
@@ -3623,7 +3623,7 @@ html.is-leaving .footer { opacity: 0; transition-duration: 0.14s; }
     .pay-accepted { margin-top: 24px; }
 }
 
-/* ===== The Zebra Dormus experience (see experience.js) =====
+/* ===== The Zebra Domus experience (see experience.js) =====
    The card in #about opens a view like a room's: photos to swipe through,
    what guests can enjoy, good-to-know notes and "Book your stay". */
 .about-photo {

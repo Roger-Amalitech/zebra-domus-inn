@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Event bookings in the dashboard, mounted at /api/admin/events
 
    GET    /                 ?show=waiting|upcoming|past   events, prices, counts   (bookings.view)

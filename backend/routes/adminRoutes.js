@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Admin API (everything except /login needs the admin token)
 
    POST  /api/admin/login              { email, password } -> { token, user },

@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Monthly budgets per stock category, and what was spent.
    Spending = purchases the owner recorded that month (not cancelled).
 ========================================= */

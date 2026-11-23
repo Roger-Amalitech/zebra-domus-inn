@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Purchases, mounted at /api/admin/purchases
 
    GET   /                 latest purchases, waiting ones first        (purchases.view)

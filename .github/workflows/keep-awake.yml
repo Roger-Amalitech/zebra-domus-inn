@@ -1,4 +1,4 @@
-# Zebra Dormus Inn: keep the free Render server awake.
+# Zebra Domus Inn: keep the free Render server awake.
 #
 # Render's free plan puts the server to sleep after 15 minutes without
 # visitors, and the next guest then waits about a minute. This job visits

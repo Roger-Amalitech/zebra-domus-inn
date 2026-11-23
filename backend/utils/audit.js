@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    The audit log: one line for every change, with who made it.
    Writing it never stops the change itself from working.
 ========================================= */

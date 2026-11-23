@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Two-step sign-in: the 6-digit codes of authenticator apps
    (Google Authenticator, Microsoft Authenticator...), the standard
    "time-based one-time password" (RFC 6238): a new code every 30 seconds,
@@ -14,7 +14,7 @@ const crypto = require("crypto");
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; // base32, what the apps read
 const STEP_SECONDS = 30;
 const DIGITS = 6;
-const ISSUER = "Zebra Dormus Inn";
+const ISSUER = "Zebra Domus Inn";
 
 function toBase32(buffer) {
   let bits = 0;
@@ -82,7 +82,7 @@ function checkCode(secret, typed, lastUsedStep = 0) {
   return 0;
 }
 
-/* What the QR code holds: the apps read it and add "Zebra Dormus Inn (email)". */
+/* What the QR code holds: the apps read it and add "Zebra Domus Inn (email)". */
 function setupLink(secret, account) {
   const label = encodeURIComponent(`${ISSUER}:${account}`);
   return `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(ISSUER)}&algorithm=SHA1&digits=${DIGITS}&period=${STEP_SECONDS}`;

@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    The units stock is counted in.
    Weight and volume can have decimals (2.5 kg); counted things
    are whole numbers (you can't issue 2.5 bottles).

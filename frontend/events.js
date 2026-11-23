@@ -1,4 +1,4 @@
-/* Zebra Dormus Inn: the event page (events.html).
+/* Zebra Domus Inn: the event page (events.html).
    Guests ask for a house party or a swimming competition:
    - the events are shown as cards with their price (set by the owner in the dashboard)
    - the day is checked against the days that already have an event (one per day)
@@ -14,7 +14,7 @@
 
     var TEXT = {
         en: {
-            back: "Back to the inn", backHome: "Back to Zebra Dormus",
+            back: "Back to the inn", backHome: "Back to Zebra Domus",
             title: "Book an event",
             intro: "A house party in the garden or a swimming competition at the pool. One event per day: send your request and the inn calls you to confirm.",
             whichEvent: "Which event?", loading: "Loading…",
@@ -54,7 +54,7 @@
             }
         },
         rw: {
-            back: "Subira ku icumbi", backHome: "Subira kuri Zebra Dormus",
+            back: "Subira ku icumbi", backHome: "Subira kuri Zebra Domus",
             title: "Bika ibirori cyangwa irushanwa",
             intro: "Ibirori mu busitani cyangwa irushanwa ryo koga muri pisine. Igikorwa kimwe ku munsi: ohereza ubusabe bwawe, icumbi rizaguhamagara rikwemerere.",
             whichEvent: "Ni ikihe gikorwa?", loading: "Birimo gushakishwa…",
@@ -94,7 +94,7 @@
             }
         },
         fr: {
-            back: "Retour à l'auberge", backHome: "Retour à Zebra Dormus",
+            back: "Retour à l'auberge", backHome: "Retour à Zebra Domus",
             title: "Réserver un événement",
             intro: "Une fête privée dans le jardin ou une compétition de natation à la piscine. Un seul événement par jour : envoyez votre demande, l'auberge vous appelle pour confirmer.",
             whichEvent: "Quel événement ?", loading: "Chargement…",
@@ -516,7 +516,7 @@
             var key = node.getAttribute("data-ev-placeholder");
             if (typeof t[key] === "string") node.placeholder = t[key];
         });
-        document.title = t.title + " | Zebra Dormus Inn";
+        document.title = t.title + " | Zebra Domus Inn";
         if (!state.sending) byId("eventSubmit").querySelector(".button-label").textContent = t.send;
         if (state.types.length) renderOptions();
         renderDayStatus();

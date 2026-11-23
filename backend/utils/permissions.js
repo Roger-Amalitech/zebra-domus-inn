@@ -1,5 +1,5 @@
 /* =========================================
-   ZEBRA DORMUS INN
+   ZEBRA DOMUS INN
    Roles for the admin dashboard
 
    owner    purchases, budgets, approvals, money reports, audit log,

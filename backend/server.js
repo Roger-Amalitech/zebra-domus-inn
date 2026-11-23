@@ -50,6 +50,8 @@ app.use((req, res, next) => {
 // share one address, so this is only for the inn's own domain and, on a
 // computer (not on Render), for a preview tool such as VS Code Live Server.
 const ALLOWED_ORIGINS = [
+  "https://zebradomusinn.com",
+  "https://www.zebradomusinn.com",
   "https://zebradormusinn.com",
   "https://www.zebradormusinn.com",
 ];
@@ -75,7 +77,7 @@ app.use("/api/admin", adminRoutes);
 
 app.get("/api", (req, res) => {
   res.json({
-    message: "Welcome to Zebra Dormus Inn API",
+    message: "Welcome to Zebra Domus Inn API",
   });
 });
 
@@ -121,7 +123,7 @@ const startServer = async () => {
         console.error(`Failed to start server: port ${PORT} could not be opened (${error.code || error.message}).`);
         process.exit(1);
       }
-      console.log(`Zebra Dormus Inn server running on port ${PORT}`);
+      console.log(`Zebra Domus Inn server running on port ${PORT}`);
       console.log(`Website:   http://localhost:${PORT}`);
       console.log(`Admin:     http://localhost:${PORT}/admin.html`);
     });
