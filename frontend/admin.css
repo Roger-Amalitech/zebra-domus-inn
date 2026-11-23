@@ -1385,8 +1385,10 @@ a {
     margin-top: 0;
 }
 
+/* a column: the buttons sit at the bottom, so cards side by side line up */
 .stock-card {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 6px;
     padding: 16px;
     border: 1px solid var(--line);
@@ -1494,7 +1496,12 @@ a {
 }
 
 .stock-card .booking-actions {
-    margin-top: 6px;
+    margin-top: auto;
+}
+
+/* at least 12px between the card's last line and the buttons, as before */
+.stock-card > :nth-last-child(2) {
+    margin-bottom: 6px;
 }
 
 .stock-unused,
@@ -1754,9 +1761,10 @@ a {
         grid-template-columns: minmax(220px, 1fr) 220px auto;
     }
 
+    /* two cards in a row are the same height */
     #stockList {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        align-items: start;
+        align-items: stretch;
     }
 
     #stockList > .empty,
@@ -2773,6 +2781,7 @@ html.sheet-open body {
 
 /* expired or damaged, on the stock cards and in the changes list */
 .stock-lost {
+    align-self: flex-start;
     justify-self: start;
     padding: 5px 10px;
     border: 1px solid var(--line-strong);
